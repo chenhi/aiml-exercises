@@ -2,23 +2,23 @@ import tensorflow as tf
 
 print("TensorFlow version: ", tf.__version__)
 
-####################################################################
+#####################################################################
 
-#class GreyscaleToColor(tf.keras.layers.Layer):
-#    trainable = False
+# Toggle these as desired
 
+trainDigits = True
+trainFashion = False
 
-
+trainDense = True
+trainConvolution = True
 
 #####################################################################
 
-# MNIST data set for digits and fashion
+# Get MNIST data sets for digits and fashion
 mnist = tf.keras.datasets.mnist
 mnistf = tf.keras.datasets.fashion_mnist
 
 (x_train, y_train), (x_test, y_test) = mnist.load_data()
-
-
 (x_trainf, y_trainf), (x_testf, y_testf) = mnistf.load_data()
 
 
@@ -36,18 +36,30 @@ print("Output shape", y_trainf[0].shape)
 x_train, x_test = x_train/255.0, x_test/255.0
 x_trainf, x_testf = x_trainf/255.0, x_testf/255.0
 
-# Digits models
+
+# Some standard stuff
+def getVarScale():              # Call a function to generate a different seed each time
+    return tf.keras.initializers.VarianceScaling(scale=0.001, mode='fan_in', distribution='normal')
+#loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)              # Use without softmax
+loss_fn = tf.keras.losses.SparseCategoricalCrossentropy()                               # Use with softmax
+
+
+
+# Define digits models
 digitsModels = []
 
 model = tf.keras.models.Sequential(name="digits.dense128")
 model.add(tf.keras.Input(shape=(28,28)))
 model.add(tf.keras.layers.Flatten(input_shape=(28,28)))
-model.add(tf.keras.layers.Dense(128, activation='relu'))
-model.add(tf.keras.layers.Dense(128, activation='relu'))
+model.add(tf.keras.layers.Dense(128, activation='relu', kernel_initializer=getVarScale()))
+model.add(tf.keras.layers.BatchNormalization())
+model.add(tf.keras.layers.Dense(128, activation='relu', kernel_initializer=getVarScale()))
+model.add(tf.keras.layers.BatchNormalization())
 model.add(tf.keras.layers.Dropout(0.2))
-model.add(tf.keras.layers.Dense(10))
+model.add(tf.keras.layers.Dense(10, activation='softmax', kernel_initializer=getVarScale()))
 
-digitsModels.append(model)
+if trainDigits and trainDense:
+    digitsModels.append(model)
 
 model = tf.keras.models.Sequential(name="digits.conv32x64")
 model.add(tf.keras.Input(shape=(28,28)))
@@ -58,14 +70,22 @@ model.add(tf.keras.layers.MaxPooling2D((2, 2)))
 model.add(tf.keras.layers.Conv2D(64, (3, 3), activation='relu'))
 model.add(tf.keras.layers.MaxPooling2D((2, 2)))
 model.add(tf.keras.layers.Flatten())
-model.add(tf.keras.layers.Dense(128, activation='relu'))
+model.add(tf.keras.layers.Dense(128, activation='relu', kernel_initializer=getVarScale()))
+model.add(tf.keras.layers.BatchNormalization())
 model.add(tf.keras.layers.Dropout(0.5))
-model.add(tf.keras.layers.Dense(10))
+model.add(tf.keras.layers.Dense(10, activation='softmax', kernel_initializer=getVarScale()))
 
-digitsModels.append(model)
+if trainDigits and trainConvolution:
+    digitsModels.append(model)
 
-# Fashion model
+
+
+# Define fashion models
+# NOTE: haven't updated these
+
+
 fashionModels = []
+
 
 model = tf.keras.models.Sequential(name="fashion.dense128")
 model.add(tf.keras.Input(shape=(28,28)))
@@ -75,7 +95,8 @@ model.add(tf.keras.layers.Dense(128, activation='relu'))
 model.add(tf.keras.layers.Dropout(0.2))
 model.add(tf.keras.layers.Dense(10))
 
-fashionModels.append(model)
+if trainFashion and trainDense:
+    fashionModels.append(model)
 
 
 model = tf.keras.models.Sequential(name="fashion.conv32x64")
@@ -91,21 +112,8 @@ model.add(tf.keras.layers.Dense(128, activation='relu'))
 model.add(tf.keras.layers.Dropout(0.5))
 model.add(tf.keras.layers.Dense(10))
 
-fashionModels.append(model)
-
-
-# Run the digits model on a the first entry just to mess around
-#print("The first entry is", x_train[:1])
-#print("The first entry is a", y_train[:1])
-#badpredict = model(x_train[:1]).numpy()
-#print("Before training, it is predicted to be", badpredict)
-#print("Probability that the first entry is a given digit", tf.nn.softmax(badpredict).numpy())
-
-#loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)			# The logit function is the inverse to the logistic function
-loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
-
-#print("Loss", loss_fn(y_train[:1], badpredict).numpy())
-#print("-log(1/10) =", -1.0 * tf.math.log(1/10).numpy())
+if trainFashion and trainConvolution:
+    fashionModels.append(model)
 
 
 # Now actually train the models
@@ -125,7 +133,8 @@ for x in fashionModels:
 
 # Add a layer converting the predictions to probabilities, then save the models
 for x in digitsModels + fashionModels:
-    probmodel = tf.keras.models.Sequential()
-    probmodel.add(x)                            # Inherits the weights already chosen from the previous model
-    probmodel.add(tf.keras.layers.Softmax())
-    probmodel.save(x.name + ".keras")
+    #probmodel = tf.keras.models.Sequential()
+    #probmodel.add(x)                            # Inherits the weights already chosen from the previous model
+    #probmodel.add(tf.keras.layers.Softmax())
+    #probmodel.save(x.name + ".keras")
+    x.save(x.name + ".keras")
