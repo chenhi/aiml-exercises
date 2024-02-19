@@ -1,0 +1,161 @@
+<html>
+    <script type="text/javascript">
+    var canvas, ctx, flag = false,
+        prevX = 0,
+        currX = 0,
+        prevY = 0,
+        currY = 0,
+        dot_flag = false;
+
+    var brushColor = "black",
+        brushWidth = 10;
+    
+    function init() {
+        canvas = document.getElementById('can');
+        ctx = canvas.getContext("2d");
+        w = canvas.width;
+        h = canvas.height;
+    
+        canvas.addEventListener("mousemove", function (e) {
+            findxy('move', e)
+        }, false);
+        canvas.addEventListener("mousedown", function (e) {
+            findxy('down', e)
+        }, false);
+        canvas.addEventListener("mouseup", function (e) {
+            findxy('up', e)
+        }, false);
+        canvas.addEventListener("mouseout", function (e) {
+            findxy('out', e)
+        }, false);
+
+        const oldImageArray = new Uint8ClampedArray([ {{ image }} ]);
+        oldImage = new ImageData(oldImageArray, 28, 28);
+
+        var oldcanvas = document.getElementById('oldcan');
+        var oldctx = oldcanvas.getContext("2d");
+        oldctx.putImageData(oldImage, 0, 0);
+        oldctx.canvas.hidden = false;
+        //oldctx.setAttribute("hidden", "false");
+        //document.getElementById("oldcanvasimg").style.border = "2px solid";
+        //document.getElementById("oldcanvasimg").src = oldImage;
+        //document.getElementById("oldcanvasimg").style.display = "inline";
+    }
+
+    
+    function draw() {
+        ctx.beginPath();
+        ctx.moveTo(prevX, prevY);
+        ctx.lineTo(currX, currY);
+        ctx.strokeStyle = brushColor;
+        ctx.lineWidth = brushWidth;
+        ctx.stroke();
+        ctx.closePath();
+    }
+    
+    function erase() {
+        var m = confirm("Want to clear");
+        if (m) {
+            ctx.clearRect(0, 0, w, h);
+            document.getElementById("canvasimg").style.display = "none";
+        }
+    }
+    
+    function detect(type) {
+        var userImage = ctx.getImageData(0,0,420,420).data
+        var userPixels = "";
+
+        for (let i = 0; i < userImage.length; i += 4) {
+            if (userImage[i + 3] !=  0) {
+                userPixels = userPixels + "1";
+            } else {
+                userPixels = userPixels + "0";
+            }
+        }
+
+
+        const form = document.createElement('form');
+        form.method = 'post';
+        form.action = window.location.href;
+
+        const pixelField = document.createElement('input');
+        pixelField.type = 'hidden';
+        pixelField.name = "pixels";
+        pixelField.value = userPixels;
+        
+        const typeField = document.createElement('input');
+        typeField.type = 'hidden';
+        typeField.name = 'type';
+        typeField.value = type;
+
+        form.appendChild(pixelField);
+        form.appendChild(typeField);
+
+        document.body.appendChild(form);
+        form.submit();
+    }
+    
+    function findxy(res, e) {
+        if (res == 'down') {
+            prevX = currX;
+            prevY = currY;
+            currX = e.clientX - canvas.offsetLeft;
+            currY = e.clientY - canvas.offsetTop;
+    
+            flag = true;
+            dot_flag = true;
+            if (dot_flag) {
+                ctx.beginPath();
+                ctx.fillStyle = brushColor;
+                ctx.fillRect(currX, currY, 2, 2);
+                ctx.closePath();
+                dot_flag = false;
+            }
+        }
+        if (res == 'up' || res == "out") {
+            flag = false;
+        }
+        if (res == 'move') {
+            if (flag) {
+                prevX = currX;
+                prevY = currY;
+                currX = e.clientX - canvas.offsetLeft;
+                currY = e.clientY - canvas.offsetTop;
+                draw();
+            }
+        }
+    }
+    </script>
+    <body onload="init()">
+<div style="position:absolute; top: 5%; left: 50%; float: right"> {{ notice }} 
+    
+    <canvas id="oldcan" width="28" height="28" style="border:2px solid;" hidden="true"></canvas>
+      
+
+
+</div>
+        <div style="position:absolute; top: 10%; left: 50%; float: right">
+        
+        {% for result in results %}
+
+        The model {{ result['name'] }} thinks you have drawn a  {{ result['str'] }}  with certainty {{ result['prob'] }}%<br><br>
+        
+        Probabilities:<br>
+        {% for key, entry in result['probs'].items() %}
+            {{key}}: {{entry}}%<br>
+
+        
+        {% endfor %}
+
+        <br><br><hr>
+
+        {% endfor %}
+        
+        </div>
+        <canvas id="can" width="420" height="420" style="position:absolute;top:10%;left:10%;border:2px solid;"></canvas>
+        <img id="canvasimg" style="position:absolute;top:10%;left:52%;" style="display:none;">
+        <input type="button" value="detect digit" id="btn" size="30" onclick="detect('digit')" style="position:absolute;top:70%;left:10%;">
+        <input type="button" value="detect clothes" id="btn" size="30" onclick="detect('fashion')" style="position:absolute;top:70%;left:20%;">
+        <input type="button" value="clear" id="clr" size="23" onclick="erase()" style="position:absolute;top:70%;left:30%;">
+    </body>
+    </html>
