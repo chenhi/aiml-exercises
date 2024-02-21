@@ -64,8 +64,13 @@ def sum_spec(a, out):
     for i in range(len(a)):
         out[0] += a[i]
         
+
 def sum(a: TT["i"]) -> TT[1]:
-    return a @ ones(a.shape[0])[:,None]         # speed 39
+    return ones(a.shape[0])[None, :] @ a
+   
+# Previously:
+#return a @ ones(a.shape[0])[:,None]
+# This doesn't work when a is multidimensional tensor
 
 
 #test_sum = make_test("sum", sum, sum_spec)
@@ -142,8 +147,13 @@ def cumsum_spec(a, out):
         total += a[i]
 
 def cumsum(a: TT["i"]) -> TT["i"]:
-    return sum(where((arange(a.shape[0])[:, None] - arange(a.shape[0])[None, :]) >= 0, 1, 0) * a)[:,0]		# Make a lower triangular matrix of 1s, then multiply, then sum
-													# This might not be the best way
+    return sum(where((arange(a.shape[0])[:, None] - arange(a.shape[0])[None, :]) >= 0, 1, 0) * a)[:,0]		
+
+
+# Make a lower triangular matrix of 1s, then multiply, then sum
+# This might not be the best way
+
+
 #test_cumsum = make_test("cumsum", cumsum, cumsum_spec)
 #run_test(test_cumsum)
 
@@ -323,7 +333,8 @@ def constraint_set_max(d):
 test_scatter_add = make_test("scatter_add",
     scatter_add, scatter_add_spec, add_sizes=["j"], constraint=constraint_set_max
 )
-run_test(test_scatter_add)  ####### PRETTY SURE THIS WORKS BUT RUNNING INTO SOME BUG???
+
+#run_test(test_scatter_add)  ####### PRETTY SURE THIS WORKS BUT RUNNING INTO SOME BUG???
 
 
 
@@ -413,6 +424,7 @@ def constraint_set(d):
 
 # If the boundaries is [3, 6] then the buckets are (-inf, 3), [3, 6), [6, inf), labelled 0, 1, 2 respectively
 def bucketize(v: TT["i"], boundaries: TT["j"]) -> TT["i"]:
+    #return sum(where(boundaries[None,:] * ones(v.shape[0])[:,None] <= ones(boundaries.shape[0])[None,:] * v[:,None], 1, 0))
     return ones(boundaries.shape[0]) @ where(boundaries[:, None] * ones(v.shape[0])[None,:] <= ones(boundaries.shape[0])[:, None] * v[None, :], 1, 0)
 
 

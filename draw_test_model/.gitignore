@@ -1,3 +1,4 @@
 *.keras
 venv/
 __pycache__/
+.gcloudignore

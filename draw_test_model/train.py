@@ -1,140 +1,131 @@
 import tensorflow as tf
 
+import matplotlib.pyplot as plt
+import numpy as np
+
 print("TensorFlow version: ", tf.__version__)
 
 #####################################################################
+# WHAT TO TRAIN
 
-# Toggle these as desired
-
-trainDigits = True
-trainFashion = False
-
-trainDense = True
-trainConvolution = True
+# Format: the dataset, the model, the number of epochs, save model/results
+whatToTrain = [   
+#    ("digits", "dense2", 9, True),
+    ("digits", "conv2", 5, True),
+#    ("fashion", "dense2", 9, True),
+#    ("fashion", "conv2", 5, True),
+    ]
 
 #####################################################################
-
-# Get MNIST data sets for digits and fashion
-mnist = tf.keras.datasets.mnist
-mnistf = tf.keras.datasets.fashion_mnist
-
-(x_train, y_train), (x_test, y_test) = mnist.load_data()
-(x_trainf, y_trainf), (x_testf, y_testf) = mnistf.load_data()
-
-
-print("MNIST training data", len(x_train), "entries")
-print("MNIST test data", len(x_test), "entries")
-print("Input shape", x_train[0].shape)
-print("Output shape", y_train[0].shape)
-
-print("MNIST Fashion training data", len(x_trainf), "entries")
-print("MNIST Fashion test data", len(x_testf), "entries")
-print("Input shape", x_trainf[0].shape)
-print("Output shape", y_trainf[0].shape)
-
-
-x_train, x_test = x_train/255.0, x_test/255.0
-x_trainf, x_testf = x_trainf/255.0, x_testf/255.0
-
+# SOME UNIFORM OPTIONS
 
 # Some standard stuff
 def getVarScale():              # Call a function to generate a different seed each time
     return tf.keras.initializers.VarianceScaling(scale=0.001, mode='fan_in', distribution='normal')
+
 #loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)              # Use without softmax
 loss_fn = tf.keras.losses.SparseCategoricalCrossentropy()                               # Use with softmax
 
+#####################################################################
+
+# Storage
+models = []
+history = []
+results = []
 
 
-# Define digits models
-digitsModels = []
-
-model = tf.keras.models.Sequential(name="digits.dense128")
-model.add(tf.keras.Input(shape=(28,28)))
-model.add(tf.keras.layers.Flatten(input_shape=(28,28)))
-model.add(tf.keras.layers.Dense(128, activation='relu', kernel_initializer=getVarScale()))
-model.add(tf.keras.layers.BatchNormalization())
-model.add(tf.keras.layers.Dense(128, activation='relu', kernel_initializer=getVarScale()))
-model.add(tf.keras.layers.BatchNormalization())
-model.add(tf.keras.layers.Dropout(0.2))
-model.add(tf.keras.layers.Dense(10, activation='softmax', kernel_initializer=getVarScale()))
-
-if trainDigits and trainDense:
-    digitsModels.append(model)
-
-model = tf.keras.models.Sequential(name="digits.conv32x64")
-model.add(tf.keras.Input(shape=(28,28)))
-#model.add(tf.keras.layers.Lambda(lambda x: x[...,None] * tf.ones(tf.concat([tf.shape(x), [3]], axis=0),dtype=x.dtype)))       # Tensors up with a vector of 3 1's
-model.add(tf.keras.layers.Lambda(lambda x: x[...,None]))
-model.add(tf.keras.layers.Conv2D(32, (3,3), activation='relu', input_shape=(28,28)))
-model.add(tf.keras.layers.MaxPooling2D((2, 2)))
-model.add(tf.keras.layers.Conv2D(64, (3, 3), activation='relu'))
-model.add(tf.keras.layers.MaxPooling2D((2, 2)))
-model.add(tf.keras.layers.Flatten())
-model.add(tf.keras.layers.Dense(128, activation='relu', kernel_initializer=getVarScale()))
-model.add(tf.keras.layers.BatchNormalization())
-model.add(tf.keras.layers.Dropout(0.5))
-model.add(tf.keras.layers.Dense(10, activation='softmax', kernel_initializer=getVarScale()))
-
-if trainDigits and trainConvolution:
-    digitsModels.append(model)
-
-
-
-# Define fashion models
-# NOTE: haven't updated these
-
-
-fashionModels = []
-
-
-model = tf.keras.models.Sequential(name="fashion.dense128")
-model.add(tf.keras.Input(shape=(28,28)))
-model.add(tf.keras.layers.Flatten(input_shape=(28,28)))
-model.add(tf.keras.layers.Dense(128, activation='relu'))
-model.add(tf.keras.layers.Dense(128, activation='relu'))
-model.add(tf.keras.layers.Dropout(0.2))
-model.add(tf.keras.layers.Dense(10))
-
-if trainFashion and trainDense:
-    fashionModels.append(model)
+# Define the models specified
+for d in whatToTrain:
+    name = d[0] + "." + d[1]
+    if d[1] == "dense2":
+        model = tf.keras.models.Sequential(name=name)
+        model.add(tf.keras.Input(shape=(28,28)))
+        model.add(tf.keras.layers.Rescaling(1./255))
+        model.add(tf.keras.layers.Flatten(input_shape=(28,28)))
+        model.add(tf.keras.layers.Dense(256, activation='relu', kernel_initializer=getVarScale()))
+        model.add(tf.keras.layers.BatchNormalization())
+        model.add(tf.keras.layers.Dense(256, activation='relu', kernel_initializer=getVarScale()))
+        model.add(tf.keras.layers.BatchNormalization())
+        model.add(tf.keras.layers.Dropout(0.5))
+        model.add(tf.keras.layers.Dense(10, activation='softmax', kernel_initializer=getVarScale()))
+        models.append(model)
+    elif d[1] == "conv2":
+        model = tf.keras.models.Sequential(name=name)
+        model.add(tf.keras.Input(shape=(28,28)))
+        model.add(tf.keras.layers.Rescaling(1./255))
+        #model.add(tf.keras.layers.RandomRotation((-.1, .1), fill_mode="constant", fill_value=0))
+        #model.add(tf.keras.layers.RandomZoom((0., 0.5), fill_mode="constant", fill_value=0))
+        #model.add(tf.keras.layers.RandomTranslation(0.1, 0.1, fill_mode="constant", fill_value=0))
+        #model.add(tf.keras.layers.Lambda(lambda x: x[...,None] * tf.ones(tf.concat([tf.shape(x), [3]], axis=0),dtype=x.dtype)))        # Tensors up to add RGB channel
+        #model.add(tf.keras.layers.Lambda(lambda x: x[...,None]))                                                                       # Actually it was enough to just add a 1 dimensional channel
+        model.add(tf.keras.layers.Reshape((28, 28, 1)))                                                                                 # This is the simpler way to do it
+        model.add(tf.keras.layers.Conv2D(32, (3,3), activation='relu', kernel_initializer=getVarScale()))
+        model.add(tf.keras.layers.MaxPooling2D((2, 2)))
+        model.add(tf.keras.layers.BatchNormalization())
+        model.add(tf.keras.layers.Conv2D(64, (3,3), activation='relu', kernel_initializer=getVarScale()))
+        model.add(tf.keras.layers.MaxPooling2D((2, 2)))
+        model.add(tf.keras.layers.BatchNormalization())
+        model.add(tf.keras.layers.Flatten())
+        model.add(tf.keras.layers.Dense(128, activation='relu', kernel_initializer=getVarScale()))
+        model.add(tf.keras.layers.BatchNormalization())
+        model.add(tf.keras.layers.Dropout(0.5))
+        model.add(tf.keras.layers.Dense(10, activation='softmax', kernel_initializer=getVarScale()))
+        models.append(model)
+    else:
+        print("Model", d[1], "not found, exiting.")
+        exit()
 
 
-model = tf.keras.models.Sequential(name="fashion.conv32x64")
-model.add(tf.keras.Input(shape=(28,28)))
-#model.add(tf.keras.layers.Lambda(lambda x: x[...,None] * tf.ones(tf.concat([tf.shape(x), [3]], axis=0),dtype=x.dtype)))       # Tensors up with a vector of 3 1's
-model.add(tf.keras.layers.Lambda(lambda x: x[...,None]))
-model.add(tf.keras.layers.Conv2D(32, (3,3), activation='relu', input_shape=(28,28)))
-model.add(tf.keras.layers.MaxPooling2D((2, 2)))
-model.add(tf.keras.layers.Conv2D(64, (3, 3), activation='relu'))
-model.add(tf.keras.layers.MaxPooling2D((2, 2)))
-model.add(tf.keras.layers.Flatten())
-model.add(tf.keras.layers.Dense(128, activation='relu'))
-model.add(tf.keras.layers.Dropout(0.5))
-model.add(tf.keras.layers.Dense(10))
 
-if trainFashion and trainConvolution:
-    fashionModels.append(model)
+# Get training and test data
+digitsTrainData, digitsTestData = tf.keras.datasets.mnist.load_data()
+fashionTrainData, fashionTestData = tf.keras.datasets.fashion_mnist.load_data()
 
+# Now actually train the models and save the results
+for i in range(0, len(whatToTrain)):
+    m = models[i]
+    epochs = whatToTrain[i][2]
+    if whatToTrain[i][0] == "digits":
+        train, test = digitsTrainData, digitsTestData
+    elif whatToTrain[i][0] == "fashion":
+        train, test = fashionTrainData, fashionTestData
+    else:
+        print("Data", whatToTrain[i][0], "not found!  Exiting.")
+        exit()
+    
+    print("Training:", m.name)
+    m.compile(optimizer='adam', loss=loss_fn, metrics=['accuracy'])
+    history.append(m.fit(x=train[0], y=train[1], validation_data=test, epochs=epochs))
+    results.append(m.evaluate(x=test[0], y=test[1], verbose=2))
+    print(results[i])
 
-# Now actually train the models
+    print(history[i].history)
 
-for x in digitsModels:
-    print("Training:", x.name)
-    x.compile(optimizer='adam', loss=loss_fn, metrics=['accuracy'])
-    x.fit(x_train, y_train, epochs=5)
-    x.evaluate(x_test, y_test, verbose=2)
+    acc = history[i].history['accuracy']
+    val_acc = history[i].history['val_accuracy']
 
-for x in fashionModels:
-    print("Training:", x.name)
-    x.compile(optimizer='adam', loss=loss_fn, metrics=['accuracy'])
-    x.fit(x_trainf, y_trainf, epochs=5)
-    x.evaluate(x_testf, y_testf, verbose=2)
+    loss = history[i].history['loss']
+    val_loss = history[i].history['val_loss']
 
+    epochs_range = range(epochs)
 
-# Add a layer converting the predictions to probabilities, then save the models
-for x in digitsModels + fashionModels:
-    #probmodel = tf.keras.models.Sequential()
-    #probmodel.add(x)                            # Inherits the weights already chosen from the previous model
-    #probmodel.add(tf.keras.layers.Softmax())
-    #probmodel.save(x.name + ".keras")
-    x.save(x.name + ".keras")
+    plt.figure(figsize=(8, 8))
+    plt.subplot(1, 2, 1)
+    plt.plot(epochs_range, acc, label='Training Accuracy')
+    plt.plot(epochs_range, val_acc, label='Validation Accuracy')
+    plt.legend(loc='lower right')
+    plt.title('Training and Validation Accuracy')
+
+    plt.subplot(1, 2, 2)
+    plt.plot(epochs_range, loss, label='Training Loss')
+    plt.plot(epochs_range, val_loss, label='Validation Loss')
+    plt.legend(loc='upper right')
+    plt.title('Training and Validation Loss')
+    plt.show()
+
+    if whatToTrain[i][3] == True:
+        m.save(m.name + ".keras")
+        with open(m.name + ".log") as f:
+            f.write(results[i] + "\n\n\n" + history[i].history)
+            f.close()
+
