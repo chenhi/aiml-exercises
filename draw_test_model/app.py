@@ -9,7 +9,7 @@ app = Flask(__name__)
 
 
 digitsModels = ["digits.dense2", "digits.conv2"]
-#fashionModels = ["fashion.dense2", "fashion.conv2"]
+fashionModels = ["fashion.dense2", "fashion.conv2"]
 
 @app.route('/', methods=('GET', 'POST'))
 
@@ -43,7 +43,6 @@ def index():
 			textkeys = ["0", "1", "2","3","4","5","6","7","8","9"]
 			names = digitsModels
 		elif request.form['type'] == "fashion":
-			return("Temporarily disabled.")					# DISABLED!!!
 			for s in fashionModels:
 				models.append(tf.keras.models.load_model(s + '.keras'))
 			textkeys = ["T-shirt", "trousers", "pullover", "dress", "coat", "sandal", "shirt", "sneaker", "bag", "boot"]
