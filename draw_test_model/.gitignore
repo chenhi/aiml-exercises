@@ -1,3 +1,6 @@
 venv/
 __pycache__/
 .gcloudignore
+*.keras
+*.log
+*.log.png

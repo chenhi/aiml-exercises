@@ -11,7 +11,7 @@ print("TensorFlow version: ", tf.__version__)
 # Format: the dataset, the model, the number of epochs, save model/results
 whatToTrain = [   
 #    ("digits", "dense2", 9, True),
-    ("digits", "conv2", 5, True),
+    ("digits", "conv2", 100, True),
 #    ("fashion", "dense2", 9, True),
 #    ("fashion", "conv2", 5, True),
     ]
@@ -23,8 +23,10 @@ whatToTrain = [
 def getVarScale():              # Call a function to generate a different seed each time
     return tf.keras.initializers.VarianceScaling(scale=0.001, mode='fan_in', distribution='normal')
 
-#loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)              # Use without softmax
-loss_fn = tf.keras.losses.SparseCategoricalCrossentropy()                               # Use with softmax
+                                                                                                    # Sparse means expects one-hot outputs
+#loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, name="nll")              # Use without softmax
+loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(name="nll")                                 # Use with softmax
+#loss_fn = tf.keras.losses.CategoricalHinge(name="hinge")
 
 #####################################################################
 
@@ -36,7 +38,7 @@ results = []
 
 # Define the models specified
 for d in whatToTrain:
-    name = d[0] + "." + d[1]
+    name = d[0] + "." + d[1] + "." + loss_fn.name + "." + str(d[2])
     if d[1] == "dense2":
         model = tf.keras.models.Sequential(name=name)
         model.add(tf.keras.Input(shape=(28,28)))
@@ -61,15 +63,18 @@ for d in whatToTrain:
         model.add(tf.keras.layers.Reshape((28, 28, 1)))                                                                                 # This is the simpler way to do it
         model.add(tf.keras.layers.Conv2D(32, (3,3), activation='relu', kernel_initializer=getVarScale()))
         model.add(tf.keras.layers.MaxPooling2D((2, 2)))
+        model.add(tf.keras.layers.Dropout(0.2))
         model.add(tf.keras.layers.BatchNormalization())
         model.add(tf.keras.layers.Conv2D(64, (3,3), activation='relu', kernel_initializer=getVarScale()))
         model.add(tf.keras.layers.MaxPooling2D((2, 2)))
+        model.add(tf.keras.layers.Dropout(0.2))
         model.add(tf.keras.layers.BatchNormalization())
         model.add(tf.keras.layers.Flatten())
-        model.add(tf.keras.layers.Dense(128, activation='relu', kernel_initializer=getVarScale()))
+        model.add(tf.keras.layers.Dense(128, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.001),  kernel_initializer=getVarScale()))
         model.add(tf.keras.layers.BatchNormalization())
         model.add(tf.keras.layers.Dropout(0.5))
-        model.add(tf.keras.layers.Dense(10, activation='softmax', kernel_initializer=getVarScale()))
+        #model.add(tf.keras.layers.Dense(10, activation='relu', kernel_initializer=getVarScale()))
+        model.add(tf.keras.layers.Dense(10, activation='softmax', kernel_regularizer=tf.keras.regularizers.l2(0.001), kernel_initializer=getVarScale()))
         models.append(model)
     else:
         print("Model", d[1], "not found, exiting.")
@@ -97,8 +102,8 @@ for i in range(0, len(whatToTrain)):
     m.compile(optimizer='adam', loss=loss_fn, metrics=['accuracy'])
     history.append(m.fit(x=train[0], y=train[1], validation_data=test, epochs=epochs))
     results.append(m.evaluate(x=test[0], y=test[1], verbose=2))
+    
     print(results[i])
-
     print(history[i].history)
 
     acc = history[i].history['accuracy']
@@ -125,7 +130,8 @@ for i in range(0, len(whatToTrain)):
 
     if whatToTrain[i][3] == True:
         m.save(m.name + ".keras")
-        with open(m.name + ".log") as f:
-            f.write(results[i] + "\n\n\n" + history[i].history)
+        with open(m.name + ".log", "w") as f:
+            models[i].summary(print_fn=lambda x: f.write(x + '\n'))
+            f.write("\n\n\n" + str(results[i]) + "\n\n\n" + str(history[i].history))
             f.close()
 

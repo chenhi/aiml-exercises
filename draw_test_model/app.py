@@ -8,7 +8,7 @@ app = Flask(__name__)
 
 
 
-digitsModels = ["digits.dense2", "digits.conv2"]
+digitsModels = ["digits.dense2", "digits.conv2.nll.5", "digits.conv2.nll.100"]
 fashionModels = ["fashion.dense2", "fashion.conv2"]
 
 @app.route('/', methods=('GET', 'POST'))
