@@ -4,14 +4,30 @@ import tensorflow as tf
 import numpy as np
 import random
 
+import torch
+
 app = Flask(__name__)
 
+device = (
+    "cuda"
+    if torch.cuda.is_available()
+    else "mps"
+    if torch.backends.mps.is_available()
+    else "cpu"
+)
+
+from torch import nn
 
 
-digitsModels = ["digits.dense2", "digits.conv2.nll.5", "digits.conv2.nll.100"]
-fashionModels = ["fashion.dense2", "fashion.conv2"]
+#"digits.conv2.nll.adam.10.pth",
+digitsModels = ["digits.conv2.nll.5.keras", "digits.conv2.nll.100.keras"]
+fashionModels = ["fashion.dense2.keras", "fashion.conv2.keras"]
+
+from models_pytorch import Conv2, Dense2
+
 
 @app.route('/', methods=('GET', 'POST'))
+	
 
 
 
@@ -35,27 +51,38 @@ def index():
 				imageData += "0, 0, 0, " + str(darkness) + ","
 		imageData = imageData[0:-1] 	# Get rid of the last comma
 		
-		# Load the right model and make the prediction
-		models = []
+		# What are we trying to classify?
 		if request.form['type'] == "digit":
-			for s in digitsModels:
-				models.append(tf.keras.models.load_model(s + '.keras'))
 			textkeys = ["0", "1", "2","3","4","5","6","7","8","9"]
 			names = digitsModels
 		elif request.form['type'] == "fashion":
-			for s in fashionModels:
-				models.append(tf.keras.models.load_model(s + '.keras'))
 			textkeys = ["T-shirt", "trousers", "pullover", "dress", "coat", "sandal", "shirt", "sneaker", "bag", "boot"]
 			names = fashionModels
 		else:
 			return render_template('index.html', notice="Something went wrong and you somehow requested a model we don't have.")
 		
+		# Load models
+		models = []
 		preds = []
-		for i in range(0, len(models)):
-			pred = {}
-			m = models[i]
-			pred['name'] = names[i]
-			prediction = m(tf.convert_to_tensor([pixels])).numpy()[0]
+		for s in names:
+			pred = {'name': s}
+			ext = s.split(".")[-1]
+			if ext == "keras":
+				m = tf.keras.models.load_model(s)
+				prediction = m(tf.convert_to_tensor([pixels])).numpy()[0]		# The extra bracket makes it batch size 1, and the model expects non-scaled and no channels
+			elif ext == "pth":
+				modeltype = s.split(".")[1]
+				if modeltype == "conv2":
+					m = Conv2()
+				elif modeltype == "dense2":
+					m = Dense2()
+				else:
+					return render_template('index.html', notice="PyTorch model name not recognized.")
+				m.load_state_dict(torch.load(s))
+				m.eval()					# Set to evaluation mode
+				prediction = m(torch.tensor([pixels] / 255.)).numpy()			# The extra bracket adds the channel, and the model expects a rescaled version
+			else:
+				return render_template('index.html', notice="Unrecognized file extension.")
 
 			# Find the most likely prediction and its probability
 			maxIndex = 0
@@ -84,3 +111,6 @@ def index():
 		# 		randomDigitsData.append(imageData)
 		return render_template('index.html')
 
+
+if __name__ == '__main__':
+    app.run()

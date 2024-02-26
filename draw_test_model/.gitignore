@@ -2,5 +2,7 @@ venv/
 __pycache__/
 .gcloudignore
 *.keras
+*.pth
 *.log
 *.log.png
+data/

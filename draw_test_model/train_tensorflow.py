@@ -21,7 +21,7 @@ whatToTrain = [
 
 # Some standard stuff
 def getVarScale():              # Call a function to generate a different seed each time
-    return tf.keras.initializers.VarianceScaling(scale=0.001, mode='fan_in', distribution='normal')
+    return tf.keras.initializers.VarianceScaling(scale=0.001, mode='fan_in', distribution='normal')     
 
                                                                                                     # Sparse means expects one-hot outputs
 #loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, name="nll")              # Use without softmax
