@@ -3,3 +3,4 @@ gunicorn==21.2.0
 Werkzeug==2.0.2
 tensorflow==2.15.0.post1
 numpy==1.26.3
+torch==2.1.2
