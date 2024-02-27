@@ -129,6 +129,7 @@ for i in range(0, len(whatToTrain)):
     plt.show()
 
     if whatToTrain[i][3] == True:
+        plt.savefig(name + ".keras.png")
         m.save(m.name + ".keras")
         with open(m.name + ".log", "w") as f:
             models[i].summary(print_fn=lambda x: f.write(x + '\n'))

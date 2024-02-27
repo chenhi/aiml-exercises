@@ -6,10 +6,9 @@ from torchvision import datasets
 import matplotlib.pyplot as plt
 import numpy as np
 
-from models_pytorch import Conv2, Dense2
 
 #####################################################################
-# Basic logger
+# AUXILLIARY
 
 def log(l: str) -> str:
     print(l)
@@ -17,15 +16,16 @@ def log(l: str) -> str:
 
 
 #####################################################################
-# WHAT TO TRAIN
+# TRAINING LIST AND OPTIONS
 
 # Format: the dataset, the model, the number of epochs, save model/results
-trainList = [   
-#    ("digits", "dense2", 9, True),
-    {'data': "digits", 'model': "conv2", 'opt': 'adam', 'epochs': 1, 'save': True},
-#    ("fashion", "dense2", 9, True),
-#    ("fashion", "conv2", 5, True),
+trainList = [
+#    {'data': 'digits', 'model': 'dense2', 'opt': 'adam', 'epochs': 1, 'save': True},
+    {'data': "digits", 'model': "conv2", 'opt': 'adam', 'epochs': 100, 'save': True},
+#    {'data': 'fashion', 'model': 'dense2', 'opt': 'adam', 'epochs': 5, 'save': True},
+#    {'data': "fashion", 'model': "conv2", 'opt': 'adam', 'epochs': 2, 'save': True},
     ]
+
 
 #####################################################################
 # SOME UNIFORM OPTIONS
@@ -38,7 +38,78 @@ device = (
     else "cpu"
 )
 
-# Some standard stuff
+
+#####################################################################
+# THE MODELS
+
+class Dense2(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.flatten = nn.Flatten()
+        self.reset_parameters = initWeights                 # Initialization (does this actually work????  i.e. does it apply it to the stuff below>???)
+        self.linear_relu_stack = nn.Sequential(
+            nn.Linear(28*28, 256),
+            nn.ReLU(),
+            nn.BatchNorm1d(256),
+            nn.Linear(256, 256),
+            nn.ReLU(),
+            nn.BatchNorm1d(256),
+            nn.Dropout(p=0.5),
+            nn.Linear(256, 10)
+        )
+    
+
+    def rescale(self, x):
+        return x / 255.
+    
+    def unrescale(self, x):
+        return x * 255.    
+
+    def forward(self, x):
+        x = self.flatten(x)
+        logits = self.linear_relu_stack(x)
+        return logits
+
+
+class Conv2(nn.Module):             # Input shape (1, 28, 28) or (BATCH SIZE, 1, 28, 28)
+    def __init__(self):
+        super().__init__()
+        # How to do initialization?
+        self.convolution_stack = nn.Sequential(
+            nn.Conv2d(1, 32, (3,3), padding='same'),                    # Input channel 1, output 32, filter size (3,3)
+            nn.ReLU(),
+            nn.MaxPool2d((2,2)),    # Image now 14x14
+            nn.Dropout(p=0.2),
+            nn.BatchNorm2d(32),
+            nn.Conv2d(32, 64, (3,3), padding='same'),
+            nn.ReLU(),
+            nn.MaxPool2d((2,2)),    # Image now 7x7
+            nn.Dropout(p=0.2),
+            nn.BatchNorm2d(64),
+            nn.Flatten(),           # Default start_dim=1
+            nn.Linear(7*7*64, 128),
+            nn.ReLU(),
+            nn.Dropout(p=0.5),
+            nn.BatchNorm1d(128),
+            nn.Linear(128, 10)
+        )
+
+    def rescale(self, x):
+        return x / 255.
+    
+    def unrescale(self, x):
+        return x * 255.  
+
+    def addChannels(self, x, n=1):
+        return torch.reshape(list(x.shape)[:-2] + [n] + list(x.shape)[-2:])
+    
+    def forward(self, x):
+        logits = self.convolution_stack(x)
+        return logits
+
+
+#####################################################################
+# INITIALIZER, LOSS FUNCTION, BATCH SIZE
 
 # Weight initializer
 def initWeights(m):
@@ -57,20 +128,11 @@ loss_fn, loss_fn_name = nn.CrossEntropyLoss(), "nll"                   # Inputs 
 # Batch size (i.e. how often back-propagation happens)
 batch_size = 64
 
+
 #####################################################################
+# DATA
 
-
-# Storage
-history = []
-results = []
-
-
-
-
-
-# Get training and test data
 # Note: data comes in tensor of the form (BATCH SIZE, 1, 28, 28) and is already scaled
-
 digitsTrainData = datasets.MNIST(
     root="data",
     train=True,
@@ -104,6 +166,8 @@ fashionTestLoader = torch.utils.data.DataLoader(fashionTestData, batch_size=batc
 
 
 
+#####################################################################
+# TRAIN, TEST, SAVE
 
 
 # Now actually train the models and save the results
@@ -151,12 +215,19 @@ for d in trainList:
     logtext += log("Loaded optimizer:")
     logtext += log(str(optimizer))
 
-
+    # Record accuracy and loss for testing and training in each epoch
+    trainLoss = []
+    trainAcc = []
+    testLoss = []
+    testAcc = []
     for ep in range(0, d['epochs']):
         logtext += log("Epoch " + str(ep + 1) + "/" + str(d['epochs']) + ": -------------------------------------")
 
         logtext += log("Training: " + name)
         m.train()           # Sets in training mode, e.g. vs. m.eval()
+        
+        train_loss = 0.
+        train_correct = 0.
         for curBatch, (X, y) in enumerate(train):
             X, y = X.to(device), y.to(device)
 
@@ -167,13 +238,22 @@ for d in trainList:
             optimizer.step()                # Performs an optimization step for the tensors in the model m
             optimizer.zero_grad()           # Zeroes out computed gradients in m
 
+            train_loss += loss.item()
+            train_correct += (pred.argmax(1) == y).type(torch.float).sum().item()
+
             if curBatch % 100 == 0:         # Print some information every 100 batches
                 loss, current = loss.item(), (curBatch + 1) * batch_size
                 logtext += log(f"loss: {loss:>7f}  [{current:>5d}/{trainsize:>5d}]")
+
+        # Log the training accuracy and loss
+        train_loss /= len(train)
+        train_acc = train_correct / trainsize
+        trainLoss.append(train_loss)
+        trainAcc.append(train_acc)
         
         logtext += log("Testing: " + name)
         m.eval()
-        test_loss, correct = 0,0
+        test_loss, correct = 0.,0
         with torch.no_grad():
             for X, y in test:
                 X, y = X.to(device), y.to(device)
@@ -181,13 +261,45 @@ for d in trainList:
                 test_loss += loss_fn(pred, y).item()
                 correct += (pred.argmax(1) == y).type(torch.float).sum().item()     # argmax returns a vector whose nth entry is the maximum index in the nth row
             test_loss /= len(test)
-            correct /= testsize
-            logtext += log(f"Test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
+            test_acc = correct / testsize
+            logtext += log(f"Test Error: \n Accuracy: {(test_acc*100):>0.1f}%, Avg loss: {test_loss:>8f} \n")
+        testLoss.append(test_loss)
+        testAcc.append(test_acc)
+
+
 
     logtext += log("Done training and testing!")
 
+    # Log the accuracy and loss across all epochs
+    logtext += log("Training accuracy: " + str(trainAcc))
+    logtext += log("Training loss: " + str(trainLoss))
+    logtext += log("Validation accuracy: " + str(testAcc))
+    logtext += log("Validation loss: " + str(testLoss))
+    
+    # Plot some graphs
+    epochs_range = range(d['epochs'])
+    plt.figure(figsize=(8, 8))
+    plt.subplot(1, 2, 1)
+    plt.plot(epochs_range, trainAcc, label='Training Accuracy')
+    plt.plot(epochs_range, testAcc, label='Validation Accuracy')
+    plt.legend(loc='lower right')
+    plt.title('Training and Validation Accuracy')
+
+    plt.subplot(1, 2, 2)
+    plt.plot(epochs_range, trainLoss, label='Training Loss')
+    plt.plot(epochs_range, testLoss, label='Validation Loss')
+    plt.legend(loc='upper right')
+    plt.title('Training and Validation Loss')
+    #plt.show()        
+
     if d['save'] == True:
-        torch.save(m.state_dict(), name + ".pth")
+        #torch.save(m.state_dict(), name + ".pth")
+        plt.savefig(name + ".pth.png")
+        logtext += log("Saved accuracy/loss plot to " + name + ".pth.png")
+        model_scripted = torch.jit.script(m)
+        model_scripted.save(name + ".pth")
         logtext += log("Saved PyTorch model to " + name + ".pth")
-        with open(name + ".log", "w") as f:
+        with open(name + ".pth.log", "w") as f:
+            logtext += log("Saved logs to " + name + ".pth.log")
             f.write(logtext)
+            

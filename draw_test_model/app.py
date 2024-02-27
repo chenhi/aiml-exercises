@@ -5,6 +5,7 @@ import numpy as np
 import random
 
 import torch
+from torch import nn
 
 app = Flask(__name__)
 
@@ -16,14 +17,10 @@ device = (
     else "cpu"
 )
 
-from torch import nn
 
 
-#"digits.conv2.nll.adam.10.pth",
-digitsModels = ["digits.conv2.nll.5.keras", "digits.conv2.nll.100.keras"]
+digitsModels = ["digits.conv2.nll.adam.100.pth", "digits.conv2.nll.100.keras"]
 fashionModels = ["fashion.dense2.keras", "fashion.conv2.keras"]
-
-from models_pytorch import Conv2, Dense2
 
 
 @app.route('/', methods=('GET', 'POST'))
@@ -72,15 +69,16 @@ def index():
 				prediction = m(tf.convert_to_tensor([pixels])).numpy()[0]		# The extra bracket makes it batch size 1, and the model expects non-scaled and no channels
 			elif ext == "pth":
 				modeltype = s.split(".")[1]
-				if modeltype == "conv2":
-					m = Conv2()
-				elif modeltype == "dense2":
-					m = Dense2()
-				else:
-					return render_template('index.html', notice="PyTorch model name not recognized.")
-				m.load_state_dict(torch.load(s))
+				# if modeltype == "conv2":
+				# 	m = Conv2()
+				# elif modeltype == "dense2":
+				# 	m = Dense2()
+				# else:
+				# 	return render_template('index.html', notice="PyTorch model name not recognized.")
+				#m.load_state_dict(torch.load(s))
+				m = torch.jit.load(s)
 				m.eval()					# Set to evaluation mode
-				prediction = m(torch.tensor([pixels] / 255.)).numpy()			# The extra bracket adds the channel, and the model expects a rescaled version
+				prediction = torch.nn.Softmax()(m(torch.tensor([[pixels]],dtype=torch.float) / 255.)).detach().numpy()[0]	# The extra bracket adds the channel and batch size 1, and the model expects a rescaled version
 			else:
 				return render_template('index.html', notice="Unrecognized file extension.")
 

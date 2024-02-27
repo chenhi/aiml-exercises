@@ -4,5 +4,7 @@ __pycache__/
 *.keras
 *.pth
 *.log
+*.pth.png
 *.log.png
+*.keras.png
 data/
