@@ -19,7 +19,7 @@ device = (
 
 
 
-digitsModels = ["digits.conv2.nll.adam.100.pth", "digits.conv2.nll.100.keras"]
+digitsModels = ["digits.conv2.nll.adam.20.pth", "digits.conv2.nll.adam.30.pth", "digits.conv2.nll.100.keras"]
 fashionModels = ["fashion.dense2.keras", "fashion.conv2.keras"]
 
 

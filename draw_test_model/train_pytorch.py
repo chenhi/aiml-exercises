@@ -2,9 +2,11 @@ import torch
 import torchvision
 from torch import nn
 from torchvision import datasets
+from torchvision.transforms import v2
 
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.random as rand
 
 
 #####################################################################
@@ -21,7 +23,7 @@ def log(l: str) -> str:
 # Format: the dataset, the model, the number of epochs, save model/results
 trainList = [
 #    {'data': 'digits', 'model': 'dense2', 'opt': 'adam', 'epochs': 1, 'save': True},
-    {'data': "digits", 'model': "conv2", 'opt': 'adam', 'epochs': 100, 'save': True},
+    {'data': "digits", 'model': "conv2", 'opt': 'adam', 'epochs': 30, 'save': True},
 #    {'data': 'fashion', 'model': 'dense2', 'opt': 'adam', 'epochs': 5, 'save': True},
 #    {'data': "fashion", 'model': "conv2", 'opt': 'adam', 'epochs': 2, 'save': True},
     ]
@@ -103,6 +105,16 @@ class Conv2(nn.Module):             # Input shape (1, 28, 28) or (BATCH SIZE, 1,
     def addChannels(self, x, n=1):
         return torch.reshape(list(x.shape)[:-2] + [n] + list(x.shape)[-2:])
     
+    def randomWiggle(self, x):
+        zoom = rand.exponential(scale=1.0)                                              # Probability of no zoom is 1 - e^(-scale) 
+        if zoom > 1.:
+            x = v2.functional.affine(scale=1./zoom)(x)                                          # Maybe select the zoom from some distribution?
+        rot = rand.exponential(scale=0.3) * np.sign(rand.uniform(-1, 1))                # Want 95% of zooms to between [-10, 10], so want 1 - e^(-10 * scale) roughly 95%
+        x_trans = rand.exponential(scale=max(zoom, 1.)) (np.sign(rand.uniform(-1,1)))     # Depends on zoom.  With no zoom, 95% of translates up to 3. 
+        y_trans = rand.exponential(scale=max(zoom, 1.)) (np.sign(rand.uniform(-1,1)))
+        x = v2.functional.affine(degrees=rot, translate=[x_trans, y_trans])(x)
+        return x 
+
     def forward(self, x):
         logits = self.convolution_stack(x)
         return logits
@@ -132,12 +144,30 @@ batch_size = 64
 #####################################################################
 # DATA
 
+# Feature transformation
+class RandomWiggle(v2.Transform):
+    
+    def __init__(self):
+        super().__init__()
+
+
+    def _transform(self, x):
+        zoom = rand.exponential(scale=1.0)                                              # Probability of no zoom is 1 - e^(-scale) 
+        if zoom > 1.:
+            x = v2.functional.affine(scale=1./zoom)(x)                                          # Maybe select the zoom from some distribution?
+        rot = rand.exponential(scale=0.3) * np.sign(rand.uniform(-1, 1))                # Want 95% of zooms to between [-10, 10], so want 1 - e^(-10 * scale) roughly 95%
+        x_trans = rand.exponential(scale=max(zoom, 1.)) (np.sign(rand.uniform(-1,1)))     # Depends on zoom.  With no zoom, 95% of translates up to 3. 
+        y_trans = rand.exponential(scale=max(zoom, 1.)) (np.sign(rand.uniform(-1,1)))
+        x = v2.functional.affine(degrees=rot, translate=[x_trans, y_trans])(x)
+        return x 
+
+
 # Note: data comes in tensor of the form (BATCH SIZE, 1, 28, 28) and is already scaled
 digitsTrainData = datasets.MNIST(
     root="data",
     train=True,
     download=True,
-    transform=torchvision.transforms.ToTensor(),
+    transform=v2.Compose([v2.RandomAffine(10, translate=(.3,.3), scale=(.75, 1.)), torchvision.transforms.ToTensor()]),
 )
 digitsTestData = datasets.MNIST(
     root="data",
