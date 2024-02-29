@@ -1,11 +1,5 @@
 venv/
 __pycache__/
 .gcloudignore
-*.keras
-*.pth
-*.log
-*.pth.png
-*.log.png
-*.keras.png
 data/
-oldmodels/
+models/

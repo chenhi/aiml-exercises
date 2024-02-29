@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import numpy.random as rand
 
+import datetime
 
 #####################################################################
 # AUXILLIARY
@@ -23,7 +24,7 @@ def log(l: str) -> str:
 # Format: the dataset, the model, the number of epochs, save model/results
 trainList = [
 #    {'data': 'digits', 'model': 'dense2', 'opt': 'adam', 'epochs': 1, 'save': True},
-    {'data': "digits", 'model': "conv2", 'opt': 'adam', 'epochs': 30, 'save': True},
+    {'data': "digits", 'model': "conv2", 'opt': 'adam', 'epochs': 1, 'save': True},
 #    {'data': 'fashion', 'model': 'dense2', 'opt': 'adam', 'epochs': 5, 'save': True},
 #    {'data': "fashion", 'model': "conv2", 'opt': 'adam', 'epochs': 2, 'save': True},
     ]
@@ -142,9 +143,9 @@ batch_size = 64
 
 
 #####################################################################
-# DATA
+# DATA AND FEATURE TRANSFORMATIONS
 
-# Feature transformation
+# Feature transformation TODO
 class RandomWiggle(v2.Transform):
     
     def __init__(self):
@@ -162,7 +163,7 @@ class RandomWiggle(v2.Transform):
         return x 
 
 
-# Note: data comes in tensor of the form (BATCH SIZE, 1, 28, 28) and is already scaled
+# ToTensor transforms to tensor of the form (BATCH SIZE, 1, 28, 28) with values in range [0, 1]
 digitsTrainData = datasets.MNIST(
     root="data",
     train=True,
@@ -208,17 +209,14 @@ for d in trainList:
     # Load the relevant data
     if d['data'] == "digits":
         train, test = digitsTrainLoader, digitsTestLoader
-        logtext += log("Using MNIST digits data")
     elif d['data'] == "fashion":
         train, test = fashionTrainLoader, fashionTestLoader
-        logtext += log("Using MNIST fashion data")
     else:
         print("Data", d['data'], "not found!  Exiting.")
         exit()
-    trainsize = len(train.dataset)
-    testsize = len(test.dataset)
-    logtext += log("Training dataset size " + str(trainsize))
-    logtext += log("Test dataset size " + str(testsize))
+    logtext += log(f"Training dataset and transforms: {train.dataset}")
+    logtext += log(f"Validation dataset and transforms: {test.dataset}")
+    logtext += log(f"Batch size: {batch_size}")
 
     # Load the specified model
     if d['model'] == "dense2":
@@ -232,7 +230,7 @@ for d in trainList:
     logtext += log(str(m))
 
     # Make the name
-    name = d['data'] + "." + d['model'] + "." + loss_fn_name + "." + d['opt'] + "." + str(d['epochs'])
+    name = d['data'] + "." + d['model'] + "." + loss_fn_name + "." + d['opt'] + "." + str(d['epochs']) + "." + datetime.datetime.now().strftime("%Y%m%d%H%M%S")
 
     # Define optimizer on the model (m.parameters() is iterator over parameters)
     if d['opt'] == 'sgd':
@@ -270,6 +268,7 @@ for d in trainList:
 
             train_loss += loss.item()
             train_correct += (pred.argmax(1) == y).type(torch.float).sum().item()
+            trainsize = len(train.dataset)
 
             if curBatch % 100 == 0:         # Print some information every 100 batches
                 loss, current = loss.item(), (curBatch + 1) * batch_size
@@ -290,6 +289,8 @@ for d in trainList:
                 pred = m(X)
                 test_loss += loss_fn(pred, y).item()
                 correct += (pred.argmax(1) == y).type(torch.float).sum().item()     # argmax returns a vector whose nth entry is the maximum index in the nth row
+            
+            testsize = len(test.dataset)
             test_loss /= len(test)
             test_acc = correct / testsize
             logtext += log(f"Test Error: \n Accuracy: {(test_acc*100):>0.1f}%, Avg loss: {test_loss:>8f} \n")
@@ -324,12 +325,12 @@ for d in trainList:
 
     if d['save'] == True:
         #torch.save(m.state_dict(), name + ".pth")
-        plt.savefig(name + ".pth.png")
+        plt.savefig("models/" + name + ".pth.png")
         logtext += log("Saved accuracy/loss plot to " + name + ".pth.png")
         model_scripted = torch.jit.script(m)
-        model_scripted.save(name + ".pth")
+        model_scripted.save("models/" + name + ".pth")
         logtext += log("Saved PyTorch model to " + name + ".pth")
-        with open(name + ".pth.log", "w") as f:
+        with open("models/" + name + ".pth.log", "w") as f:
             logtext += log("Saved logs to " + name + ".pth.log")
             f.write(logtext)
             

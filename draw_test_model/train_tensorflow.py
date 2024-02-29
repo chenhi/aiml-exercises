@@ -1,3 +1,5 @@
+# WARNING: This script is mostly deprecated.  I've been using PyTorch more.
+
 import tensorflow as tf
 
 import matplotlib.pyplot as plt
@@ -129,9 +131,9 @@ for i in range(0, len(whatToTrain)):
     plt.show()
 
     if whatToTrain[i][3] == True:
-        plt.savefig(name + ".keras.png")
-        m.save(m.name + ".keras")
-        with open(m.name + ".log", "w") as f:
+        plt.savefig("models/" + name + ".keras.png")
+        m.save("models/" + m.name + ".keras")
+        with open("models/" + m.name + ".log", "w") as f:
             models[i].summary(print_fn=lambda x: f.write(x + '\n'))
             f.write("\n\n\n" + str(results[i]) + "\n\n\n" + str(history[i].history))
             f.close()

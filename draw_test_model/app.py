@@ -19,7 +19,7 @@ device = (
 
 
 
-digitsModels = ["digits.conv2.nll.adam.20.pth", "digits.conv2.nll.adam.30.pth", "digits.conv2.nll.100.keras"]
+digitsModels = ["digits.conv2.nll.adam.50.pth", "digits.conv2.nll.adam.30.pth", "digits.conv2.nll.100.keras"]
 fashionModels = ["fashion.dense2.keras", "fashion.conv2.keras"]
 
 
@@ -65,7 +65,7 @@ def index():
 			pred = {'name': s}
 			ext = s.split(".")[-1]
 			if ext == "keras":
-				m = tf.keras.models.load_model(s)
+				m = tf.keras.models.load_model("models/" + s)
 				prediction = m(tf.convert_to_tensor([pixels])).numpy()[0]		# The extra bracket makes it batch size 1, and the model expects non-scaled and no channels
 			elif ext == "pth":
 				modeltype = s.split(".")[1]
@@ -76,7 +76,7 @@ def index():
 				# else:
 				# 	return render_template('index.html', notice="PyTorch model name not recognized.")
 				#m.load_state_dict(torch.load(s))
-				m = torch.jit.load(s)
+				m = torch.jit.load("models/" + s)
 				m.eval()					# Set to evaluation mode
 				prediction = torch.nn.Softmax()(m(torch.tensor([[pixels]],dtype=torch.float) / 255.)).detach().numpy()[0]	# The extra bracket adds the channel and batch size 1, and the model expects a rescaled version
 			else:

@@ -1,6 +1,16 @@
 Some comments on digits:
 * These models are still really bad when the digit is zoomed, or translated, or rotated.
+** Applying some random transformations to the training data helped a lot with this.  It still gets 4/9, 0/6 confused a bit, especially when small.
 * I thickened the brush and it improved the results, so probably the model is also sensitive to thickness.
+** Haven't tested this much more.
+
+
 
 Some comments on fashion:
 * My drawings of various articles of clothing are cartoons of cartoons, so probably not a good way to evaluate the model.
+
+
+
+Todo:
+* Have the web app save images for usage in testing later
+* 

@@ -36,12 +36,19 @@
         var oldctx = oldcanvas.getContext("2d");
         oldctx.putImageData(oldImage, 0, 0);
         oldctx.canvas.hidden = false;
+        document.getElementById('diglabel').hidden = false;
+        document.getElementById('dig').hidden = false;
+        document.getElementById('savebutton').hidden = false;
         //oldctx.setAttribute("hidden", "false");
         //document.getElementById("oldcanvasimg").style.border = "2px solid";
         //document.getElementById("oldcanvasimg").src = oldImage;
         //document.getElementById("oldcanvasimg").style.display = "inline";
     }
 
+
+    function savedigit() {
+    	return false;
+    }
     
     function draw() {
         ctx.beginPath();
@@ -52,6 +59,8 @@
         ctx.stroke();
         ctx.closePath();
     }
+    
+    
     
     function erase() {
         var m = confirm("Want to clear");
@@ -125,18 +134,35 @@
             }
         }
     }
+    
+
     </script>
     <body onload="init()">
 <div style="position:absolute; top: 5%; left: 50%; float: right"> {{ notice }} 
     
-    <canvas id="oldcan" width="28" height="28" style="border:2px solid;" hidden="true"></canvas>
-      
+    <canvas id="oldcan" width="28" height="28" style="border:2px solid;" hidden="true"></canvas>  <label id="diglabel" for="dig" hidden="true">Label:</label>
+
+<select name="dig" id="dig" hidden="true">
+  <option value="0">0</option>
+  <option value="1">1</option>
+  <option value="2">2</option>
+  <option value="3">3</option>
+  <option value="4">4</option>
+  <option value="5">5</option>
+  <option value="6">6</option>
+  <option value="7">7</option>
+  <option value="8">8</option>
+  <option value="9">9</option>
+</select> 
+<input type="button" value="save for testing" id="savebutton" size="30" hidden="true" onclick="savedigit()">
 
 
 </div>
         <div style="position:absolute; top: 10%; left: 50%; float: right">
         
         {% for result in results %}
+        
+        <hr>
 
         The model {{ result['name'] }} thinks you have drawn a  {{ result['str'] }}  with certainty {{ result['prob'] }}%<br><br>
         
@@ -147,7 +173,7 @@
         
         {% endfor %}
 
-        <br><br><hr>
+        <br>
 
         {% endfor %}
         
