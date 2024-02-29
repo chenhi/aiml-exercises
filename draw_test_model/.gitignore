@@ -2,5 +2,5 @@ venv/
 __pycache__/
 .gcloudignore
 data/
-models/
-savedtests/
+models/*
+savedtests/*
