@@ -21,10 +21,12 @@ device = (
 )
 
 
-
+# MODIFY THIS TO CHANGE THE MODELS APPEARING
 digitsModels = ["digits.conv2.nll.adam.50.pth", "digits.conv2.nll.adam.30.pth", "digits.conv2.nll.100.keras"]
-fashionModels = ["fashion.dense2.keras", "fashion.conv2.keras"]
+fashionModels = ["fashion.conv2.nll.adam.20.20240229225014.pth", "fashion.dense2.keras", "fashion.conv2.keras"]
 
+digitsKeys = ("0", "1", "2","3","4","5","6","7","8","9")
+fashionKeys = ("T-shirt", "trousers", "pullover", "dress", "coat", "sandal", "shirt", "sneaker", "bag", "boot")
 
 @app.route('/', methods=('GET', 'POST'))
 
@@ -34,11 +36,19 @@ def index():
 		if request.form['action'] == "saveimg":
 			imgdata = request.form['oldimg']
 			imgval =  request.form['oldimgval']
+			type = request.form['type']
+			if type == "digits":
+				keys = digitsKeys
+			elif type == "fashion":
+				keys = fashionKeys
+			else:
+				return render_template('index.html', notice="Unknown type, not saved.")
 			if imgval != '-':
 				response = urllib.request.urlopen(imgdata)
-				with open(f"savedtests/{request.form['type']}.{request.form['oldimgval']}.{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.jpg", 'wb') as f:
+				with open(f"savedtests/{type}.{imgval}.{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.jpg", 'wb') as f:
 					f.write(response.file.read())
-			return render_template('index.html', notice=f"Saved a {imgval}!" if imgval != '-' else "No value selected, not saved.")
+			return render_template('index.html', notice=f"Saved a {keys[int(imgval)]}!" if imgval != '-' else "No value selected, not saved.")
+		
 		elif request.form['action'] == "detect":
 
 			# Get pixels from the form in string form, then stick it in a (420, 420) array
@@ -61,11 +71,11 @@ def index():
 			imageData = imageData[0:-1] 	# Get rid of the last comma
 			
 			# What are we trying to classify?
-			if request.form['type'] == "digit":
-				textkeys = ["0", "1", "2","3","4","5","6","7","8","9"]
+			if request.form['type'] == "digits":
+				textkeys = digitsKeys
 				names = digitsModels
 			elif request.form['type'] == "fashion":
-				textkeys = ["T-shirt", "trousers", "pullover", "dress", "coat", "sandal", "shirt", "sneaker", "bag", "boot"]
+				textkeys = fashionKeys
 				names = fashionModels
 			else:
 				return render_template('index.html', notice="Something went wrong and you somehow requested a model we don't have.")
@@ -104,7 +114,7 @@ def index():
 		else:
 			return render_template('index.html', notice="Invalid POST request.")
 	else:
-		return render_template('index.html')
+		return render_template('index.html', notice="Draw a digit and see if the models can recognize it.  You can try drawing an article of clothing too (not so serious).")
 
 
 #@app.route('/digittests', methods=('GET'))

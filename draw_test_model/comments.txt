@@ -6,7 +6,7 @@ Some comments on digits:
 * I thickened the brush and it improved the results, so probably the model is also sensitive to thickness.
 ** Haven't tested this much more.
 ** I noticed the saved images look a little too transparent.  Maybe they need to be darkened?  Darkening them a little bit.
-
+** This means before I thickened the brush, the digits were probably just not really registering after compression.  When I compressed I just chose darkness based on the percentage of compressed pixels which were dark.  There's probably a smarter downscaling algorithm.  For now, I am just hacking it by multiplying the darkness by 1.5 with cutoff.
 
 Some comments on fashion:
 * My drawings of various articles of clothing are cartoons of cartoons, so probably not a good way to evaluate the model.
@@ -15,3 +15,4 @@ Some comments on fashion:
 
 Todo:
 * Have a way to re-test the models on the saved images en masse
+* See if I can write my own Transform class and play with that a litle

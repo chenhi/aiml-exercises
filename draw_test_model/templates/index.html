@@ -33,22 +33,43 @@
             findxy('out', e)
         }, false);
 
-        var oldImageArray = new Uint8ClampedArray([ {{ image }} ]);
 
-        oldCanvas = document.getElementById('oldcan');
-        oldCtx = oldCanvas.getContext("2d");
-        oldImage = new ImageData(oldImageArray, 28, 28);
+        // Only show this part if we actually have an image passed to us, meaning some model was applied to
 
+        try {
+            var oldImageArray = new Uint8ClampedArray([ {{ image }} ]);
 
-        oldCtx.putImageData(oldImage, 0, 0);
-        oldCtx.canvas.hidden = false;
-        document.getElementById('diglabel').hidden = false;
-        document.getElementById('dig').hidden = false;
-        document.getElementById('savebutton').hidden = false;
-        //oldctx.setAttribute("hidden", "false");
-        //document.getElementById("oldcanvasimg").style.border = "2px solid";
-        //document.getElementById("oldcanvasimg").src = oldImage;
-        //document.getElementById("oldcanvasimg").style.display = "inline";
+            oldCanvas = document.getElementById('oldcan');
+            oldCtx = oldCanvas.getContext("2d");
+            oldImage = new ImageData(oldImageArray, 28, 28);
+
+            oldCtx.putImageData(oldImage, 0, 0);
+            oldCtx.canvas.hidden = false;
+            document.getElementById('diglabel').hidden = false;
+            document.getElementById('dig').hidden = false;
+            document.getElementById('savebutton').hidden = false;
+            //oldctx.setAttribute("hidden", "false");
+            //document.getElementById("oldcanvasimg").style.border = "2px solid";
+            //document.getElementById("oldcanvasimg").src = oldImage;
+            //document.getElementById("oldcanvasimg").style.display = "inline";
+
+            if ('{{type}}' == 'fashion') {
+                document.getElementById('v0').text = "T-shirt";
+                document.getElementById('v1').text = "trousers";
+                document.getElementById('v2').text = "pullover";
+                document.getElementById('v3').text = "dress";
+                document.getElementById('v4').text = "coat";
+                document.getElementById('v5').text = "sandal";
+                document.getElementById('v6').text = "shirt";
+                document.getElementById('v7').text = "sneaker";
+                document.getElementById('v8').text = "bag";
+                document.getElementById('v9').text = "boot";           
+            }
+        } catch {
+            //pass
+        } finally {
+            //pass
+        }
     }
 
 
@@ -75,7 +96,7 @@
         const savetype = document.createElement('input');
         savetype.type = 'hidden';
         savetype.name = 'type';
-        savetype.value = '{{ type }}';
+        savetype.value = '{{type}}';
 
         saveform.appendChild(smallpixels);
         saveform.appendChild(digitvalue);
@@ -190,28 +211,28 @@
 <!-- BODY -->
 
     <body onload="init()">
-<div style="position:absolute; top: 5%; left: 50%; float: right"> {{ notice }} 
+<div style="position:absolute; top: 5%; left: 40%; float: right"> {{ notice }}
     
     <canvas id="oldcan" width="28" height="28" style="border:2px solid;" hidden="true"></canvas>  <label id="diglabel" for="dig" hidden="true">Label:</label>
 
 <select name="dig" id="dig" hidden="true">
-  <option value="-">-</option>
-  <option value="0">0</option>
-  <option value="1">1</option>
-  <option value="2">2</option>
-  <option value="3">3</option>
-  <option value="4">4</option>
-  <option value="5">5</option>
-  <option value="6">6</option>
-  <option value="7">7</option>
-  <option value="8">8</option>
-  <option value="9">9</option>
+  <option id="none" value="-">-</option>
+  <option id="v0" value="0">0</option>
+  <option id="v1" value="1">1</option>
+  <option id="v2" value="2">2</option>
+  <option id="v3" value="3">3</option>
+  <option id="v4" value="4">4</option>
+  <option id="v5" value="5">5</option>
+  <option id="v6" value="6">6</option>
+  <option id="v7" value="7">7</option>
+  <option id="v8" value="8">8</option>
+  <option id="v9" value="9">9</option>
 </select> 
 <input type="button" value="save for testing" id="savebutton" size="30" hidden="true" onclick="saveDigit()">
 
 
 </div>
-        <div style="position:absolute; top: 10%; left: 50%; float: right">
+        <div style="position:absolute; top: 10%; left: 40%; float: right">
         
         {% for result in results %}
         
@@ -233,8 +254,8 @@
         </div>
         <canvas id="can" width="420" height="420" style="position:absolute;top:10%;left:10%;border:2px solid;"></canvas>
         <img id="canvasimg" style="position:absolute;top:10%;left:52%;" style="display:none;">
-        <input type="button" value="detect digit" id="btn" size="30" onclick="detect('digit')" style="position:absolute;top:70%;left:10%;">
-        <input type="button" value="detect clothes" id="btn" size="30" onclick="detect('fashion')" style="position:absolute;top:70%;left:20%;">
-        <input type="button" value="clear" id="clr" size="23" onclick="erase()" style="position:absolute;top:70%;left:30%;">
+        <input type="button" value="detect digit" id="btn" size="30" onclick="detect('digits')" style="position:absolute;top:70%;left:10%;">
+        <input type="button" value="detect fashion" id="btn" size="30" onclick="detect('fashion')" style="position:absolute;top:70%;left:18%;">
+        <input type="button" value="clear" id="clr" size="23" onclick="erase()" style="position:absolute;top:70%;left:26%;">
     </body>
     </html>

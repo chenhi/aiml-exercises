@@ -24,9 +24,9 @@ def log(l: str) -> str:
 # Format: the dataset, the model, the number of epochs, save model/results
 trainList = [
 #    {'data': 'digits', 'model': 'dense2', 'opt': 'adam', 'epochs': 1, 'save': True},
-    {'data': "digits", 'model': "conv2", 'opt': 'adam', 'epochs': 1, 'save': True},
+#    {'data': "digits", 'model': "conv2", 'opt': 'adam', 'epochs': 1, 'save': True},
 #    {'data': 'fashion', 'model': 'dense2', 'opt': 'adam', 'epochs': 5, 'save': True},
-#    {'data': "fashion", 'model': "conv2", 'opt': 'adam', 'epochs': 2, 'save': True},
+    {'data': "fashion", 'model': "conv2", 'opt': 'adam', 'epochs': 20, 'save': True},
     ]
 
 
@@ -184,7 +184,7 @@ fashionTrainData = datasets.FashionMNIST(
     root="data",
     train=True,
     download=True,
-    transform=torchvision.transforms.ToTensor(),
+    transform=v2.Compose([v2.RandomAffine(10, translate=(.3,.3), scale=(.75, 1.)), torchvision.transforms.ToTensor()]),
 )
 fashionTestData = datasets.FashionMNIST(
     root="data",
