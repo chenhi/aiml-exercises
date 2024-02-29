@@ -9,7 +9,11 @@
 
     var brushColor = "black",
         brushWidth = 15;
-    
+
+    var oldImage;
+    var oldCanvas;
+    var oldCtx;
+
     function init() {
         canvas = document.getElementById('can');
         ctx = canvas.getContext("2d");
@@ -30,12 +34,14 @@
         }, false);
 
         var oldImageArray = new Uint8ClampedArray([ {{ image }} ]);
+
+        oldCanvas = document.getElementById('oldcan');
+        oldCtx = oldCanvas.getContext("2d");
         oldImage = new ImageData(oldImageArray, 28, 28);
 
-        var oldcanvas = document.getElementById('oldcan');
-        var oldctx = oldcanvas.getContext("2d");
-        oldctx.putImageData(oldImage, 0, 0);
-        oldctx.canvas.hidden = false;
+
+        oldCtx.putImageData(oldImage, 0, 0);
+        oldCtx.canvas.hidden = false;
         document.getElementById('diglabel').hidden = false;
         document.getElementById('dig').hidden = false;
         document.getElementById('savebutton').hidden = false;
@@ -46,10 +52,91 @@
     }
 
 
-    function savedigit() {
-    	return false;
+    function saveDigit() {
+        const saveform = document.createElement('form');
+        saveform.method='post';
+        saveform.action = window.location.href;
+
+        const smallpixels = document.createElement('input');
+        smallpixels.type = 'hidden';
+        smallpixels.name = 'oldimg';
+        smallpixels.value = oldCanvas.toDataURL();
+
+        const digitvalue = document.createElement('input');
+        digitvalue.type = 'hidden';
+        digitvalue.name = 'oldimgval';
+        digitvalue.value = document.getElementById('dig').value;
+
+        const saveaction = document.createElement('input');
+        saveaction.type = 'hidden';
+        saveaction.name = 'action';
+        saveaction.value = 'saveimg';
+
+        saveform.appendChild(smallpixels);
+        saveform.appendChild(digitvalue);
+        saveform.appendChild(saveaction);
+        document.body.appendChild(saveform);
+        saveform.submit();
+    	//return false;
     }
     
+    function erase() {
+        var m = confirm("Clear image?");
+        if (m) {
+            ctx.clearRect(0, 0, w, h);
+            document.getElementById("canvasimg").style.display = "none";
+        }
+    }
+    
+    // Assume the input image only has information in the alpha channels.
+    function imageDataToString(imgdata) {
+        // The image is converted to an array.  Each pixel is converted to four array entries, representing the RGB and alpha channels, value in [0, 255].
+        // Because we drew in black and white, only the alpha channel matters.
+        // The result is a string of 1s and 0s: 1 for a black pixel and 0 for a white pixel.
+        let output = ""
+        for (let i = 0; i < imgdata.length; i += 4) {
+            if (imgdata[i + 3] !=  0) {
+                output += "1";
+            } else {
+                output += "0";
+            }
+        }
+        return output;
+    }
+
+    function detect(type) {
+        var userImage = ctx.getImageData(0,0,420,420).data;
+        var userPixels = imageDataToString(userImage);
+
+
+        // Send the type of model (digits vs. fashion) and the image string to the app.
+        const form = document.createElement('form');
+        form.method = 'post';
+        form.action = window.location.href;
+
+        const pixelField = document.createElement('input');
+        pixelField.type = 'hidden';
+        pixelField.name = 'pixels';
+        pixelField.value = userPixels;
+        
+        const typeField = document.createElement('input');
+        typeField.type = 'hidden';
+        typeField.name = 'type';
+        typeField.value = type;
+
+        const detaction = document.createElement('input');
+        detaction.type = 'hidden';
+        detaction.name = 'action';
+        detaction.value = 'detect';
+
+        form.appendChild(pixelField);
+        form.appendChild(typeField);
+        form.appendChild(detaction);
+        document.body.appendChild(form);
+        form.submit();
+    }
+
+
     function draw() {
         ctx.beginPath();
         ctx.moveTo(prevX, prevY);
@@ -58,50 +145,6 @@
         ctx.lineWidth = brushWidth;
         ctx.stroke();
         ctx.closePath();
-    }
-    
-    
-    
-    function erase() {
-        var m = confirm("Want to clear");
-        if (m) {
-            ctx.clearRect(0, 0, w, h);
-            document.getElementById("canvasimg").style.display = "none";
-        }
-    }
-    
-    function detect(type) {
-        var userImage = ctx.getImageData(0,0,420,420).data
-        var userPixels = "";
-
-        for (let i = 0; i < userImage.length; i += 4) {
-            if (userImage[i + 3] !=  0) {
-                userPixels = userPixels + "1";
-            } else {
-                userPixels = userPixels + "0";
-            }
-        }
-
-
-        const form = document.createElement('form');
-        form.method = 'post';
-        form.action = window.location.href;
-
-        const pixelField = document.createElement('input');
-        pixelField.type = 'hidden';
-        pixelField.name = "pixels";
-        pixelField.value = userPixels;
-        
-        const typeField = document.createElement('input');
-        typeField.type = 'hidden';
-        typeField.name = 'type';
-        typeField.value = type;
-
-        form.appendChild(pixelField);
-        form.appendChild(typeField);
-
-        document.body.appendChild(form);
-        form.submit();
     }
     
     function findxy(res, e) {
@@ -137,12 +180,16 @@
     
 
     </script>
+
+<!-- BODY -->
+
     <body onload="init()">
 <div style="position:absolute; top: 5%; left: 50%; float: right"> {{ notice }} 
     
     <canvas id="oldcan" width="28" height="28" style="border:2px solid;" hidden="true"></canvas>  <label id="diglabel" for="dig" hidden="true">Label:</label>
 
 <select name="dig" id="dig" hidden="true">
+  <option value="-">-</option>
   <option value="0">0</option>
   <option value="1">1</option>
   <option value="2">2</option>
@@ -154,7 +201,7 @@
   <option value="8">8</option>
   <option value="9">9</option>
 </select> 
-<input type="button" value="save for testing" id="savebutton" size="30" hidden="true" onclick="savedigit()">
+<input type="button" value="save for testing" id="savebutton" size="30" hidden="true" onclick="saveDigit()">
 
 
 </div>
