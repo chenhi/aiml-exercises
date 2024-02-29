@@ -72,9 +72,15 @@
         saveaction.name = 'action';
         saveaction.value = 'saveimg';
 
+        const savetype = document.createElement('input');
+        savetype.type = 'hidden';
+        savetype.name = 'type';
+        savetype.value = '{{ type }}';
+
         saveform.appendChild(smallpixels);
         saveform.appendChild(digitvalue);
         saveform.appendChild(saveaction);
+        saveform.appendChild(savetype);
         document.body.appendChild(saveform);
         saveform.submit();
     	//return false;

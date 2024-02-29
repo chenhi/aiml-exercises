@@ -33,10 +33,12 @@ def index():
 
 		if request.form['action'] == "saveimg":
 			imgdata = request.form['oldimg']
-			response = urllib.request.urlopen(imgdata)
-			with open(f"savedtests/{request.form['oldimgval']}.{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.jpg", 'wb') as f:
-				f.write(response.file.read())
-			return render_template('index.html')
+			imgval =  request.form['oldimgval']
+			if imgval != '-':
+				response = urllib.request.urlopen(imgdata)
+				with open(f"savedtests/{request.form['type']}.{request.form['oldimgval']}.{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.jpg", 'wb') as f:
+					f.write(response.file.read())
+			return render_template('index.html', notice=f"Saved a {imgval}!" if imgval != '-' else "No value selected, not saved.")
 		elif request.form['action'] == "detect":
 
 			# Get pixels from the form in string form, then stick it in a (420, 420) array
@@ -69,23 +71,16 @@ def index():
 				return render_template('index.html', notice="Something went wrong and you somehow requested a model we don't have.")
 			
 			# Load models
-			models = []
 			preds = []
 			for s in names:
 				pred = {'name': s}
 				ext = s.split(".")[-1]
+				# TensorFlow
 				if ext == "keras":
 					m = tf.keras.models.load_model("models/" + s)
 					prediction = m(tf.convert_to_tensor([pixels])).numpy()[0]		# The extra bracket makes it batch size 1, and the model expects non-scaled and no channels
+				# PyTorch
 				elif ext == "pth":
-					modeltype = s.split(".")[1]
-					# if modeltype == "conv2":
-					# 	m = Conv2()
-					# elif modeltype == "dense2":
-					# 	m = Dense2()
-					# else:
-					# 	return render_template('index.html', notice="PyTorch model name not recognized.")
-					#m.load_state_dict(torch.load(s))
 					m = torch.jit.load("models/" + s)
 					m.eval()					# Set to evaluation mode
 					prediction = torch.nn.Softmax()(m(torch.tensor([[pixels]],dtype=torch.float) / 255.)).detach().numpy()[0]	# The extra bracket adds the channel and batch size 1, and the model expects a rescaled version
@@ -105,21 +100,17 @@ def index():
 				pred['str'] = textkeys[maxIndex]
 				preds.append(pred)
 			
-			return render_template('index.html', notice="Results:", results=preds, image=imageData)
+			return render_template('index.html', notice="Results:", results=preds, image=imageData, type=request.form['type'])
 		else:
 			return render_template('index.html', notice="Invalid POST request.")
 	else:
 		return render_template('index.html')
 
 
-# @app.route('/saveimage.html', methods=('POST',))
+#@app.route('/digittests', methods=('GET'))
 
-# def saveimage():
-# 	pixelstext = str(request.form['oldimg'])
-# 	# Make sure it's a string of 0s and 1s
-# 	# TODO is there a better way?
-# 	return pixelstext
-	
+# TODO: load the images from the tests folder and run the models against them.
 
-if __name__ == '__main__':
-    app.run()
+
+# if __name__ == '__main__':
+#     app.run()
