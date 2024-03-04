@@ -10,25 +10,7 @@ import numpy.random as rand
 
 import datetime
 
-#####################################################################
-# AUXILLIARY
-
-def log(l: str) -> str:
-    print(l)
-    return l + "\n"
-
-
-#####################################################################
-# TRAINING LIST AND OPTIONS
-
-# Format: the dataset, the model, the number of epochs, save model/results
-trainList = [
-#    {'data': 'digits', 'model': 'dense2', 'opt': 'adam', 'epochs': 1, 'save': True},
-#    {'data': "digits", 'model': "conv2", 'opt': 'adam', 'epochs': 1, 'save': True},
-#    {'data': 'fashion', 'model': 'dense2', 'opt': 'adam', 'epochs': 5, 'save': True},
-    {'data': "fashion", 'model': "conv2", 'opt': 'adam', 'epochs': 20, 'save': True},
-    ]
-
+from models_pytorch import Dense2, Conv2, Conv3
 
 #####################################################################
 # SOME UNIFORM OPTIONS
@@ -41,98 +23,25 @@ device = (
     else "cpu"
 )
 
+#####################################################################
+# AUXILLIARY
+
+def log(l: str) -> str:
+    print(l)
+    return l + "\n"
 
 #####################################################################
-# THE MODELS
+# TRAINING LIST AND OPTIONS
 
-class Dense2(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.flatten = nn.Flatten()
-        self.reset_parameters = initWeights                 # Initialization (does this actually work????  i.e. does it apply it to the stuff below>???)
-        self.linear_relu_stack = nn.Sequential(
-            nn.Linear(28*28, 256),
-            nn.ReLU(),
-            nn.BatchNorm1d(256),
-            nn.Linear(256, 256),
-            nn.ReLU(),
-            nn.BatchNorm1d(256),
-            nn.Dropout(p=0.5),
-            nn.Linear(256, 10)
-        )
-    
+# Format: the dataset, the model, the number of epochs, save model/results
+trainList = [
+#    {'data': 'digits', 'model': 'dense2', 'opt': 'adam', 'epochs': 1, 'save': True},
+     {'data': "digits", 'model': Conv2, 'opt': 'adam', 'epochs': 50, 'rate': 1e-2, 'save': True},
+#     {'data': "digits", 'model': Conv3, 'opt': 'adam', 'epochs': 20, 'rate': 1e-1, 'save': True},
+#    {'data': 'fashion', 'model': 'dense2', 'opt': 'adam', 'epochs': 5, 'save': True},
+#    {'data': "fashion", 'model': "conv2", 'opt': 'adam', 'epochs': 20, 'save': True},
+    ]
 
-    def rescale(self, x):
-        return x / 255.
-    
-    def unrescale(self, x):
-        return x * 255.    
-
-    def forward(self, x):
-        x = self.flatten(x)
-        logits = self.linear_relu_stack(x)
-        return logits
-
-
-class Conv2(nn.Module):             # Input shape (1, 28, 28) or (BATCH SIZE, 1, 28, 28)
-    def __init__(self):
-        super().__init__()
-        # How to do initialization?
-        self.convolution_stack = nn.Sequential(
-            nn.Conv2d(1, 32, (3,3), padding='same'),                    # Input channel 1, output 32, filter size (3,3)
-            nn.ReLU(),
-            nn.MaxPool2d((2,2)),    # Image now 14x14
-            nn.Dropout(p=0.2),
-            nn.BatchNorm2d(32),
-            nn.Conv2d(32, 64, (3,3), padding='same'),
-            nn.ReLU(),
-            nn.MaxPool2d((2,2)),    # Image now 7x7
-            nn.Dropout(p=0.2),
-            nn.BatchNorm2d(64),
-            nn.Flatten(),           # Default start_dim=1
-            nn.Linear(7*7*64, 128),
-            nn.ReLU(),
-            nn.Dropout(p=0.5),
-            nn.BatchNorm1d(128),
-            nn.Linear(128, 10)
-        )
-
-    def rescale(self, x):
-        return x / 255.
-    
-    def unrescale(self, x):
-        return x * 255.  
-
-    def addChannels(self, x, n=1):
-        return torch.reshape(list(x.shape)[:-2] + [n] + list(x.shape)[-2:])
-    
-    def randomWiggle(self, x):
-        zoom = rand.exponential(scale=1.0)                                              # Probability of no zoom is 1 - e^(-scale) 
-        if zoom > 1.:
-            x = v2.functional.affine(scale=1./zoom)(x)                                          # Maybe select the zoom from some distribution?
-        rot = rand.exponential(scale=0.3) * np.sign(rand.uniform(-1, 1))                # Want 95% of zooms to between [-10, 10], so want 1 - e^(-10 * scale) roughly 95%
-        x_trans = rand.exponential(scale=max(zoom, 1.)) (np.sign(rand.uniform(-1,1)))     # Depends on zoom.  With no zoom, 95% of translates up to 3. 
-        y_trans = rand.exponential(scale=max(zoom, 1.)) (np.sign(rand.uniform(-1,1)))
-        x = v2.functional.affine(degrees=rot, translate=[x_trans, y_trans])(x)
-        return x 
-
-    def forward(self, x):
-        logits = self.convolution_stack(x)
-        return logits
-
-
-#####################################################################
-# INITIALIZER, LOSS FUNCTION, BATCH SIZE
-
-# Weight initializer
-def initWeights(m):
-    if isinstance(m, nn.Linear):
-        torch.nn.init.kaiming_uniform_(m.weight)                # I guess there's not a huge difference between uniform vs. normal, and uniform probably easier to sample
-        if self.bias is not None:                               # Set the linear bias (just copied it from default nn.Linear code but can tweak it here)
-            fan_in, _ = init._calculate_fan_in_and_fan_out(self.weight)
-            bound = 1 / math.sqrt(fan_in) if fan_in > 0 else 0
-            init.uniform_(self.bias, -bound, bound)
-        #m.bias.data.fill_(0.01)                                # E.g. if I just want to set it to something.
 
 # Loss function
 loss_fn, loss_fn_name = nn.CrossEntropyLoss(), "nll"                   # Inputs are logits (i.e. pre-softmax)
@@ -141,6 +50,8 @@ loss_fn, loss_fn_name = nn.CrossEntropyLoss(), "nll"                   # Inputs 
 # Batch size (i.e. how often back-propagation happens)
 batch_size = 64
 
+# Shuffling
+shuffle = True
 
 #####################################################################
 # DATA AND FEATURE TRANSFORMATIONS
@@ -176,7 +87,7 @@ digitsTestData = datasets.MNIST(
     download=True,
     transform=torchvision.transforms.ToTensor(),
 )
-digitsTrainLoader = torch.utils.data.DataLoader(digitsTrainData, batch_size=batch_size)
+digitsTrainLoader = torch.utils.data.DataLoader(digitsTrainData, batch_size=batch_size, shuffle=shuffle)
 digitsTestLoader = torch.utils.data.DataLoader(digitsTestData, batch_size=batch_size)
 
 
@@ -192,7 +103,7 @@ fashionTestData = datasets.FashionMNIST(
     download=True,
     transform=torchvision.transforms.ToTensor(),            # Check maybe this already has the extra channel???
 )
-fashionTrainLoader = torch.utils.data.DataLoader(fashionTrainData, batch_size=batch_size)
+fashionTrainLoader = torch.utils.data.DataLoader(fashionTrainData, batch_size=batch_size, shuffle=shuffle)
 fashionTestLoader = torch.utils.data.DataLoader(fashionTestData, batch_size=batch_size)
 
 
@@ -204,6 +115,7 @@ fashionTestLoader = torch.utils.data.DataLoader(fashionTestData, batch_size=batc
 # Now actually train the models and save the results
 for d in trainList:
     logtext = ""
+    logtext += log(f"PyTorch version {torch.__version__}")
     logtext += log(f"Using {device} device")
 
     # Load the relevant data
@@ -217,26 +129,21 @@ for d in trainList:
     logtext += log(f"Training dataset and transforms: {train.dataset}")
     logtext += log(f"Validation dataset and transforms: {test.dataset}")
     logtext += log(f"Batch size: {batch_size}")
+    logtext += log(f"Shuffle: {shuffle}")
 
     # Load the specified model
-    if d['model'] == "dense2":
-        m = Dense2()
-    elif d['model'] == "conv2":
-        m = Conv2()
-    else:
-        print("Model", d['model'], "not found!  Exiting.")
-        exit()
+    m = d['model']()
     logtext += log("Loaded model:")
     logtext += log(str(m))
 
     # Make the name
-    name = d['data'] + "." + d['model'] + "." + loss_fn_name + "." + d['opt'] + "." + str(d['epochs']) + "." + datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+    name = f"{d['data']}.{m.label}.{loss_fn_name}.{d['opt']}.{d['epochs']}.{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
 
     # Define optimizer on the model (m.parameters() is iterator over parameters)
     if d['opt'] == 'sgd':
         optimizer = torch.optim.SGD(m.parameters(), lr=1e-3, dampening=0, momentum=0, weight_decay=0)                    # lr = learning rate
     elif d['opt'] == 'adam':
-        optimizer, optimizer_name = torch.optim.Adam(m.parameters(), lr = 1e-3), "adam"
+        optimizer, optimizer_name = torch.optim.Adam(m.parameters(), lr = d['rate']), "adam"
     else:
         print("Optimizer", d['opt'], "not found!  Exiting.")
         exit()

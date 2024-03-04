@@ -3,4 +3,4 @@ __pycache__/
 .gcloudignore
 data/
 models/*
-savedtests/*
+static/savedtests/*

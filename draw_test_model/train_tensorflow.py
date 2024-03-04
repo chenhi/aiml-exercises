@@ -5,7 +5,15 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 import numpy as np
 
-print("TensorFlow version: ", tf.__version__)
+
+
+#####################################################################
+# AUXILLIARY
+
+def log(l: str) -> str:
+    print(l)
+    return l + "\n"
+
 
 #####################################################################
 # WHAT TO TRAIN

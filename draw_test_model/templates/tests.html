@@ -1,0 +1,35 @@
+<html>
+
+
+
+<style>
+    table, img {
+        border:1px solid #000000;
+    }
+</style>
+<!-- BODY -->
+
+    <body>
+        <div style="position:absolute; top: 5%; left: 10%; float: left">
+            <table>
+                {% for list in files %}
+                <tr>
+                    <td>{{loop.index0}}</td>
+                    {% for f in list %}
+                    <td><img src="{{f}}" /></td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+
+        <div style="position:absolute; top: 5%; left: 50%; float: left">
+            {% for p in predictions %}
+                <img src="{{p['image']}}" /><br>
+                {% for key, val in p['predictions'].items() %}
+                    {{key}}: {{val}}<br>
+                {% endfor %}
+            {% endfor %}
+        </div>
+    </body>
+    </html>
