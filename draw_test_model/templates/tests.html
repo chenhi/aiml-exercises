@@ -1,11 +1,39 @@
 <html>
 
+<script type="text/javascript">
+    function show(num) {
+        for (i = 0; i < 10; i ++) {
+            if (i.toString() != num.toString() && num != -1) {
+                document.getElementById("col" + i.toString()).style.display = "none";
+            } else {
+                document.getElementById("col" + i.toString()).style.display = "block";
+            }
+        }
+    }
 
+</script>
 
 <style>
     table, img {
         border:1px solid #000000;
     }
+
+    /* Create ten equal columns that floats next to each other */
+.column {
+  position: absolute;
+  top: 5%;
+  float: left;
+  left: 33%;
+  padding: 0px;
+}
+
+/* Clear floats after the columns */
+.row:after {
+  content: "";
+  display: table;
+  clear: both;
+}
+</style>
 </style>
 <!-- BODY -->
 
@@ -14,21 +42,28 @@
             <table>
                 {% for list in files %}
                 <tr>
-                    <td>{{loop.index0}}</td>
+                    <td><button type="button" onclick="show({{loop.index0}})">{{loop.index0}}</button></td>
                     {% for f in list %}
                     <td><img src="{{f}}" /></td>
                     {% endfor %}
                 </tr>
                 {% endfor %}
             </table>
+            <button type="button" onclick="show(-1)">all</button>
         </div>
 
-        <div style="position:absolute; top: 5%; left: 50%; float: left">
-            {% for p in predictions %}
-                <img src="{{p['image']}}" /><br>
-                {% for key, val in p['predictions'].items() %}
-                    {{key}}: {{val}}<br>
+        <div class="row">
+            {% for digpred in predictions %}
+                <div class="column" id="col{{loop.index0}}" style="display: none">
+                Predictions for digit {{loop.index0}}<hr><br>
+                {% for f, p in digpred.items() %}
+                    <img src="{{f}}" /><br>
+                    {% for key, val in p.items() %}
+                        {{key}}: {{val}}<br>
+                    {% endfor %}
+                    <br>
                 {% endfor %}
+                </div>
             {% endfor %}
         </div>
     </body>

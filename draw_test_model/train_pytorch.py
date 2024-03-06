@@ -36,8 +36,8 @@ def log(l: str) -> str:
 # Format: the dataset, the model, the number of epochs, save model/results
 trainList = [
 #    {'data': 'digits', 'model': 'dense2', 'opt': 'adam', 'epochs': 1, 'save': True},
-     {'data': "digits", 'model': Conv2, 'opt': 'adam', 'epochs': 50, 'rate': 1e-2, 'save': True},
-#     {'data': "digits", 'model': Conv3, 'opt': 'adam', 'epochs': 20, 'rate': 1e-1, 'save': True},
+#     {'data': "digits", 'model': Conv2, 'opt': 'adam', 'epochs': 50, 'rate': 1e-2, 'save': True},
+    {'data': "digits", 'model': Conv3, 'opt': 'adam', 'epochs': 50, 'rate': 1e-2, 'save': True},
 #    {'data': 'fashion', 'model': 'dense2', 'opt': 'adam', 'epochs': 5, 'save': True},
 #    {'data': "fashion", 'model': "conv2", 'opt': 'adam', 'epochs': 20, 'save': True},
     ]

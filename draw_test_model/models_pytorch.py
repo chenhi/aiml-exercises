@@ -7,27 +7,31 @@ from torchvision.transforms import v2
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.random as rand
+import math
 
 import datetime
 
-# Weight initializer
+########## AUXILLARY FUNCTIONS ##########
+
+# Weight initializer (basically standard, copied from nn.Linear)
 def initWeights(m):
     if isinstance(m, nn.Linear):
-        torch.nn.init.kaiming_uniform_(m.weight)                # I guess there's not a huge difference between uniform vs. normal, and uniform probably easier to sample
-        if self.bias is not None:                               # Set the linear bias (just copied it from default nn.Linear code but can tweak it here)
-            fan_in, _ = init._calculate_fan_in_and_fan_out(self.weight)
+        # I guess there's not a huge difference between uniform vs. normal, and uniform probably easier to sample
+        torch.nn.init.kaiming_uniform_(m.weight)
+        if m.bias is not None:
+            fan_in, _ = nn.init._calculate_fan_in_and_fan_out(m.weight)
             bound = 1 / math.sqrt(fan_in) if fan_in > 0 else 0
-            init.uniform_(self.bias, -bound, bound)
+            torch.nn.init.uniform_(m.bias, -bound, bound)
         #m.bias.data.fill_(0.01)                                # E.g. if I just want to set it to something.
 
 
+########## MODEL DEFINITIONS ##########
 
 class Dense2(nn.Module):
     def __init__(self):
         super().__init__()
         self.label = "dense2"
         self.flatten = nn.Flatten()
-        self.reset_parameters = initWeights                 # Initialization (does this actually work????  i.e. does it apply it to the stuff below>???)
         self.linear_relu_stack = nn.Sequential(
             nn.Linear(28*28, 256),
             nn.ReLU(),
@@ -37,14 +41,7 @@ class Dense2(nn.Module):
             nn.BatchNorm1d(256),
             nn.Dropout(p=0.5),
             nn.Linear(256, 10)
-        )
-    
-
-    def rescale(self, x):
-        return x / 255.
-    
-    def unrescale(self, x):
-        return x * 255.    
+        ) 
 
     def forward(self, x):
         x = self.flatten(x)
@@ -111,6 +108,12 @@ class Conv2(nn.Module):             # Input shape (1, 28, 28) or (BATCH SIZE, 1,
             nn.Linear(128, 10)
         )
 
+    def forward(self, x):
+        logits = self.convolution_stack(x)
+        return logits
+    
+    # The rest of this is not used or needed
+
     def rescale(self, x):
         return x / 255.
     
@@ -129,7 +132,30 @@ class Conv2(nn.Module):             # Input shape (1, 28, 28) or (BATCH SIZE, 1,
         y_trans = rand.exponential(scale=max(zoom, 1.)) (np.sign(rand.uniform(-1,1)))
         x = v2.functional.affine(degrees=rot, translate=[x_trans, y_trans])(x)
         return x 
+    
+# TODO not done yet
+class RandomWiggle():
+    def __init__(self, zoom_probability, rotation_95) -> None:
+        self.zoom_probability = zoom_probability
+        # We use a truncated exponential distribution for the zoom amount, and will only ever zoom out.
+        # This means probability of zoom is e^{-scale}, so the scale is -ln(zoom_probability)
+        self.zoom_scale = -1 * math.log(self.zoom_probability)
+        # The angle in degrees that 95% of zooms should be in (in either direction)
+        self.rotation_95 = rotation_95
+        self.rotation_scale = math.log(.05) / (-math.abs(rotation_95))
 
-    def forward(self, x):
-        logits = self.convolution_stack(x)
-        return logits
+        nn.utils._log_api_usage_once(self)
+
+
+    def __call__(self, pic):        
+        # Zoom
+        zoom = rand.exponential(scale = self.zoom_scale)
+        if zoom > 1:
+            pic = v2.functional.affine(scale=1./zoom)(x)
+        
+        # Rotate
+        rot = rand.exponential(scale=self.rotation_scale) * rand.choice([-1.,1.])
+        x = v2.functional.affine(degrees=rot)(x)        # Is this how to use this function?
+
+        # Translate
+        
