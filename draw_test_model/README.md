@@ -10,7 +10,7 @@ To use it:
 2) Use pip to install the python packages indicated in the requirements.txt file (the specific versions are probably not important).
 3) Create the directories: models/ and static/savedtests/
 4) Make or modify some of the models in models_pytorch.py or models_tensorflow.py
-5) Train the models using train.py -- this can basically be used out of the box, you just need to modify the list trainList
+5) Train the models using train.py -- this can basically be used out of the box, you just need to modify the options in the top of the script
 6) Modify the list of models you want to actually run in app.py
 7) Run Flask (go to the directory, then flask run) and then open your browser to http://localhost:5000/
 
