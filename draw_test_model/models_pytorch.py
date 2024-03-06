@@ -1,15 +1,10 @@
 import torch
-import torchvision
 from torch import nn
-from torchvision import datasets
 from torchvision.transforms import v2
 
-import matplotlib.pyplot as plt
 import numpy as np
 import numpy.random as rand
 import math
-
-import datetime
 
 ########## AUXILLARY FUNCTIONS ##########
 
@@ -134,7 +129,7 @@ class Conv2(nn.Module):             # Input shape (1, 28, 28) or (BATCH SIZE, 1,
         return x 
     
 # TODO not done yet
-class RandomWiggle():
+class RandomWiggle(v2.Transform):
     def __init__(self, zoom_probability, rotation_95) -> None:
         self.zoom_probability = zoom_probability
         # We use a truncated exponential distribution for the zoom amount, and will only ever zoom out.
@@ -158,4 +153,3 @@ class RandomWiggle():
         x = v2.functional.affine(degrees=rot)(x)        # Is this how to use this function?
 
         # Translate
-        
