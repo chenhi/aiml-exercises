@@ -14,5 +14,4 @@ Some comments on fashion:
 
 
 Todo:
-* Have a way to re-test the models on the saved images en masse
 * See if I can write my own Transform class and play with that a litle

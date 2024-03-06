@@ -8,22 +8,24 @@ import tensorflow as tf
 
 import matplotlib.pyplot as plt
 import datetime
+from io import StringIO
 
 import models_pytorch as ptm
 import models_tensorflow as tfm
+from aux import log, tf_summary_string
 
-#####################################################################
-# TRAINING LIST AND OPTIONS
+#################### TRAINING LIST AND OPTIONS ####################
 
 
 # ptm means a PyTorch model, tfm means a TensorFlow/Keras model
+# Note that PyTorch entries require a 'rate', not implemented for TensorFlow
 trainList = [
 #    {'data': 'digits', 'model': ptm.Dense2, 'opt': 'adam', 'epochs': 1, 'rate': 1e-3, 'save': True},
 #     {'data': 'digits', 'model': ptm.Conv2, 'opt': 'adam', 'epochs': 50, 'rate': 1e-2, 'save': True},
 #    {'data': 'digits', 'model': ptm.Conv3, 'opt': 'adam', 'epochs': 50, 'rate': 1e-2, 'save': True},
 #    {'data': 'fashion', 'model': ptm.Dense2, 'opt': 'adam', 'epochs': 5, 'save': True},
-#    {'data': 'fashion', 'model': ptm.Conv2, 'opt': 'adam', 'epochs': 20, 'save': True},
-#    {'data': 'digits', 'model': tfm.Conv2, 'opt': 'adam', 'epochs': 1, 'save': True},
+    {'data': 'fashion', 'model': tfm.Conv2, 'opt': 'adam', 'epochs': 2, 'save': True},
+    
     ]
 
 
@@ -47,27 +49,13 @@ tf_loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(name="nll")          
 #tf_loss_fn = tf.keras.losses.CategoricalHinge(name="hinge")
 
 
-#####################################################################
-# SOME UNIFORM OPTIONS
 
-device = (
-    "cuda"
-    if torch.cuda.is_available()
-    else "mps"
-    if torch.backends.mps.is_available()
-    else "cpu"
-)
 
-#####################################################################
-# AUXILLIARY
 
-def log(l: str) -> str:
-    print(l)
-    return l + "\n"
 
-#####################################################################
-# DATA AND FEATURE TRANSFORMATIONS
+#################### DATA AND FEATURE TRANSFORMATIONS ####################
 
+# PyTorch
 # ToTensor transforms to tensor of the form (BATCH SIZE, 1, 28, 28) with values in range [0, 1]
 digitsTrainData = datasets.MNIST(
     root="data",
@@ -101,47 +89,85 @@ fashionTrainLoader = torch.utils.data.DataLoader(fashionTrainData, batch_size=ba
 fashionTestLoader = torch.utils.data.DataLoader(fashionTestData, batch_size=batch_size)
 
 
-
+# TensorFlow 
 tf_digitsTrainData, tf_digitsTestData = tf.keras.datasets.mnist.load_data()
 tf_fashionTrainData, tf_fashionTestData = tf.keras.datasets.fashion_mnist.load_data()
 
-#####################################################################
-# TRAIN, TEST, SAVE
+
+
+
+
+
+#################### TRAIN, TEST, SAVE ####################
+
+# Get device
+device = (
+    "cuda"
+    if torch.cuda.is_available()
+    else "mps"
+    if torch.backends.mps.is_available()
+    else "cpu"
+)
 
 
 # Now actually train the models and save the results
 for d in trainList:
     # Load the specified model
     m = d['model']()
-
-    ##### PYTORCH #####
+    
+    # First, figure out if it's PyTorch or TensorFlow (or unrecognized).
     if isinstance(m, nn.Module):
-        logtext = ""
-        logtext += log(f"PyTorch version {torch.__version__}")
-        logtext += log(f"Using {device} device")
+        isTorch = True
+    elif isinstance(m, tf.keras.Model):
+        isTorch = False
+    else:
+        print("ERROR: Unrecognized model format (not PyTorch nor TensorFlow).")
+        print(m)
+        print("Skipping entry in training list.")
+        continue
+    
+    # Start the log
+    logtext = ""
+    logtext += log(f"PyTorch version {torch.__version__}") if isTorch else log(f"TensorFlow version {tf.__version__}")
+    logtext += log(f"Using {device} device")
 
-        # Load the relevant data
-        if d['data'] == "digits":
+
+    # Load the relevant data
+    if d['data'] == "digits":
+        if isTorch:
             train, test = digitsTrainLoader, digitsTestLoader
-        elif d['data'] == "fashion":
+        else:
+            train, test = tf_digitsTrainData, tf_digitsTestData
+    elif d['data'] == "fashion":
+        if isTorch:
             train, test = fashionTrainLoader, fashionTestLoader
         else:
-            print("Data", d['data'], "not found!  Exiting.")
-            exit()
+            train, test = tf_fashionTrainData, tf_fashionTestData
+    else:
+        print("ERROR: Data", d['data'], "not recognized.  Skipping entry in training list.")
+        continue
+
+    # Some extra inputs for PyTorch
+    if isTorch:
         logtext += log(f"Training dataset and transforms: {train.dataset}")
         logtext += log(f"Validation dataset and transforms: {test.dataset}")
         logtext += log(f"Batch size: {batch_size}")
         logtext += log(f"Shuffle: {shuffle}")
 
-        # Load the specified model
-        m = d['model']()
-        logtext += log("Loaded model:")
+    # Log model information and make the name
+    logtext += log("Loaded model:")
+    if isTorch:
         logtext += log(str(m))
-
-        # Make the name
         name = f"{d['data']}.{m.label}.{loss_fn_name}.{d['opt']}.{d['epochs']}.{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+    else:
+        # For TensorFlow, the summary will come later
+        name = f"{d['data']}.{m.name}.{tf_loss_fn.name}.{d['opt']}.{d['epochs']}.{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
 
-        # Define optimizer on the model (m.parameters() is iterator over parameters)
+
+    # Start training
+    if isTorch:
+ 
+         # Define optimizer on the model (m.parameters() is iterator over parameters)
         if d['opt'] == 'sgd':
             optimizer = torch.optim.SGD(m.parameters(), lr=1e-3, dampening=0, momentum=0, weight_decay=0)                    # lr = learning rate
         elif d['opt'] == 'adam':
@@ -206,17 +232,29 @@ for d in trainList:
             testLoss.append(test_loss)
             testAcc.append(test_acc)
 
-
-
         logtext += log("Done training and testing!")
-
+        
         # Log the accuracy and loss across all epochs
         logtext += log("Training accuracy: " + str(trainAcc))
         logtext += log("Training loss: " + str(trainLoss))
         logtext += log("Validation accuracy: " + str(testAcc))
         logtext += log("Validation loss: " + str(testLoss))
+
+    else:
         
-        # Plot some graphs
+        logtext += log(f"Training: {name}")
+        m.compile(optimizer=d['opt'], loss=tf_loss_fn, metrics=['accuracy'])
+        history = m.fit(x=train[0], y=train[1], validation_data=test, epochs=d['epochs'])
+        results = m.evaluate(x=test[0], y=test[1], verbose=2)
+        
+        logtext += log("Done training!")
+        logtext += log(results)
+        logtext += log(history)
+        logtext += log(tf_summary_string(m))
+
+
+    # Plot some graphs
+    if isTorch:
         epochs_range = range(d['epochs'])
         plt.figure(figsize=(8, 8))
         plt.subplot(1, 2, 1)
@@ -231,38 +269,7 @@ for d in trainList:
         plt.legend(loc='upper right')
         plt.title('Training and Validation Loss')
         #plt.show()        
-
-        if d['save'] == True:
-            #torch.save(m.state_dict(), name + ".pth")
-            plt.savefig("models/" + name + ".pth.png")
-            logtext += log("Saved accuracy/loss plot to " + name + ".pth.png")
-            model_scripted = torch.jit.script(m)
-            model_scripted.save("models/" + name + ".pth")
-            logtext += log("Saved PyTorch model to " + name + ".pth")
-            with open("models/" + name + ".pth.log", "w") as f:
-                logtext += log("Saved logs to " + name + ".pth.log")
-                f.write(logtext)
-
-    ##### TENSORFLOW #####
-    elif isinstance(m, tf.keras.Model):
-        name = f"{d['data']}.{m.name}.{tf_loss_fn.name}.{d['opt']}.{d['epochs']}.{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
-
-        if d['data'] == "digits":
-            train, test = tf_digitsTrainData, tf_digitsTestData
-        elif d['data'] == "fashion":
-            train, test = tf_fashionTrainData, tf_fashionTestData
-        else:
-            print("Data", d['data'], "not found!  Exiting.")
-            exit()
-        
-        print("Training:", m.name)
-        m.compile(optimizer=d['opt'], loss=tf_loss_fn, metrics=['accuracy'])
-        history = m.fit(x=train[0], y=train[1], validation_data=test, epochs=d['epochs'])
-        results = m.evaluate(x=test[0], y=test[1], verbose=2)
-        
-        print(results)
-        print(history)
-
+    else:
         acc = history.history['accuracy']
         val_acc = history.history['val_accuracy']
 
@@ -283,13 +290,29 @@ for d in trainList:
         plt.plot(epochs_range, val_loss, label='Validation Loss')
         plt.legend(loc='upper right')
         plt.title('Training and Validation Loss')
-        plt.show()
+        #plt.show()
 
-        if d['save'] == True:
-            plt.savefig("models/" + name + ".keras.png")
-            m.save("models/" + m.name + ".keras")
-            with open("models/" + m.name + ".log", "w") as f:
-                m.summary(print_fn=lambda x: f.write(x + '\n'))
-                f.write("\n\n\n" + str(results) + "\n\n\n" + str(history.history))
-                f.close()
+    # Save the model, logs and graph
+    if d['save'] == True:
+        #torch.save(m.state_dict(), name + ".pth")
+        mpath = "models/" + name + (".pth" if isTorch else ".keras")
+        plotpath = mpath + ".png"
+        logpath = mpath + ".log"
 
+        # Save graph
+        plt.savefig(plotpath)
+        logtext += log(f"Saved accuracy/loss plot to {plotpath}")
+        
+        # Save model
+        if isTorch:
+            model_scripted = torch.jit.script(m)
+            model_scripted.save(mpath)
+        else:
+            m.save(mpath)
+        logtext += log(f"Saved model to {mpath}")
+
+        # Save logs
+        with open(logpath, "w") as f:
+            logtext += log(f"Saved logs to {logpath}")
+            f.write(logtext)
+        #m.summary(print_fn=lambda x: f.write(x + '\n'))
