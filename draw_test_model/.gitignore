@@ -4,3 +4,5 @@ __pycache__/
 data/
 models/*
 static/savedtests/*
+main.py
+app.yaml

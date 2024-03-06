@@ -5,10 +5,11 @@ For the time being, it's mostly a tool I created to help myself interact with ne
 
 
 
-To use it, download the repository and create the directories: models/ and static/savedtests/
-
-app.yaml, main.py are just for deploying to Google Cloud and can be ignored.
-
+To use it:
+1) Download the repository.
+2) Use pip to install the python packages indicated in the requirements.txt file (the specific versions are probably not important).
+3) Create the directories: models/ and static/savedtests/
+4) Run Flask (go to the directory, then flask run) and then open your browser to http://localhost:5000/
 
 
 The app also allows for training and testing of classification of images of articles of clothing using Fashion MNIST data.
