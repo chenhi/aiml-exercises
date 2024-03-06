@@ -28,8 +28,14 @@ device = (
 
 ########## MODIFY THIS TO CHANGE THE MODELS TO LOAD ##########
 
+# A list of the file names of the models to load
 digitsModels = ["digits.conv3.nll.adam.50.20240304230753.pth", "digits.conv3.nll.adam.20.20240304033700.pth", "digits.conv2.nll.adam.20.20240304030352.pth", "digits.conv2.nll.adam.20.20240304024502.pth", "digits.conv2.nll.adam.50.pth", "digits.conv2.nll.adam.30.pth", "digits.conv2.nll.100.keras"]
 fashionModels = ["fashion.conv2.nll.adam.20.20240229225014.pth", "fashion.dense2.keras", "fashion.conv2.keras"]
+
+
+
+
+########## KEY TO LABEL ##########
 
 digitsKeys = ("0", "1", "2","3","4","5","6","7","8","9")
 fashionKeys = ("T-shirt", "trousers", "pullover", "dress", "coat", "sandal", "shirt", "sneaker", "bag", "boot")

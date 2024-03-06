@@ -15,31 +15,37 @@ import models_tensorflow as tfm
 #####################################################################
 # TRAINING LIST AND OPTIONS
 
-# Format: the dataset, the model, the number of epochs, save model/results
+
+# ptm means a PyTorch model, tfm means a TensorFlow/Keras model
 trainList = [
 #    {'data': 'digits', 'model': ptm.Dense2, 'opt': 'adam', 'epochs': 1, 'rate': 1e-3, 'save': True},
-#     {'data': "digits", 'model': ptm.Conv2, 'opt': 'adam', 'epochs': 50, 'rate': 1e-2, 'save': True},
-#    {'data': "digits", 'model': ptm.Conv3, 'opt': 'adam', 'epochs': 50, 'rate': 1e-2, 'save': True},
+#     {'data': 'digits', 'model': ptm.Conv2, 'opt': 'adam', 'epochs': 50, 'rate': 1e-2, 'save': True},
+#    {'data': 'digits', 'model': ptm.Conv3, 'opt': 'adam', 'epochs': 50, 'rate': 1e-2, 'save': True},
 #    {'data': 'fashion', 'model': ptm.Dense2, 'opt': 'adam', 'epochs': 5, 'save': True},
-#    {'data': "fashion", 'model': ptm.Conv2, 'opt': 'adam', 'epochs': 20, 'save': True},
-    {'data': "digits", 'model': tfm.Conv2, 'opt': 'adam', 'epochs': 1, 'save': True},
+#    {'data': 'fashion', 'model': ptm.Conv2, 'opt': 'adam', 'epochs': 20, 'save': True},
+#    {'data': 'digits', 'model': tfm.Conv2, 'opt': 'adam', 'epochs': 1, 'save': True},
     ]
 
 
-# Loss function (PyTorch)
+##### PyTorch #####
+
+# Loss function
 loss_fn, loss_fn_name = nn.CrossEntropyLoss(), "nll"                   # Inputs are logits (i.e. pre-softmax)
 #loss_fn, loss_fn_name = torch.nn.HingeEmbeddingLoss(margin=1.), "hinge"        
-
-# Loss function (TensorFlow)
-#tf_loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, name="nll")              # Use without softmax
-tf_loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(name="nll")                                 # Use with softmax
-#tf_loss_fn = tf.keras.losses.CategoricalHinge(name="hinge")
 
 # Batch size (i.e. how often back-propagation happens)
 batch_size = 64
 
 # Shuffling
 shuffle = True
+
+##### TensorFlow #####
+
+# Loss function
+#tf_loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, name="nll")              # Use without softmax
+tf_loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(name="nll")                                 # Use with softmax
+#tf_loss_fn = tf.keras.losses.CategoricalHinge(name="hinge")
+
 
 #####################################################################
 # SOME UNIFORM OPTIONS
@@ -250,7 +256,7 @@ for d in trainList:
             exit()
         
         print("Training:", m.name)
-        m.compile(optimizer='adam', loss=tf_loss_fn, metrics=['accuracy'])
+        m.compile(optimizer=d['opt'], loss=tf_loss_fn, metrics=['accuracy'])
         history = m.fit(x=train[0], y=train[1], validation_data=test, epochs=d['epochs'])
         results = m.evaluate(x=test[0], y=test[1], verbose=2)
         
