@@ -226,10 +226,12 @@ class SimpleGame():
         return None if s == None else s[0]
 
     # Player data is (start state, action taken, all reward before next action, starting state for next action)
-    def batch_learn(self, learn_rate: float, iterations: int, episodes: int, episode_length: int):
+    def batch_learn(self, learn_rate: float, iterations: int, episodes: int, episode_length: int, verbose=False):
         player_experiences = [[] for i in range(self.num_players)]
         for i in range(iterations):
             for j in range(episodes):
+                if verbose and j % 10 == 9:
+                    print(f"Training iteration {i+1}, episode {j+1}", end='\r')
                 s = self.mdp.get_initial_state()
                 queue =[None for k in range(self.num_players)]
                 for k in range(episode_length):

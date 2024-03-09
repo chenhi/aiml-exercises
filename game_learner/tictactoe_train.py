@@ -1,6 +1,6 @@
 import tictactoe
 from qlearn import *
-import os, datetime
+import os, datetime, re
 
 ttt = tictactoe.TTTMDP()
 game = SimpleGame(ttt, 2)
@@ -58,17 +58,11 @@ else:
         print("Not a valid value.  Setting iterations to 100.")
         its = 100
     
-    res = input("Name of file (w/o extension): ")
-    try:
-        fname = str(res) + f"-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.pkl"
-        f = open(fname, 'wb')
-        f.close()
-    except:
-        print(f"Not a valid value.  Defaulting to tttbot.")
-        fname = f"tttbot-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.pkl"
-
+    res = input("Name of file (alphanumeric only, max length 64, w/o extension): ")
+    fname = re.sub(r'\W+', '', res)[0:64] + f"-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.pkl"
+    
     game.set_greed([expl, expl])
-    game.batch_learn(lr, its, eps, 1000)
+    game.batch_learn(lr, its, eps, 1000, verbose=True)
     
     # Setting the maximum episode length to be very high is safe, since the game is very short
     # This will run the game 10 times before retraining, and do this 1000 times.  Good for an initial training

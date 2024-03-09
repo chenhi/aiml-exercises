@@ -1,0 +1,3 @@
+Tic-tac-toe
+* For full exploration (no explotation), one problem is it will still choose invalid moves a lot of the time.  Also, the Q-values will be highly unstable, since the AI are playing randomly, so they will be optimizing against a random strategy, not an optimal strategy.  For full exploitation, there are the usual caveats.
+* For the learning rate, it is tempting to set it to 1.  But this can make the AI learn to favor a bad strategy when its opponent happened to play poorly the last time, and vice versa.  So an intermediate learning rate might still be best.
