@@ -1,5 +1,5 @@
 import numpy as np
-from interface import *
+from qlearn import *
 import random
 
 import matplotlib.pyplot as plt

@@ -1,5 +1,6 @@
 import random
 import numpy as np
+import pickle
 
 # Returns the set of maximum arguments
 def argmax(args: list, f: callable):
@@ -210,6 +211,13 @@ class SimpleGame():
     def set_greed(self, eps):
         self.strategies = [get_greedy(self.qs[i], eps[i]) for i in range(self.num_players)]
 
+    def save_q(self, fname):
+        with open(fname, 'wb') as f:
+            pickle.dump(self.qs, f)
+        
+    def load_q(self, fname):
+        with open(fname, 'rb') as f:
+            self.qs = pickle.load(f)
 
     def transition(self, p, s, a) -> tuple[int, object, np.ndarray]:
         return self.mdp.transition((p, s), a)
@@ -239,7 +247,7 @@ class SimpleGame():
                     
 
                     # Update rewards for all other players; if the player hasn't taken an action yet, no reward (but is accounted somewhat by zero sum nature)
-                    # Is the state is terminal, also append
+                    # If the state is terminal, also append
                     for l in range(self.num_players):
                         if l != p and queue[l] != None:
                             queue[l][2] += r[l]

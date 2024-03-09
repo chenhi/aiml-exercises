@@ -1,4 +1,4 @@
-from interface import *
+from qlearn import *
 import numpy as np
 import random
 
