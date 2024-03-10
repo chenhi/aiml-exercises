@@ -52,12 +52,14 @@ class MDP():
         if self.states != None:
             return random.choice(self.states)
         raise NotImplementedError
-    
-    # Can re-implement this to take the state into consideration to avoid invalid moves
+
+    # Can re-implement this to take the state into consideration to avoid invalid moves    
+    def get_actions(self, s = None):
+        if s == None:
+            return self.actions
+
     def get_random_action(self, s = None):
-        if self.actions != None:
-            return random.choice(self.actions)
-        raise NotImplementedError
+        return random.choice(self.get_actions(s))
 
     # Returns: (next state, reward)
     def transition(self, s, a):
@@ -98,7 +100,7 @@ class ValueFunction():
         
         # If we have a defined (finite) set of actions, just iterate
         if self.mdp.actions != None:
-            return valmax(self.mdp.actions, lambda a: self.get(s, a))
+            return valmax(self.mdp.get_actions(s), lambda a: self.get(s, a))
 
         # If the set of actions is undefined and infinite, we don't have much control over things.
         # We will assume that there is always some choice that hasn't been explored yet, which therefore has value 0.
@@ -124,7 +126,7 @@ class ValueFunction():
 
         # If we have a defined set of actions, we can just do an argmax
         if self.mdp.actions != None:
-            return random.choice(argmax(self.mdp.actions, lambda a: self.get(s,a)))
+            return random.choice(argmax(self.mdp.get_actions(s), lambda a: self.get(s,a)))
         
         # Same issue as val() when the actions are not defined.
         # The result is that when enterng a state that only has negative known values, the AI will choose a random action.
@@ -188,12 +190,22 @@ class ValueFunction():
             self.update(experiences, learn_rate)
                 
 
+class NNValueFunction(ValueFunction):
+    def __init__(self, mdp: MDP):
+        self.nnq = None #TODO
+        self.mdp = mdp    
+
+    def to_tensor(s, a):
+        raise NotImplementedError
+    
+    def get(self, s, a) -> float:
+        return self.nnq(self.to_tensor(s, a))
 
 
 # Greedy function to use as a strategy.  Default is totally greedy.
 # This only works if the set of actions is defined and finite
 def greedy(q: ValueFunction, s, e = 0.):
-    return q.mdp.get_random_action(s) if random.random() < e else random.choice(argmax(q.mdp.actions, lambda a: q.get(s,a)))
+    return q.mdp.get_random_action(s) if random.random() < e else random.choice(argmax(q.mdp.get_actions(s), lambda a: q.get(s,a)))
 
 def get_greedy(q: ValueFunction, e: float) -> callable:
     return lambda s: greedy(q, s, e)
@@ -234,7 +246,7 @@ class SimpleGame():
         return None if s == None else s[0]
 
     # Player data is (start state, action taken, all reward before next action, starting state for next action)
-    def batch_learn(self, learn_rate: float, iterations: int, episodes: int, episode_length: int, verbose=False):
+    def batch_learn(self, learn_rate: float, iterations: int, episodes: int, episode_length: int, verbose=False, savefile=None):
         player_experiences = [[] for i in range(self.num_players)]
         for i in range(iterations):
             for j in range(episodes):
@@ -271,3 +283,6 @@ class SimpleGame():
             # Do an update for each player
             for p in range(self.num_players):
                 self.qs[p].update(player_experiences[p], learn_rate)
+        if savefile != None:
+            with open(savefile, 'wb') as f:
+                pickle.dump(player_experiences, f)

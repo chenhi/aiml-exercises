@@ -19,10 +19,16 @@ class C4MDP(MDP):
             for c in range(6):
                 rows[5 - c] += self.symb[''] if c >= len(col) else self.symb[col[c]]
         for row in rows:
-            out += f"{row}\n"
+            out += f"{row}|\n"
+        out += "|1234567|"
         return out
 
-
+    def get_actions(state):
+        notfull = []
+        for i in range(7):
+            if len(state[1][i]) < 6:
+                notfull.append(i)
+        return notfull
 
     # Reward is 1 for winning the game, -1 for losing, and 0 for a tie; awarded upon entering terminal state
     def transition(self, state, a):

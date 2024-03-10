@@ -48,7 +48,7 @@ except:
 
 if saveindex >= 0:
     # Load the AI
-    game.load_q(saves[saveindex])
+    game.load_q('bots/' + saves[saveindex])
 elif saveindex == -1:
     # Train AI
     res = input("How greedy should it be?  A number in [0, 1]: ")
@@ -92,7 +92,7 @@ elif saveindex == -1:
     fname = 'bots/' + re.sub(r'\W+', '', res)[0:64] + f"-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}{file_ext}"
     
     game.set_greed([expl, expl])
-    game.batch_learn(lr, its, eps, 1000, verbose=True)
+    game.batch_learn(lr, its, eps, 1000, verbose=True, savefile=fname + ".exp")
     
     # Setting the maximum episode length to be very high is safe, since the game is very short
     # This will run the game 10 times before retraining, and do this 1000 times.  Good for an initial training
@@ -110,7 +110,7 @@ elif saveindex == -1:
 # Play the AI
 if shortname == "ttt":
     while True:
-        if res != 'p':
+        if saveindex >= -1:
             res = input("Play as first or second player?  Enter '1' or '2' or 'q' to quit: ")
             if res == 'q':
                 exit()
@@ -134,7 +134,7 @@ if shortname == "ttt":
                 y = int(res[1].strip())
                 s, _ = game.mdp.transition(s, (x-1,y-1))
             else:
-                for a in game.mdp.actions:
+                for a in game.mdp.get_actions(s):
                     print(f"Value of action {a} is {game.qs[comp].get(s, a)}.")
                 a = game.qs[comp].policy(s)
                 print(f"Chosen action: {a}.\n")
@@ -164,7 +164,7 @@ elif shortname == "c4":
                 re = input(f"Input column to play (1-7). ")
                 s, _ = game.mdp.transition(s, int(re) - 1)
             else:
-                for a in game.mdp.actions:
+                for a in game.mdp.get_actions(s):
                     print(f"Value of action {a} is {game.qs[comp].get(s, a)}.")
                 a = game.qs[comp].policy(s)
                 print(f"Chosen action: {a}.\n")
