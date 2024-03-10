@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 from qlearn import *
 import random
@@ -56,11 +57,12 @@ class GoHomeMDP(MDP):
         return self.start
     
     
-
-    
+# get command line options
+options = sys.argv[1:]
+   
 mdp = GoHomeMDP((6,6), (0,0), (3,3), 0.9)
 # Test: play the MDP
-if False:
+if 'play' in options:
     s = mdp.get_initial_state()
     reward = 0
     history = [s]
@@ -77,14 +79,14 @@ if False:
 q = ValueFunction(mdp)
 
 # Test single update and val
-if False:
+if 'single' in options:
     print(q.single_update((4,5), (1,0), 1))
     print(q.q[((4,5),(1,0))])
     print(q.val((4,5)))
     print(q.val((4,4)))
 
 # Test update
-if False:
+if 'update' in options:
     exp = 0.5
     lr = 0.5
     iter = 100000
@@ -108,7 +110,7 @@ if False:
     plt.show()
 
 #Test batch update, policy
-if True:
+if 'batch' in options:
     exp = 0.5
     lr = 0.5
     iter = 100
