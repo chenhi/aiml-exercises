@@ -2,4 +2,6 @@ qlearn.py contains base classes for implementing games as Markov decision proces
 
 test_mdp.py is a basic MDP where a robot tries to find its way "home" on a grid, for testing basic functionality.
 
-tictactoe.py etc. implements Tic Tac Toe and trains an AI to play it using Q learning (no neural network).
+tictactoe.py and connectfour.py implement Tic-Tac-Toe and Connect Four game logic
+
+play.py is for playing and training AI, also for playing self
