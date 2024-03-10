@@ -196,14 +196,13 @@ def get_greedy(q: ValueFunction, e: float) -> callable:
 
 
 
-
-
-
-# A simple game is a multiplayer game one where a player either wins or loses (zero sum)
 # To each player, the game will act like a MDP; i.e. they do not distinguish between the opponents and the environment
 # We can only batch learn, since there is a lag in rewards updating
 # Player order can make a difference, so when training, do not shuffle the order
-# Discount factor is 1
+
+# Requirements for the MDP:
+# The state must be a tuple, whose first entry is the current player
+# The rewards are returned as a tuple, corresponding to rewards for each player
 class SimpleGame():
     def __init__(self, mdp: MDP, num_players):
         # An mdp that encodes the rules of the game.  The current player is part of the state, which is of the form (current player, actual state)

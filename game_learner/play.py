@@ -32,7 +32,7 @@ except:
 
 print(f"\nPlaying {name}.\n")
 
-saves = [each for each in os.listdir() if each.endswith(file_ext)]
+saves = [each for each in os.listdir('bots/') if each.endswith(file_ext)]
 savestr = ""
 for i in range(len(saves)):
     savestr += f"[{i}] {saves[i]}\n"
@@ -89,7 +89,7 @@ elif saveindex == -1:
         its = 100
     
     res = input("Name of file (alphanumeric only, max length 64, w/o extension): ")
-    fname = re.sub(r'\W+', '', res)[0:64] + f"-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}{file_ext}"
+    fname = 'bots/' + re.sub(r'\W+', '', res)[0:64] + f"-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}{file_ext}"
     
     game.set_greed([expl, expl])
     game.batch_learn(lr, its, eps, 1000, verbose=True)
