@@ -76,6 +76,16 @@ class TTTMDP(MDP):
     # The game is short enough that maybe we don't care about intermediate states
     def get_random_state(self):
         return self.get_initial_state()
+    
+    def get_random_action(self, s = None):
+        if s == None:
+            return random.choice(self.actions)
+        else:
+            empty = []
+            for i in range(9):
+                if s[1][i] == 0:
+                    empty.append((i//3, i % 3))
+            return random.choice(empty)
 
     def is_terminal(self, state):
         return False if self.winner(state) == None else True

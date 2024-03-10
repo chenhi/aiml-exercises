@@ -1,4 +1,8 @@
 Tic-tac-toe
 * For full exploration (no explotation), one problem is it will still choose invalid moves a lot of the time.  Also, the Q-values will be highly unstable, since the AI are playing randomly, so they will be optimizing against a random strategy, not an optimal strategy.  For full exploitation, there are the usual caveats.
 * For the learning rate, it is tempting to set it to 1.  But this can make the AI learn to favor a bad strategy when its opponent happened to play poorly the last time, and vice versa.  So an intermediate learning rate might still be best.
-* I wonder if, instead of updating Q in each iteration, I should just retrain Q.  Can try this next time.
+* I thought about just retraining Q instead of updating Q in each iteration.  But this won't save any time.  What it can do is erase "early noise" but it it might make convergence slower.
+* I wonder if I should make the algorithm a bit more greedy.  I can play with this a little bit.
+
+Connect Four:
+* 100 episodes, 1000 iterations is taking maybe 2 hours.  The AI is not great because there are large branches of the tree it hasn't explored at all.  Will try training it with a neural network.

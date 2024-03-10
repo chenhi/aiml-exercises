@@ -36,7 +36,7 @@ class MDP():
         self.discount = discount   
 
     def copy(self):
-        new_mdp = MDP(self.states, self.actions, self.discount)
+        raise NotImplementedError
 
     def is_state(self, s):
         return True if self.states == None or s in self.states else False
@@ -53,7 +53,8 @@ class MDP():
             return random.choice(self.states)
         raise NotImplementedError
     
-    def get_random_action(self):
+    # Can re-implement this to take the state into consideration to avoid invalid moves
+    def get_random_action(self, s = None):
         if self.actions != None:
             return random.choice(self.actions)
         raise NotImplementedError
@@ -95,11 +96,14 @@ class ValueFunction():
         if self.mdp.is_terminal(s):
             return 0
         
-        # If we have a defined set of actions, just iterate
+        # If we have a defined (finite) set of actions, just iterate
         if self.mdp.actions != None:
             return valmax(self.mdp.actions, lambda a: self.get(s, a))
 
-        # Otherwise TODO
+        # If the set of actions is undefined and infinite, we don't have much control over things.
+        # We will assume that there is always some choice that hasn't been explored yet, which therefore has value 0.
+        # This is generally not going to be true; it's better to do some kind of regression on the states we know.
+        # The result is that states will not have negative value, only zero value.  This can cause the AI to claim an immediate reward but then enter a really bad state.
         values = []
         for t, a in self.q.keys():
             if s == t:
@@ -122,7 +126,8 @@ class ValueFunction():
         if self.mdp.actions != None:
             return random.choice(argmax(self.mdp.actions, lambda a: self.get(s,a)))
         
-        # Otherwise, we need to look... #TODO needs implementation
+        # Same issue as val() when the actions are not defined.
+        # The result is that when enterng a state that only has negative known values, the AI will choose a random action.
         valid = []
         maxim = None
         for t, a in self.q.keys():
@@ -133,7 +138,7 @@ class ValueFunction():
                 else:
                     maxim = max(maxim, valid[-1][1])            
             
-        if len(valid) == 0:
+        if len(valid) == 0 or maxim < 0:
             return self.mdp.get_random_action()
         
         best = []
@@ -188,7 +193,7 @@ class ValueFunction():
 # Greedy function to use as a strategy.  Default is totally greedy.
 # This only works if the set of actions is defined and finite
 def greedy(q: ValueFunction, s, e = 0.):
-    return q.mdp.get_random_action() if random.random() < e else random.choice(argmax(q.mdp.actions, lambda a: q.get(s,a)))
+    return q.mdp.get_random_action(s) if random.random() < e else random.choice(argmax(q.mdp.actions, lambda a: q.get(s,a)))
 
 def get_greedy(q: ValueFunction, e: float) -> callable:
     return lambda s: greedy(q, s, e)
