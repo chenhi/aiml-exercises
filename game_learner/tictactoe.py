@@ -44,7 +44,7 @@ class TTTMDP(MDP):
     # Reward is 1 for winning the game, -1 for losing, and 0 for a tie; awarded upon entering terminal state
     def transition(self, state, a):
         # Copy it
-        p, s = self.state_to_array((state))
+        p, s = self.state_to_array(state)
             
         # Check if move is valid
         # If it's not a valid move, give a penalty (a large penality; it should learn to never make these moves)
@@ -53,7 +53,7 @@ class TTTMDP(MDP):
                 penalty = (-1000, 0)
             else:
                 penalty = (0, -1000)
-            return self.array_to_state(p, s), penalty
+            return state, penalty
         
         # If the move is valid, make it
         b = s.copy()
@@ -85,7 +85,7 @@ class TTTMDP(MDP):
     def winner(self, state):
         _, s = self.state_to_array(state)
         for i in range(3):
-            # Check rows
+            # Check rows and columns    
             if s[0][i] == s[1][i] and s[1][i] == s[2][i] and s[0][i] != 0:
                 return s[0][i]
             if s[i][0] == s[i][1] and s[i][1] == s[i][2] and s[i][0] != 0:

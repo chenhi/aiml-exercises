@@ -43,6 +43,10 @@ class MDP():
     
     def is_action(self, a):
         return True if self.actions == None or a in self.actions else False
+    
+    # Takes in the "full" state and returns the status of the game
+    def board_str(self, s) -> str:
+        raise NotImplementedError
         
     def get_random_state(self):
         if self.states != None:

@@ -108,7 +108,7 @@ if False:
     plt.show()
 
 #Test batch update, policy
-if False:
+if True:
     exp = 0.5
     lr = 0.5
     iter = 100
@@ -141,45 +141,3 @@ if False:
             dumpol[i][j] = pol[i][j][0] + pol[i][j][1]
     print(pol)
     print(np.array(dumpol))
-
-
-
-#Test game
-# OK not so easy to port over...
-game = SimpleGame(mdp, 1)
-if True:
-    exp = 0.5
-    lr = 0.5
-    iter = 100
-    eps = 10
-    eplen = 15
-    game.set_greed([exp])
-    game.batch_learn(lr, iter, eps, eplen)
-#    q.batch_learn(get_greedy(q, exp), lr, iter, eps, eplen)
-    output = [[0. for j in range(0, mdp.size[1])] for i in range(0, mdp.size[0])]
-    for i in range(0, mdp.size[0]):
-        for j in range(0, mdp.size[1]):
-            output[i][j] = q.val((i, j))
-    print(q.q)
-    
-    heat = np.round(np.array(output), 3)
-    print(heat)
-
-    fig, ax = plt.subplots()
-    im = ax.imshow(heat)
-    for i in range(mdp.size[0]):
-        for j in range(mdp.size[1]):
-            text = ax.text(j, i, heat[i, j],
-                        ha="center", va="center", color="w")
-    ax.set_title(f"lr {lr}, expl {exp}, its {iter}, eps {eps}, eplen {eplen}")
-    plt.show()
-
-    pol = [[0. for j in range(0, mdp.size[1])] for i in range(0, mdp.size[0])]
-    dumpol = [[0. for j in range(0, mdp.size[1])] for i in range(0, mdp.size[0])]
-    for i in range(0, mdp.size[0]):
-        for j in range(0, mdp.size[1]):
-            pol[i][j] = q.policy((i, j))
-            dumpol[i][j] = pol[i][j][0] + pol[i][j][1]
-    print(pol)
-    print(np.array(dumpol))
-
