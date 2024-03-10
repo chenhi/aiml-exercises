@@ -1,7 +1,7 @@
 import connectfour as c4
 import tictactoe as ttt
 from qlearn import *
-import os, datetime, re
+import os, datetime, re, sys
 
 
 tttmdp = ttt.TTTMDP()
@@ -13,10 +13,17 @@ mdps = [tttmdp, c4mdp]
 games = [SimpleGame(tttmdp, 2), SimpleGame(c4mdp, 2)]
 file_exts = ['.ttt.pkl', '.c4.pkl']
 
-print("Games:")
-for i in range(len(names)):
-    print(f"[{i}] {names[i]}")
-res = input("Select game from list (input number): ")
+option = sys.argv[1]
+res = None
+for i in range(len(shortnames)):
+    if option == shortnames[i]:
+        res = i
+
+if res == None:
+    print("Games:")
+    for i in range(len(names)):
+        print(f"[{i}] {names[i]}")
+    res = input("Select game from list (input number): ")
 
 try:
     game_index = int(res)

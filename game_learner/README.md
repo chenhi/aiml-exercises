@@ -4,4 +4,4 @@ test_mdp.py is a basic MDP where a robot tries to find its way "home" on a grid,
 
 tictactoe.py and connectfour.py implement Tic-Tac-Toe and Connect Four game logic
 
-play.py is for playing and training AI, also for playing self
+play.py is for playing and training AI, also for playing self.  Can run it with options ttt and c4.
