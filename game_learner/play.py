@@ -30,7 +30,7 @@ except:
     exit()
 
 
-print(f"Playing {name}.\n\n")
+print(f"\nPlaying {name}.\n")
 
 saves = [each for each in os.listdir() if each.endswith(file_ext)]
 savestr = ""
@@ -161,8 +161,8 @@ elif shortname == "c4":
             p = s[0]
             print(game.mdp.board_str(s))
             if p != comp:
-                re = input(f"{game.mdp.board_str(s)}Input column to play (0-6). ")
-                s, _ = game.mdp.transition(s, int(re))
+                re = input(f"Input column to play (1-7). ")
+                s, _ = game.mdp.transition(s, int(re) - 1)
             else:
                 for a in game.mdp.actions:
                     print(f"Value of action {a} is {game.qs[comp].get(s, a)}.")
@@ -170,7 +170,7 @@ elif shortname == "c4":
                 print(f"Chosen action: {a}.\n")
                 s, _ = game.mdp.transition(s, a)
 
-        print(f"{game.mdp.board_str(s)}The winner is {game.mdp.symb[str(s[2])]}.")
+        print(f"{game.mdp.board_str(s)}The winner is {game.mdp.symb[str(s[2])]}.\n\n")
     
 
 
