@@ -3,8 +3,9 @@ Tic-tac-toe
 * For the learning rate, it is tempting to set it to 1.  But this can make the AI learn to favor a bad strategy when its opponent happened to play poorly the last time, and vice versa.  So an intermediate learning rate might still be best.
 * I thought about just retraining Q instead of updating Q in each iteration.  But this won't save any time.  What it can do is erase "early noise" but it it might make convergence slower.
 * I wonder if I should make the algorithm a bit more greedy.  I can play with this a little bit.
-* Somehow, when I ran for more iterations but shorter episodes (1000/10), the performance got a lot worse (even though it took longer to train) than 100/100.
-* Generally, player 2 is a lot worse than player 1 for 100/100.
+* Somehow, when I ran for more iterations but shorter episodes (1000/10), the performance got a lot worse (even though it took longer to train) than 100/100.  I found 1000/50 also gave good results but the AI still lost sometimes.
+* I think it might be important to keep the learning rate low, since it's possible for the oppoenent AI to randomly play poorly which might throw off the Q value.  For example, if X is about to win, and O doesn't block it, but then X derps out and doesn't claim the win, then O blocks it and eventually wins, O might learn that not blocking that move was good.
+
 
 * Think about: penalizing invalid moves vs. prohibiting them (though it's not strictly prohibited, only in training).
 

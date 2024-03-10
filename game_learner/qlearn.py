@@ -283,6 +283,13 @@ class SimpleGame():
             # Do an update for each player
             for p in range(self.num_players):
                 self.qs[p].update(player_experiences[p], learn_rate)
+        if verbose:
+            total = 0
+            for e in player_experiences:
+                total += len(e)
+            print(f"Trained on {total} experiences.")
         if savefile != None:
             with open(savefile, 'wb') as f:
                 pickle.dump(player_experiences, f)
+                if verbose:
+                    print(f"Saved experiences to {savefile}")
