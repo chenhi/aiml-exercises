@@ -10,7 +10,7 @@ c4mdp = c4.C4MDP()
 names = ["Tic-Tac-Toe", "Connect Four"]
 shortnames = ["ttt", "c4"]
 mdps = [tttmdp, c4mdp]
-games = [SimpleGame(tttmdp, 2), SimpleGame(c4mdp, 2)]
+games = [SimpleGame(tttmdp), SimpleGame(c4mdp)]
 file_exts = ['.ttt.pkl', '.c4.pkl']
 
 option = sys.argv[1]
@@ -40,17 +40,24 @@ except:
 print(f"\nPlaying {name}.\n")
 
 saves = [each for each in os.listdir('bots/') if each.endswith(file_ext)]
-savestr = ""
-for i in range(len(saves)):
-    savestr += f"[{i}] {saves[i]}\n"
-res = input(f"There are some saved bots:\n{savestr}\n\nWhich one do you want to load?  Enter number, or 'n' to train a new one, or 'p' to play without bots. ")
-try:
-    saveindex = int(res)
-except:
+if len(saves) == 0:
+    res = input(f"There are no bots.  Enter 'n' to train a new one, or 'p' to play without bots. ")
     if res == 'n':
         saveindex = -1
     else:
         saveindex = -2
+else:
+    savestr = ""
+    for i in range(len(saves)):
+        savestr += f"[{i}] {saves[i]}\n"
+    res = input(f"There are some saved bots:\n{savestr}\n\nWhich one do you want to load?  Enter number, or 'n' to train a new one, or 'p' to play without bots. ")
+    try:
+        saveindex = int(res)
+    except:
+        if res == 'n':
+            saveindex = -1
+        else:
+            saveindex = -2
 
 
 if saveindex >= 0:
@@ -76,7 +83,7 @@ elif saveindex == -1:
         if lr < 0 or lr > 1:
             raise Exception
     except:
-        print("Not a valid value.  Setting learning rate to {default}.")
+        print(f"Not a valid value.  Setting learning rate to {default}.")
         lr = default
 
     default = 64

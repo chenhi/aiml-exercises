@@ -31,22 +31,31 @@ def valmax(args: list, f: callable):
 
 
 
-# WARNING: states and actions must be hashable!
+# WARNING: states and actions must be hashable if using with ValueFunction.
 class MDP():
-    def __init__(self, states, actions, discount=1):
+    def __init__(self, states, actions, discount=1, num_players=1):
         self.states = states
         self.actions = actions
-        self.discount = discount   
+        self.discount = discount
+        self.num_players = num_players
 
     def copy(self):
         raise NotImplementedError
 
-    def is_state(self, s):
-        return True if self.states == None or s in self.states else False
+    def is_state(self, state):
+        return True if self.states == None or state in self.states else False
+        
+    # Only need to define this if you are doing deep learning
+    def state_to_tensor(self, state):
+        raise NotImplementedError
     
-    def is_action(self, a):
-        return True if self.actions == None or a in self.actions else False
+    def action_to_tensor(self, action):
+        raise NotImplementedError
     
+    # Action first because it's more similar to "batches"
+    def to_tensor(self, state, action):
+        return np.outer(self.action_to_tensor(action), self.state_to_tensor(state))
+
     # Takes in the "full" state and returns the status of the game
     def board_str(self, s) -> str:
         raise NotImplementedError
@@ -60,6 +69,8 @@ class MDP():
     def get_actions(self, s = None):
         if s == None:
             return self.actions
+        else:
+            raise NotImplementedError
 
     def get_random_action(self, s = None):
         return random.choice(self.get_actions(s))
@@ -75,7 +86,6 @@ class MDP():
     # Tells us if a state is terminal.
     def is_terminal(self, s) -> bool:
         raise NotImplementedError
-
 
 
 # Value function Q
@@ -104,23 +114,8 @@ class ValueFunction():
         # If we have a defined (finite) set of actions, just iterate
         if self.mdp.actions != None:
             return valmax(self.mdp.get_actions(s), lambda a: self.get(s, a))
-
-        # If the set of actions is undefined and infinite, we don't have much control over things.
-        # We will assume that there is always some choice that hasn't been explored yet, which therefore has value 0.
-        # This is generally not going to be true; it's better to do some kind of regression on the states we know.
-        # The result is that states will not have negative value, only zero value.  This can cause the AI to claim an immediate reward but then enter a really bad state.
-        values = []
-        for t, a in self.q.keys():
-            if s == t:
-                values.append(self.q[(s,a)])
-        #values = [self.q[(s,a)] if s == t else 0 for t, a in self.q.keys()]
-        
-        if len(values) == 0:
-            return 0
-        m = max(values)
-        if max(values) < 0:
-            return 0
-        return max(values)
+        else:
+            raise NotImplementedError           #If there are infinitely many actions, this needs to be handled explicitly
         
     # Returns the value of an optimal policy at a given state
     def policy(self, s) -> float:
@@ -130,30 +125,9 @@ class ValueFunction():
         # If we have a defined set of actions, we can just do an argmax
         if self.mdp.actions != None:
             return random.choice(argmax(self.mdp.get_actions(s), lambda a: self.get(s,a)))
+        else:
+            raise NotImplementedError
         
-        # Same issue as val() when the actions are not defined.
-        # The result is that when enterng a state that only has negative known values, the AI will choose a random action.
-        valid = []
-        maxim = None
-        for t, a in self.q.keys():
-            if s == t:
-                valid.append(((s, a), self.q[(s,a)]))
-                if maxim == None:
-                    maxim = valid[-1][1]
-                else:
-                    maxim = max(maxim, valid[-1][1])            
-            
-        if len(valid) == 0 or maxim < 0:
-            return self.mdp.get_random_action()
-        
-        best = []
-        for k, v in valid:
-            if v == maxim:
-                best.append(k[1])
-        
-        return random.choice(best)
-        
-
     # Does a Q-update based on some observed set of data
     # Data is a list of the form (state, action, reward, next state)
     def update(self, data: list[tuple[any, any, float, any]], learn_rate):
@@ -194,15 +168,13 @@ class ValueFunction():
                 
 
 class NNValueFunction(ValueFunction):
-    def __init__(self, mdp: MDP, nnq: nn.Module):
-        self.nnq = nnq
+    def __init__(self, mdp: MDP, q_model: nn.Module):
+        self.q = q_model()
         self.mdp = mdp
 
-    def to_tensor(s, a):
-        raise NotImplementedError
 
     def get(self, s, a) -> float:
-        return self.nnq(self.to_tensor(s, a))
+        return self.q(self.mdp.to_tensor(s, a))
 
 
 # Greedy function to use as a strategy.  Default is totally greedy.
@@ -224,15 +196,14 @@ def get_greedy(q: ValueFunction, e: float) -> callable:
 # The state must be a tuple, whose first entry is the current player
 # The rewards are returned as a tuple, corresponding to rewards for each player
 class SimpleGame():
-    def __init__(self, mdp: MDP, num_players):
+    def __init__(self, mdp: MDP):
         # An mdp that encodes the rules of the game.  The current player is part of the state, which is of the form (current player, actual state)
         self.mdp = mdp
-        self.num_players = num_players
-        self.qs = [ValueFunction(self.mdp) for i in range(num_players)]
+        self.qs = [ValueFunction(self.mdp) for i in range(mdp.num_players)]
         self.state = None
 
     def set_greed(self, eps):
-        self.strategies = [get_greedy(self.qs[i], eps[i]) for i in range(self.num_players)]
+        self.strategies = [get_greedy(self.qs[i], eps[i]) for i in range(self.mdp.num_players)]
 
     def save_q(self, fname):
         with open(fname, 'wb') as f:
@@ -250,13 +221,13 @@ class SimpleGame():
 
     # Player data is (start state, action taken, all reward before next action, starting state for next action)
     def batch_learn(self, learn_rate: float, iterations: int, episodes: int, episode_length: int, verbose=False, savefile=None):
-        player_experiences = [[] for i in range(self.num_players)]
+        player_experiences = [[] for i in range(self.mdp.num_players)]
         for i in range(iterations):
             for j in range(episodes):
                 if verbose and j % 10 == 9:
                     print(f"Training iteration {i+1}, episode {j+1}", end='\r')
                 s = self.mdp.get_initial_state()
-                queue =[None for k in range(self.num_players)]
+                queue =[None for k in range(self.mdp.num_players)]
                 for k in range(episode_length):
                     p = self.current_player(s)
                     a = self.strategies[p](s)
@@ -273,7 +244,7 @@ class SimpleGame():
 
                     # Update rewards for all other players; if the player hasn't taken an action yet, no reward (but is accounted somewhat by zero sum nature)
                     # If the state is terminal, also append
-                    for l in range(self.num_players):
+                    for l in range(self.mdp.num_players):
                         if l != p and queue[l] != None:
                             queue[l][2] += r[l]
                             if self.mdp.is_terminal(t):
@@ -284,7 +255,7 @@ class SimpleGame():
                         break
                     s = t
             # Do an update for each player
-            for p in range(self.num_players):
+            for p in range(self.mdp.num_players):
                 self.qs[p].update(player_experiences[p], learn_rate)
         if verbose:
             total = 0
@@ -296,3 +267,79 @@ class SimpleGame():
                 pickle.dump(player_experiences, f)
                 if verbose:
                     print(f"Saved experiences to {savefile}")
+
+
+class SimpleGameNN():
+    def __init__(self, mdp: MDP, q_model: nn.Module, state_shape: tuple, action_shape: tuple):     # TODO the MDP should know about state/action tensor shapes, also maybe number of players
+        # An mdp that encodes the rules of the game.  The current player is part of the state, which is of the form (current player, actual state)
+        self.mdp = mdp
+        self.qs = [NNValueFunction(mdp, q_model) for i in range(mdp.num_players)]
+
+    def set_greed(self, eps):
+        self.strategies = [get_greedy(self.qs[i], eps[i]) for i in range(self.mdp.num_players)]
+
+    def save_q(self, fname):
+        with open(fname, 'wb') as f:
+            pickle.dump(self.qs, f)
+        
+    def load_q(self, fname):
+        with open(fname, 'rb') as f:
+            self.qs = pickle.load(f)
+
+    def transition(self, p, s, a) -> tuple[int, object, np.ndarray]:
+        return self.mdp.transition((p, s), a)
+    
+    def current_player(self, s) -> int:
+        return None if s == None else s[0]
+
+    # Player data is (start state, action taken, all reward before next action, starting state for next action)
+    def batch_learn(self, learn_rate: float, iterations: int, episodes: int, episode_length: int, verbose=False, savefile=None):
+        player_experiences = [[] for i in range(self.mdp.num_players)]
+        for i in range(iterations):
+            for j in range(episodes):
+                if verbose and j % 10 == 9:
+                    print(f"Training iteration {i+1}, episode {j+1}", end='\r')
+                s = self.mdp.get_initial_state()
+                queue =[None for k in range(self.mdp.num_players)]
+                for k in range(episode_length):
+                    p = self.current_player(s)
+                    a = self.strategies[p](s)
+                    t, r = self.mdp.transition(s, a)
+
+                    # For this player, bump the queue and add
+                    if queue[p] != None:
+                        player_experiences[p].append(tuple(queue[p]) + (s,))
+                    if self.mdp.is_terminal(t):
+                        player_experiences[p].append((s,a,r[p],t))
+                    else:
+                        queue[p] = [s, a, r[p]]
+                    
+
+                    # Update rewards for all other players; if the player hasn't taken an action yet, no reward (but is accounted somewhat by zero sum nature)
+                    # If the state is terminal, also append
+                    for l in range(self.mdp.num_players):
+                        if l != p and queue[l] != None:
+                            queue[l][2] += r[l]
+                            if self.mdp.is_terminal(t):
+                                player_experiences[l].append(tuple(queue[l]) + (t,))
+
+                    # If terminal state, then stop the episode.  Otherwise, update state and continue playing 
+                    if self.mdp.is_terminal(t):
+                        break
+                    s = t
+            # Do an update for each player
+            for p in range(self.mdp.num_players):
+                self.qs[p].update(player_experiences[p], learn_rate)
+        if verbose:
+            total = 0
+            for e in player_experiences:
+                total += len(e)
+            print(f"Trained on {total} experiences.")
+        if savefile != None:
+            with open(savefile, 'wb') as f:
+                pickle.dump(player_experiences, f)
+                if verbose:
+                    print(f"Saved experiences to {savefile}")
+
+    def deep_learn():
+        pass

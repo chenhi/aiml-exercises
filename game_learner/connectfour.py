@@ -7,7 +7,7 @@ import random
 
 class C4MDP(MDP):
     def __init__(self):
-        super().__init__(None, range(0, 7), 1)
+        super().__init__(None, range(0, 7), discount=1, num_players=2)
         self.symb = {'0': "O", '1': "X", '': "-"}
 
     def board_str(self, s):
@@ -23,12 +23,28 @@ class C4MDP(MDP):
         out += "|1234567|"
         return out
 
-    def get_actions(state):
+    def get_actions(self, state):
         notfull = []
         for i in range(7):
             if len(state[1][i]) < 6:
                 notfull.append(i)
-        return notfull
+        if len(notfull) > 0:
+            return notfull
+        else:
+            return self.actions
+    
+    def state_to_tensor(self, state):
+        # Ignore player and winner
+        tensor = np.zeros((2,7,6), dtype=float)
+        for i in range(7):
+            for j in range(len(state[1][i])):
+                tensor[int(state[1][i][j])][i][j] = 1.
+        return tensor
+    
+    def action_to_tensor(self, action):
+        tensor = np.zeroes((7,))
+        tensor[action] = 1.
+        return tensor
 
     # Reward is 1 for winning the game, -1 for losing, and 0 for a tie; awarded upon entering terminal state
     def transition(self, state, a):
@@ -134,6 +150,19 @@ class C4MDP(MDP):
             if len(row) < 6:
                 return False
         return True
+    
 
 
 
+# Some prototyping the neural network
+# Input tensors have shape (batch, 7, 2, 7, 6)
+nn.Flatten(0, 1)
+nn.Conv2d(2, 64, (4,4), padding='same')
+nn.Unflatten(0, (-1, 7))
+nn.ReLU()
+nn.Dropout(p=0.2)
+nn.BatchNorm2d(64)
+nn.Flatten()
+nn.Linear(7*2*7*6*64, 7*2*7*6*64)
+nn.ReLU()
+nn.Linear(7*2*7*6*64, 1) # ok im still confused about whether we are learning q or learning p

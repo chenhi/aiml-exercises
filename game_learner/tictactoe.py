@@ -18,7 +18,7 @@ ttt_actions = [(i, j) for i in range(3) for j in range(3)]
 class TTTMDP(MDP):
     def __init__(self):
         self.symb = {0: "X", 1: "O", -1: "."}
-        super().__init__(None, ttt_actions, 1)
+        super().__init__(None, ttt_actions, discount=1, num_players=2)
 
     # States are tuples (0 or 1, 9-tuples of 1,0,-1). Arrays are tuples (1 or -1, 3x3 array).
     def state_to_array(self, state):
