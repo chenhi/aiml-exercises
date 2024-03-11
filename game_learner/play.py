@@ -122,7 +122,7 @@ elif saveindex == -1:
 if shortname == "ttt":
     while True:
         if saveindex >= -1:
-            res = input("Play as first or second player?  Enter '1' or '2' or 'q' to quit: ")
+            res = input("Play as first (X) or second (O) player?  Enter '1' or '2' or 'q' to quit: ")
             if res == 'q':
                 exit()
             if res != '1' and res != '2':
@@ -137,13 +137,18 @@ if shortname == "ttt":
         s = game.mdp.get_initial_state()
         while game.mdp.is_terminal(s) == False:
             p = s[0]
-            print(game.mdp.board_str(s))
+            print('\n' + game.mdp.board_str(s))
             if p != comp:
-                re = input(f"Input position to play e.g. 1,3 for row 1, column 3. ")
-                res = re.split(",")
-                x = int(res[0].strip())
-                y = int(res[1].strip())
-                s, _ = game.mdp.transition(s, (x-1,y-1))
+                re = input(f"Input position to play e.g. '1,3' for row 1, column 3. ")
+                try:
+                    res = re.split(",")
+                    x, y = int(res[0].strip()), int(res[1].strip())
+                    if (x-1,y-1) in game.mdp.get_actions(s):
+                        s, _ = game.mdp.transition(s, (x-1,y-1))
+                    else:
+                        raise Exception()
+                except:
+                    print("ERROR: Invalid action, try again.")
             else:
                 for a in game.mdp.get_actions(s):
                     print(f"Value of action {a} is {game.qs[comp].get(s, a)}.")
@@ -151,7 +156,14 @@ if shortname == "ttt":
                 print(f"Chosen action: {a}.\n")
                 s, _ = game.mdp.transition(s, a)
 
-        print(f"{game.mdp.board_str(s)}The winner is {game.mdp.symb[game.mdp.winner(s)]}.\n\n")
+        winner = game.mdp.winner(s)
+        if winner == -1:
+            winnerstr = 'The game is a tie.'
+        elif winner == comp:
+            winnerstr = f"The computer ({game.mdp.symb[winner]}) won."
+        else:
+            winnerstr = f"You ({game.mdp.symb[winner]}) won."
+        print(f"{game.mdp.board_str(s)}\n{winnerstr}\n\n")
 elif shortname == "c4":
     while True:
         if saveindex >= -1:
