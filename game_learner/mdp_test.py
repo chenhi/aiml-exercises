@@ -38,7 +38,8 @@ class GoHomeMDP(MDP):
         states = [(i, j) for i in range(self.size[0]) for j in range(self.size[1])]
         super().__init__(states, actions, discount)
 
-
+    def get_actions(self, s):
+        return self.actions
         
     def is_terminal(self, s):
         return True if s == self.home else False
@@ -59,14 +60,17 @@ class GoHomeMDP(MDP):
     
 # get command line options
 options = sys.argv[1:]
-   
-mdp = GoHomeMDP((6,6), (0,0), (3,3), 0.9)
+
+home = (3,3)
+mdp = GoHomeMDP((6,6), (0,0), home, 0.9)
+
+
 # Test: play the MDP
 if 'play' in options:
     s = mdp.get_initial_state()
     reward = 0
     history = [s]
-    while s != None:
+    while not mdp.is_terminal(s):
         #print(s)
         a = mdp.get_random_action()
         s, r = mdp.transition(s, a)
@@ -80,10 +84,13 @@ q = ValueFunction(mdp)
 
 # Test single update and val
 if 'single' in options:
-    print(q.single_update((4,5), (1,0), 1))
-    print(q.q[((4,5),(1,0))])
-    print(q.val((4,5)))
-    print(q.val((4,4)))
+    s = (home[0] - 1, home[1])
+    a = (1,0)
+    t,r = mdp.transition(s, a)
+    print(q.update([(s,a,r,t)], 0.5))
+    print(q.get(s,a))
+    print(q.val(s))
+    print(q.val((0,0)))
 
 # Test update
 if 'update' in options:

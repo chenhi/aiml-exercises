@@ -135,24 +135,20 @@ class ValueFunction():
             s,a,r,t = d[0], d[1], d[2], d[3]
             self.q[(s,a)] = (1 - learn_rate) * self.get(s,a) + learn_rate * (r + self.mdp.discount * self.val(t))
 
-    # Does a single Q update using the reward and new state coming from the attached mdp.  Returns the new state. 
-    # If the input state is terminal, just return a new state
-    def single_update(self, s, a, learn_rate):
-        if self.mdp.is_terminal(s):
-            return self.mdp.get_initial_state()
-        t, r = self.mdp.transition(s, a)
-        self.update([(s, a, r, t)], learn_rate)
-        return t
-
-    # Learn based on a give nstrategy for some number of iterations
+    # Learn based on a given strategy for some number of iterations, updating each time
     def learn(self, strategy: callable, learn_rate: float, iterations: int):
         s = self.mdp.get_initial_state()
         for i in range(iterations):
-            s = self.single_update(s, strategy(s), learn_rate)
             if self.mdp.is_terminal(s):
                 s = self.mdp.get_initial_state()
+                continue
+            a = strategy(s)
+            t, r = self.mdp.transition(s, a)
+            self.update([(s,a,r,t)], learn_rate)
+            s = t
 
-    def batch_learn(self, strategy: callable, learn_rate: float, iterations: int, episodes: int, episode_length: int):
+    # Learn in batches.  An update happens each iteration, on all past experiences (including previous iterations).  A state reset happpens each episode.
+    def batch_learn(self, strategy: callable, learn_rate: float, iterations: int, episodes: int, episode_length: int, remember_experiences = True):
         experiences = []
         for i in range(iterations):
             for j in range(episodes):
@@ -165,16 +161,68 @@ class ValueFunction():
                         break
                     s = t
             self.update(experiences, learn_rate)
+            if not remember_experiences:
+                experiences = []
                 
 
 class NNValueFunction(ValueFunction):
-    def __init__(self, mdp: MDP, q_model: nn.Module):
+    def __init__(self, mdp: MDP, q_model, lossfn, optimizer: torch.optim.Optimizer):
         self.q = q_model()
         self.mdp = mdp
-
+        self.lossfn = lossfn
+        self.optimizer = optimizer
 
     def get(self, s, a) -> float:
         return self.q(self.mdp.to_tensor(s, a))
+    
+    # If already in tensor form
+    def get(self, tensor) -> float:
+        return self.q(tensor)
+    
+    # Input is a tensor of shape (batches, ) + state.shape
+    def val(self, s) -> float:
+        if self.mdp.is_terminal(s):
+            return 0
+
+        # Given a state vector s, we want to take e_1 (x) a_1 (x) s + e_2 (x) a_2 (x) s + ... where e records the "argument", then pass to q
+        #TODO?
+
+        # If we have a defined (finite) set of actions, just iterate
+        if self.mdp.actions != None:
+            return valmax(self.mdp.get_actions(s), lambda a: self.get(s, a))
+        else:
+            raise NotImplementedError           #If there are infinitely many actions, this needs to be handled explicitly
+        
+    # Returns the value of an optimal policy at a given state
+    def policy(self, s) -> float:
+        if self.mdp.is_terminal(s):
+            return self.mdp.get_random_action()
+
+        ss = self.mdp.state_to_tensor(s)
+        pred = self.q(ss)
+        pred.max(dim=1).values.numpy()      # A single state or ???? TODO
+    
+    # TODO the following needs to be changed
+    # Does a Q-update based on some observed set of data
+    # Data is a list of the form (state, action, reward, next state)
+    def update(self, data, learn_rate):
+        # TODO ??
+        if not isinstance(self.q, nn.Module):
+            Exception("NNValueFunction needs to have a class extending nn.Module.")
+        opt = self.optimizer(self.q.parameters(), lr=learn_rate)
+        X, y = data     # Data should be a tuple (tensor shape (batches, state shape, action shape), tensor shape (batches, reward, next state))
+        # TODO Actually have to compute y
+        pred = self.q(X)
+        # Don't call val, it means re-evaluating.  Just do it here.
+        #vals = pred.argmax(dim=1)
+
+
+        loss = self.lossfn(pred, y)
+
+        # Optimize
+        loss.backward()
+        opt.step()
+        opt.zero_grad()
 
 
 # Greedy function to use as a strategy.  Default is totally greedy.
