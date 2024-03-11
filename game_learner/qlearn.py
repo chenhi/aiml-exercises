@@ -1,6 +1,9 @@
 import random
 import numpy as np
 import pickle
+import torch
+from torch import nn
+from collections import namedtuple
 
 # Returns the set of maximum arguments
 def argmax(args: list, f: callable):
@@ -191,13 +194,13 @@ class ValueFunction():
                 
 
 class NNValueFunction(ValueFunction):
-    def __init__(self, mdp: MDP):
-        self.nnq = None #TODO
-        self.mdp = mdp    
+    def __init__(self, mdp: MDP, nnq: nn.Module):
+        self.nnq = nnq
+        self.mdp = mdp
 
     def to_tensor(s, a):
         raise NotImplementedError
-    
+
     def get(self, s, a) -> float:
         return self.nnq(self.to_tensor(s, a))
 

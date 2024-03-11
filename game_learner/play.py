@@ -58,42 +58,46 @@ if saveindex >= 0:
     game.load_q('bots/' + saves[saveindex])
 elif saveindex == -1:
     # Train AI
-    res = input("How greedy should it be?  A number in [0, 1]: ")
+
+    default=0.5
+    res = input(f"How greedy should it be?  A number in [0, 1] (default {default}): ")
     try:
         expl = 1. - float(res)
         if expl < 0 or expl > 1:
             raise Exception
     except:
-        print("Not a valid value.  Setting greed to 0.5.")
-        expl = 0.5
+        print(f"Not a valid value.  Setting greed to {default}.")
+        expl = default
 
-
-    res = input("Learning rate? A number in [0, 1]: ")
+    default=0.1
+    res = input(f"Learning rate? A number in [0, 1] (default {default}): ")
     try:
         lr = float(res)
         if lr < 0 or lr > 1:
             raise Exception
     except:
-        print("Not a valid value.  Setting learning rate to 0.5.")
-        lr = 0.5
+        print("Not a valid value.  Setting learning rate to {default}.")
+        lr = default
 
-    res = input("How many game runs between AI updates? E.g. 10: ")
+    default = 64
+    res = input(f"How many game runs between AI updates (default {default}): ")
     try:
         eps = int(res)
         if eps < 1:
             raise Exception
     except:
-        print("Not a valid value.  Setting episodes to 10.")
-        eps = 10
+        print(f"Not a valid value.  Setting episodes to {default}.")
+        eps = default
 
-    res = input("How many AI updates? E.g. 100: ")
+    default = 100
+    res = input(f"How many AI updates (default {default}): ")
     try:
         its = int(res)
         if its < 1:
             raise Exception
     except:
-        print("Not a valid value.  Setting iterations to 100.")
-        its = 100
+        print(f"Not a valid value.  Setting iterations to {default}.")
+        its = default
     
     res = input("Name of file (alphanumeric only, max length 64, w/o extension): ")
     fname = 'bots/' + re.sub(r'\W+', '', res)[0:64] + f"-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}{file_ext}"

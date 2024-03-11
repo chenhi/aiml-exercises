@@ -2,12 +2,11 @@ Tic-tac-toe
 * For full exploration (no explotation), one problem is it will still choose invalid moves a lot of the time.  Also, the Q-values will be highly unstable, since the AI are playing randomly, so they will be optimizing against a random strategy, not an optimal strategy.  For full exploitation, there are the usual caveats.
 * For the learning rate, it is tempting to set it to 1.  But this can make the AI learn to favor a bad strategy when its opponent happened to play poorly the last time, and vice versa.  So an intermediate learning rate might still be best.
 * I thought about just retraining Q instead of updating Q in each iteration.  But this won't save any time.  What it can do is erase "early noise" but it it might make convergence slower.
-* I wonder if I should make the algorithm a bit more greedy.  I can play with this a little bit.
-* Somehow, when I ran for more iterations but shorter episodes (1000/10), the performance got a lot worse (even though it took longer to train) than 100/100.  I found 1000/50 also gave good results but the AI still lost sometimes.
 * I think it might be important to keep the learning rate low, since it's possible for the oppoenent AI to randomly play poorly which might throw off the Q value.  For example, if X is about to win, and O doesn't block it, but then X derps out and doesn't claim the win, then O blocks it and eventually wins, O might learn that not blocking that move was good.
-
-
-* Think about: penalizing invalid moves vs. prohibiting them (though it's not strictly prohibited, only in training).
+* Moreover, the algorithm has many many chances to update its weights, so a low learning rate should not be a concern.
+* This basically bore out in the current best Q function which I ran for 500 iterations of 64 episodes, with learning rate 0.1 and greed 0.5.  I believe this is optimal.  I tried tweaking a bunch of the other parameters and this one seemed to make the biggest most obvious difference.  Previously, the models would mostly work but have some "gaps" where it would lose in really dumb ways.
+* The basic test case is to play as first player, play in a corner.  It should play center.  Then play opposite corner.  Then look at its Q function.  It should clearly differentiate between corners and non-corners.  Comparing (A) rate of 0.2 and 1000 iterations and (B) rate of 0.1 and 500 iterations, (B) did this better.
+* I would like to see it actually learn that playing non-center has negative value, which it doesn't yet.  This is probably due to noise, and possibly due to oversampling of "early" noisy data.
 
 Connect Four:
 * 100 episodes, 1000 iterations is taking maybe 2 hours.  The AI is not great because there are large branches of the tree it hasn't explored at all.  Will try training it with a neural network.
