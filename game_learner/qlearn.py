@@ -88,11 +88,11 @@ class MDP():
         raise NotImplementedError
 
 
-# Value function Q
+# Q (Quality) function class
 # Given a set of states S and a set of actions A, a value function maps Q: S x A ---> R and reflects the value (in terms of rewards) of performing a given action at the state.
 # The sets S and A might be infinite.  Therefore in practice we do not require Q to be defined everywhere.
 # We may or may not specify a set from which 
-class ValueFunction():
+class QFunction():
 
     def __init__(self, mdp: MDP):
         self.q = {}
@@ -135,7 +135,8 @@ class ValueFunction():
             s,a,r,t = d[0], d[1], d[2], d[3]
             self.q[(s,a)] = (1 - learn_rate) * self.get(s,a) + learn_rate * (r + self.mdp.discount * self.val(t))
 
-    # Learn based on a given strategy for some number of iterations, updating each time
+    # Learn based on a given strategy for some number of iterations, updating each time.
+    # In practice, this doesn't get used so much, because the "game" has to handle rewards between players (not the Q function itself)
     def learn(self, strategy: callable, learn_rate: float, iterations: int):
         s = self.mdp.get_initial_state()
         for i in range(iterations):
@@ -148,6 +149,7 @@ class ValueFunction():
             s = t
 
     # Learn in batches.  An update happens each iteration, on all past experiences (including previous iterations).  A state reset happpens each episode.
+    # In practice, this doesn't get used so much, because the "game" has to handle rewards between players (not the Q function itself)
     def batch_learn(self, strategy: callable, learn_rate: float, iterations: int, episodes: int, episode_length: int, remember_experiences = True):
         experiences = []
         for i in range(iterations):
@@ -165,7 +167,13 @@ class ValueFunction():
                 experiences = []
                 
 
-class NNValueFunction(ValueFunction):
+
+# For backwards compatibility
+class ValueFunction(QFunction):
+    def __init__(self, mdp: MDP):
+        super().__init__(mdp)
+
+class NNQFunction(QFunction):
     def __init__(self, mdp: MDP, q_model, lossfn, optimizer: torch.optim.Optimizer):
         self.q = q_model()
         self.mdp = mdp
@@ -227,10 +235,10 @@ class NNValueFunction(ValueFunction):
 
 # Greedy function to use as a strategy.  Default is totally greedy.
 # This only works if the set of actions is defined and finite
-def greedy(q: ValueFunction, s, e = 0.):
+def greedy(q: QFunction, s, e = 0.):
     return q.mdp.get_random_action(s) if random.random() < e else random.choice(argmax(q.mdp.get_actions(s), lambda a: q.get(s,a)))
 
-def get_greedy(q: ValueFunction, e: float) -> callable:
+def get_greedy(q: QFunction, e: float) -> callable:
     return lambda s: greedy(q, s, e)
 
 
