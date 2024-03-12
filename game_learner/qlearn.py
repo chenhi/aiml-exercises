@@ -226,6 +226,8 @@ class NNQFunction(QFunction):
         if self.mdp.is_terminal(state):
             return 0
         return torch.flatten(self.q(self.mdp.state_to_tensor(state)), 1, -1).max(1).values
+    
+
 
     # Input is a batch of state vectors
     # Returns the value of an optimal policy at a given state
@@ -264,6 +266,12 @@ class NNQFunction(QFunction):
 # This only works if the set of actions is defined and finite
 def greedy(q: QFunction, s, e = 0.):
     return q.mdp.get_random_action(s) if random.random() < e else q.policy(s)
+
+
+# Input shape (batch_size, ) + state_tensor
+def greedy_tensor(q: NNQFunction, state_tensor, eps = 0.):
+    pass
+
 
 def get_greedy(q: QFunction, e: float) -> callable:
     return lambda s: greedy(q, s, e)
