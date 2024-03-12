@@ -109,15 +109,8 @@ elif saveindex == -1:
     res = input("Name of file (alphanumeric only, max length 64, w/o extension): ")
     fname = 'bots/' + re.sub(r'\W+', '', res)[0:64] + f"-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}{file_ext}"
     
-    game.set_greed([expl, expl])
+    game.set_greed(expl)
     game.batch_learn(lr, its, eps, 1000, verbose=True, savefile=fname + ".exp")
-    
-    # Setting the maximum episode length to be very high is safe, since the game is very short
-    # This will run the game 10 times before retraining, and do this 1000 times.  Good for an initial training
-    #game.batch_learn(0.5, 1000, 10, 1000)
-
-    # This will barely train it, mostly for testing
-    #game.batch_learn(0.5, 10, 10, 1000)
 
     # Save the AI
     game.save_q(fname)
@@ -199,6 +192,8 @@ elif shortname == "c4":
                 a = game.qs[comp].policy(s)
                 print(f"Chosen action: {a}.\n")
                 s, _ = game.mdp.transition(s, a)
+                print(game.mdp.state_to_tensor(s), game.mdp.action_to_tensor(a))
+            
 
         print(f"{game.mdp.board_str(s)}The winner is {game.mdp.symb[str(s[2])]}.\n\n")
     

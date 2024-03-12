@@ -7,7 +7,7 @@ import random
 
 class C4MDP(MDP):
     def __init__(self):
-        super().__init__(None, range(0, 7), discount=1, num_players=2)
+        super().__init__(None, range(0, 7), discount=1, num_players=2, state_shape=(2,7,6), action_shape=(7,))
         self.symb = {'0': "O", '1': "X", '': "-"}
 
     def board_str(self, s):
@@ -42,7 +42,7 @@ class C4MDP(MDP):
         return tensor
     
     def action_to_tensor(self, action):
-        tensor = np.zeroes((7,))
+        tensor = np.zeros((7,))
         tensor[action] = 1.
         return tensor
 
@@ -156,13 +156,18 @@ class C4MDP(MDP):
 
 # Some prototyping the neural network
 # Input tensors have shape (batch, 7, 2, 7, 6)
-nn.Flatten(0, 1)
-nn.Conv2d(2, 64, (4,4), padding='same')
-nn.Unflatten(0, (-1, 7))
-nn.ReLU()
-nn.Dropout(p=0.2)
-nn.BatchNorm2d(64)
-nn.Flatten()
-nn.Linear(7*2*7*6*64, 7*2*7*6*64)
-nn.ReLU()
-nn.Linear(7*2*7*6*64, 1) # ok im still confused about whether we are learning q or learning p
+class C4NN(nn.Module):
+    def __init__(self):
+        self.stack = nn.Sequential(
+            nn.Flatten(0, 1),
+            nn.Conv2d(2, 64, (4,4), padding='same'),
+            nn.Unflatten(0, (-1, 7)),
+            nn.ReLU(),
+            nn.Dropout(p=0.2),
+            nn.BatchNorm2d(64),
+            nn.Flatten(),
+            nn.Linear(7*2*7*6*64, 7*2*7*6*64),
+            nn.ReLU(),
+            nn.Linear(7*2*7*6*64, 7) # ok im still confused about whether we are learning q or learning p
+        )
+

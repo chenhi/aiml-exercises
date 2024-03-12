@@ -31,19 +31,30 @@ def valmax(args: list, f: callable):
 
 
 
-# WARNING: states and actions must be hashable if using with ValueFunction.
+# WARNING: states and actions must be hashable if using with QFunction.
 class MDP():
-    def __init__(self, states, actions, discount=1, num_players=1):
-        self.states = states
+    def __init__(self, states, actions, discount=1, num_players=1, state_shape = None, action_shape = None):
         self.actions = actions
         self.discount = discount
         self.num_players = num_players
+
+        # The states do not literally have to be tensors for the state_shape to be defined.  This just specifies, when they are turned into tensors, what shape they should be have, ignoring batch dimension
+        self.states = states
+        self.state_shape = state_shape
+        self.actions = actions
+        self.action_shape = action_shape
+        
 
     def copy(self):
         raise NotImplementedError
 
     def is_state(self, state):
-        return True if self.states == None or state in self.states else False
+        if self.states != None:
+            return True if state in self.states else False
+        elif self.state_shape != None:
+            return True if state.shape == self.state_shape else False
+        else:
+            return True
         
     # Only need to define this if you are doing deep learning
     def state_to_tensor(self, state):
@@ -99,7 +110,7 @@ class QFunction():
         self.mdp = mdp
 
     def copy(self):
-        new_q = ValueFunction(self.mdp.copy())
+        new_q = QFunction(self.mdp.copy())
         new_q.q = self.q.copy()
     
     def get(self, s, a) -> float:
@@ -116,18 +127,30 @@ class QFunction():
             return valmax(self.mdp.get_actions(s), lambda a: self.get(s, a))
         else:
             raise NotImplementedError           #If there are infinitely many actions, this needs to be handled explicitly
+    
+    # Returns a list of optimal policies.  If the state is terminal or there are no valid actions, return empty list.
+    # This is probably only ever called internally.  But separating it anyway.
+    def policies(self, state):
+        if self.mdp.is_terminal(state):
+            return []
         
-    # Returns the value of an optimal policy at a given state
-    def policy(self, s) -> float:
-        if self.mdp.is_terminal(s):
-            return self.mdp.get_random_action()
-
-        # If we have a defined set of actions, we can just do an argmax
+        # If we have a defined set of actions, we can just do an argmax.
         if self.mdp.actions != None:
-            return random.choice(argmax(self.mdp.get_actions(s), lambda a: self.get(s,a)))
+            return argmax(self.mdp.get_actions(state), lambda a: self.get(state,a))
         else:
             raise NotImplementedError
-        
+
+
+    # Returns a randomly selected optimal policy.
+    def policy(self, s) -> float:
+        pols = self.policies(s)
+        if len(pols) == 0:
+            if self.mdp.actions != None:
+                pols = self.mdp.actions
+            else:
+                raise NotImplementedError
+        return random.choice(pols)
+
     # Does a Q-update based on some observed set of data
     # Data is a list of the form (state, action, reward, next state)
     def update(self, data: list[tuple[any, any, float, any]], learn_rate):
@@ -173,6 +196,12 @@ class ValueFunction(QFunction):
     def __init__(self, mdp: MDP):
         super().__init__(mdp)
 
+
+
+
+
+# Essentially instantiates a model and contains some methods to run it.
+# Also, everything should be vectorized. TODO The mdp can't be?
 class NNQFunction(QFunction):
     def __init__(self, mdp: MDP, q_model, lossfn, optimizer: torch.optim.Optimizer):
         self.q = q_model()
@@ -180,43 +209,41 @@ class NNQFunction(QFunction):
         self.lossfn = lossfn
         self.optimizer = optimizer
 
-    def get(self, s, a) -> float:
-        return self.q(self.mdp.to_tensor(s, a))
+    # TODO idk if we need this
+    #def get(self, s, a) -> float:
+    #    return self.get(self.mdp.state_to_tensor(s), self.mdp.action_to_tensor(a))
     
-    # If already in tensor form
-    def get(self, tensor) -> float:
-        return self.q(tensor)
-    
+    # Input has shape (batches, ) + state_shape and (batches, ) + action_shape
+    # Action should basically be boolean-valued
+    def get(self, state: torch.Tensor, action: torch.Tensor) -> float:
+        pred = self.q(self.mdp.state_to_tensor(state))                                      # Shape (batches, ) + action_shape; each entry is the value of Q for that action
+        #return torch.gather(torch.flatten(pred, 1, -1), 1, torch.flatten(action, 1, -1))     # Shape (batches, 1)
+        # TODO this isnt right -- probably what i want is "mask"?
+        return torch.sum(pred * action, tuple([i for i in range(1, len(action.shape))]))
+
     # Input is a tensor of shape (batches, ) + state.shape
-    def val(self, s) -> float:
-        if self.mdp.is_terminal(s):
+    def val(self, state) -> torch.Tensor:
+        if self.mdp.is_terminal(state):
             return 0
+        return torch.flatten(self.q(self.mdp.state_to_tensor(state)), 1, -1).max(1).values
 
-        # Given a state vector s, we want to take e_1 (x) a_1 (x) s + e_2 (x) a_2 (x) s + ... where e records the "argument", then pass to q
-        #TODO?
-
-        # If we have a defined (finite) set of actions, just iterate
-        if self.mdp.actions != None:
-            return valmax(self.mdp.get_actions(s), lambda a: self.get(s, a))
-        else:
-            raise NotImplementedError           #If there are infinitely many actions, this needs to be handled explicitly
-        
+    # Input is a batch of state vectors
     # Returns the value of an optimal policy at a given state
-    def policy(self, s) -> float:
+    def policy(self, state) -> torch.Tensor:
         if self.mdp.is_terminal(s):
             return self.mdp.get_random_action()
+        return torch.flatten(self.q(self.mdp.state_to_tensor(state)), 1, -1).max(1).indices
 
-        ss = self.mdp.state_to_tensor(s)
-        pred = self.q(ss)
-        pred.max(dim=1).values.numpy()      # A single state or ???? TODO
+    #TODO need to batch-ize greed?
+
     
     # TODO the following needs to be changed
     # Does a Q-update based on some observed set of data
     # Data is a list of the form (state, action, reward, next state)
-    def update(self, data, learn_rate):
+    def update(self, data: torch.Tensor, learn_rate):
         # TODO ??
         if not isinstance(self.q, nn.Module):
-            Exception("NNValueFunction needs to have a class extending nn.Module.")
+            Exception("NNQFunction needs to have a class extending nn.Module.")
         opt = self.optimizer(self.q.parameters(), lr=learn_rate)
         X, y = data     # Data should be a tuple (tensor shape (batches, state shape, action shape), tensor shape (batches, reward, next state))
         # TODO Actually have to compute y
@@ -236,7 +263,7 @@ class NNQFunction(QFunction):
 # Greedy function to use as a strategy.  Default is totally greedy.
 # This only works if the set of actions is defined and finite
 def greedy(q: QFunction, s, e = 0.):
-    return q.mdp.get_random_action(s) if random.random() < e else random.choice(argmax(q.mdp.get_actions(s), lambda a: q.get(s,a)))
+    return q.mdp.get_random_action(s) if random.random() < e else q.policy(s)
 
 def get_greedy(q: QFunction, e: float) -> callable:
     return lambda s: greedy(q, s, e)
@@ -255,7 +282,7 @@ class SimpleGame():
     def __init__(self, mdp: MDP):
         # An mdp that encodes the rules of the game.  The current player is part of the state, which is of the form (current player, actual state)
         self.mdp = mdp
-        self.qs = [ValueFunction(self.mdp) for i in range(mdp.num_players)]
+        self.qs = [QFunction(self.mdp) for i in range(mdp.num_players)]
         self.state = None
 
     def set_greed(self, eps):
@@ -326,13 +353,17 @@ class SimpleGame():
 
 
 class SimpleGameNN():
-    def __init__(self, mdp: MDP, q_model: nn.Module, state_shape: tuple, action_shape: tuple):     # TODO the MDP should know about state/action tensor shapes, also maybe number of players
+    def __init__(self, mdp: MDP, q_model: nn.Module, state_shape: tuple, action_shape: tuple):
         # An mdp that encodes the rules of the game.  The current player is part of the state, which is of the form (current player, actual state)
         self.mdp = mdp
-        self.qs = [NNValueFunction(mdp, q_model) for i in range(mdp.num_players)]
+        self.target_qs = [NNQFunction(mdp, q_model) for i in range(mdp.num_players)]
+        self.policy_qs = [NNQFunction(mdp, q_model) for i in range(mdp.num_players)]
 
     def set_greed(self, eps):
-        self.strategies = [get_greedy(self.qs[i], eps[i]) for i in range(self.mdp.num_players)]
+        if type(eps) == list:
+            self.strategies = [get_greedy(self.qs[i], eps[i]) for i in range(self.mdp.num_players)]
+        else:
+            self.strategies = [get_greedy(self.qs[i], eps) for i in range(self.mdp.num_players)]
 
     def save_q(self, fname):
         with open(fname, 'wb') as f:
