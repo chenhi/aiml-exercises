@@ -8,7 +8,6 @@ import tensorflow as tf
 
 import matplotlib.pyplot as plt
 import datetime
-from io import StringIO
 
 import models_pytorch as ptm
 import models_tensorflow as tfm
@@ -24,7 +23,7 @@ trainList = [
 #     {'data': 'digits', 'model': ptm.Conv2, 'opt': 'adam', 'epochs': 50, 'rate': 1e-2, 'save': True},
 #    {'data': 'digits', 'model': ptm.Conv3, 'opt': 'adam', 'epochs': 50, 'rate': 1e-2, 'save': True},
 #    {'data': 'fashion', 'model': ptm.Dense2, 'opt': 'adam', 'epochs': 5, 'save': True},
-    {'data': 'fashion', 'model': tfm.Conv2, 'opt': 'adam', 'epochs': 2, 'save': True},
+#    {'data': 'fashion', 'model': tfm.Conv2, 'opt': 'adam', 'epochs': 2, 'save': True},
     
     ]
 
@@ -169,7 +168,7 @@ for d in trainList:
  
          # Define optimizer on the model (m.parameters() is iterator over parameters)
         if d['opt'] == 'sgd':
-            optimizer = torch.optim.SGD(m.parameters(), lr=1e-3, dampening=0, momentum=0, weight_decay=0)                    # lr = learning rate
+            optimizer, optimizer_name = torch.optim.SGD(m.parameters(), lr=d['rate'], dampening=0, momentum=0, weight_decay=0)                    # lr = learning rate
         elif d['opt'] == 'adam':
             optimizer, optimizer_name = torch.optim.Adam(m.parameters(), lr = d['rate']), "adam"
         else:
