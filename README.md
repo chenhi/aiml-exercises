@@ -9,9 +9,8 @@ draw_tensor_model:
 game_learner:
 * Write some general classes for training an AI to play games using Q learning. (done)
 * Train an AI to play tic-tac-toe using Q learning.
-++ Train an AI to play Connect 4 using deep Q learning.
-++ Do the same but with Monte Carlo search trees.
-
+* TODO: Train an AI to play Connect 4 using deep Q learning.
+* TODO: Do the same but with Monte Carlo search trees.
 
 tensor_puzzles:
 * Learn how to broadcast with numpy arrays.
