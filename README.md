@@ -1,5 +1,7 @@
 # aiml-exercises
 Some machine learning exercises.  Learning goals below.
+* Completed.
++ In progress.
 
 draw_tensor_model:
 * Learn to build a Flask app.
@@ -7,11 +9,10 @@ draw_tensor_model:
 * Have an interface for testing and tweaking the models using spontaneously created data.
 
 game_learner:
-* Write some general classes for training an AI to play games.
+* Write some general classes for training an AI to play games using Q learning. (done)
 * Train an AI to play tic-tac-toe using Q learning.
-* Train an AI to play No Thanks! using deep Q learning.
-* Train an AI to play Connect 4 using deep Q learning.
-* Do the same but with Monte Carlo search trees.
++ Train an AI to play Connect 4 using deep Q learning.
++ Do the same but with Monte Carlo search trees.
 
 
 tensor_puzzles:
