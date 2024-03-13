@@ -166,6 +166,9 @@ class C4MDP(MDP):
                 return False
         return True
     
+    def get_player(self, state):
+        return [state[0]]
+    
 
 class C4TensorMDP(MDP):
     def __init__(self):
@@ -175,6 +178,10 @@ class C4TensorMDP(MDP):
         super().__init__(None, None, discount=1, num_players=2, state_shape=(2,6,7), action_shape=(7,))
         self.symb = {'0': "O", '1': "X", '': "-"}
         self.penalty = -10000000.
+
+    # Non-batch method, returns shape (1, 7) vector
+    def get_single_action_vector(self, action: int) -> torch.Tensor:
+        return torch.eye(7, dtype=float)[action][None, :]
 
     # If player 0 has placed more than player 1, then it's player 1's turn.  Otherwise, it's player 0's turn.
     # Returns a tensor of shape (batch, )
@@ -188,7 +195,7 @@ class C4TensorMDP(MDP):
 
     # Input and output shape (batch, 2)
     def swap_player(self, player_vector: torch.Tensor) -> torch.Tensor:
-        return torch.tensordot(torch.tensor([[0,1],[1,0]], dtype=float)[None,:,:], player_vector, dims=([2], [1]))
+        return torch.tensordot(player_vector, torch.tensor([[0,1],[1,0]], dtype=float), dims=([1], [0]))
 
     # Player 0 is always the first player.
     def get_initial_state(self, batch_size=1) -> torch.Tensor:
@@ -258,14 +265,14 @@ class C4TensorMDP(MDP):
         # Then, we add it to the state
         newstate = state + newpiece
 
-        # Check for a winner; 0 if no winner, 1 if winner
+        # Check whether the current player is a winner after playing at position newpos
         winner = self.is_winner(newstate, p, newpos).to(dtype=float)
-        # Make the state terminal if there is a winner, and give out the reward
+        # Make the state terminal if there is a winner
         newstate = (1 - 2 * winner)[:,None, None, None] * newstate
+        
+        # Give out a reward if there is a winner.
         reward = winner * p_tensor - winner * self.swap_player(p_tensor)
-
         # Invalid moves don't result in a change in the board.  However, we want to impose a penalty.
-        # Shape (batch, 2)
         reward += (self.is_valid_move(state, action) == False).to(dtype=float) * self.penalty * p_tensor
         
         return newstate, reward

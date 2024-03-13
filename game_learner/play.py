@@ -6,12 +6,13 @@ import os, datetime, re, sys
 
 tttmdp = ttt.TTTMDP()
 c4mdp = c4.C4MDP()
+c4tmdp = c4.C4TensorMDP()
 
-names = ["Tic-Tac-Toe", "Connect Four"]
-shortnames = ["ttt", "c4"]
-mdps = [tttmdp, c4mdp]
-games = [SimpleGame(tttmdp), SimpleGame(c4mdp)]
-file_exts = ['.ttt.pkl', '.c4.pkl']
+names = ["Tic-Tac-Toe", "Connect Four", "Tensor Connect Four"]
+shortnames = ["ttt", "c4", "c4t"]
+mdps = [tttmdp, c4mdp, c4tmdp]
+games = [SimpleGame(tttmdp), SimpleGame(c4mdp), SimpleGame(c4tmdp)]
+file_exts = ['.ttt.pkl', '.c4.pkl', '.c4t.pkl']
 
 option = sys.argv[1]
 res = None
@@ -196,6 +197,38 @@ elif shortname == "c4":
             
 
         print(f"{game.mdp.board_str(s)}The winner is {game.mdp.symb[str(s[2])]}.\n\n")
-    
+elif shortname == "c4t":
+    while True:
+        if saveindex >= -1:
+            res = input("Play as first or second player?  Enter '1' or '2' or 'q' to quit: ")
+            if res == 'q':
+                exit()
+            if res != '1' and res != '2':
+                continue
+            if res == '1':
+                comp = 1
+            else:
+                comp = 0
+        else:
+            comp = -1
+
+        s = game.mdp.get_initial_state()
+        while game.mdp.is_terminal(s).item() == False:
+            p = game.mdp.get_player(s).item()
+            print(game.mdp.board_str(s)[0])
+            if p != comp:
+                re = input(f"Input column to play (1-7). ")
+                s, r = game.mdp.transition(s, game.mdp.get_single_action_vector(int(re) - 1))
+                print(r.shape, r[0,p])
+                if r[0,p].item() == 1.:
+                    print(f"\nThe winner is player {p} ({game.mdp.symb[str(p)]}).\n")
+            else:
+                for a in game.mdp.get_actions(s):
+                    print(f"Value of action {a} is {game.qs[comp].get(s, a)}.")
+                a = game.qs[comp].policy(s)
+                print(f"Chosen action: {a}.\n")
+                s, _ = game.mdp.transition(s, a)
+                print(game.mdp.state_to_tensor(s), game.mdp.action_to_tensor(a))
+        
 
 

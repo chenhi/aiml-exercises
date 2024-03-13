@@ -97,6 +97,10 @@ class MDP():
     # Tells us if a state is terminal.
     def is_terminal(self, s) -> bool:
         raise NotImplementedError
+    
+    # Gets the current player of the given state
+    def get_player(self, state) -> int:
+        raise NotImplementedError
 
 
 # Q (Quality) function class
@@ -382,7 +386,7 @@ class SimpleGameNN():
         return self.mdp.transition((p, s), a)
     
     def current_player(self, s) -> int:
-        return None if s == None else s[0]
+        return None if s == None else self.mdp.get_player(s)[0]
 
     # Player data is (start state, action taken, all reward before next action, starting state for next action)
     def batch_learn(self, learn_rate: float, iterations: int, episodes: int, episode_length: int, verbose=False, savefile=None):
