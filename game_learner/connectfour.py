@@ -303,7 +303,7 @@ class C4TensorMDP(MDP):
         player_board = state[torch.arange(batches), player,:,:]
 
         filters = []
-        # Make the horizontal kernels
+        # Make the horizontal filters
         u1 = self.shift(lastmove, 1, 1)
         u2 = self.shift(lastmove, 2, 1)
         u3 = self.shift(lastmove, 3, 1)
@@ -315,7 +315,7 @@ class C4TensorMDP(MDP):
         filters.append(d2 + d1 + lastmove + u1)
         filters.append(d3 + d2 + d1 + lastmove)
 
-        # Make the horizontal kernels
+        # Make the horizontal filters
         r1 = self.shift(lastmove, 1, 2)
         r2 = self.shift(lastmove, 2, 2)
         r3 = self.shift(lastmove, 3, 2)
@@ -327,7 +327,7 @@ class C4TensorMDP(MDP):
         filters.append(l2 + l1 + lastmove + r1)
         filters.append(l3 + l2 + l1 + lastmove)
         
-        # Make the diagonal kernels
+        # Make the diagonal filters
         ur1 = self.shift(self.shift(lastmove, 1, 1), 1, 2)
         ur2 = self.shift(self.shift(lastmove, 2, 1), 2, 2)
         ur3 = self.shift(self.shift(lastmove, 3, 1), 3, 2)
@@ -339,7 +339,7 @@ class C4TensorMDP(MDP):
         filters.append(dl2 + dl1 + lastmove + ur1)
         filters.append(dl3 + dl2 + dl1 + lastmove)
 
-        # Make the diagonal kernels
+        # Make the diagonal filters
         ul1 = self.shift(self.shift(lastmove, 1, 1), -1, 2)
         ul2 = self.shift(self.shift(lastmove, 2, 1), -2, 2)
         ul3 = self.shift(self.shift(lastmove, 3, 1), -3, 2)
@@ -350,8 +350,6 @@ class C4TensorMDP(MDP):
         filters.append(dr1 + lastmove + ul1 + ul2)
         filters.append(dr2 + dr1 + lastmove + ul1)
         filters.append(dr3 + dr2 + dr1 + lastmove)
-
-
 
         # Shape (16, batch, 6, 7)
         filter_tensor = torch.stack(filters)
