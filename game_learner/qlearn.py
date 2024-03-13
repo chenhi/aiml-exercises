@@ -303,9 +303,6 @@ class SimpleGame():
     def load_q(self, fname):
         with open(fname, 'rb') as f:
             self.qs = pickle.load(f)
-
-    def transition(self, p, s, a) -> tuple[int, object, np.ndarray]:
-        return self.mdp.transition((p, s), a)
     
     def current_player(self, s) -> int:
         return None if s == None else s[0]
