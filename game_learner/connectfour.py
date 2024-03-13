@@ -235,7 +235,6 @@ class C4TensorMDP(MDP):
 
     # Reward is 1 for winning the game, -1 for losing, and 0 for a tie; awarded upon entering terminal state
     # Return tuple of tensors with shape (batch, ) + state_shape for the next state and (batch, 2) for the reward
-    # TODO maybe later -- when given an action vector (which might not be standard basis), maybe can select the top valid action?
     def transition(self, state: torch.Tensor, action: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         # If the batches don't match, this can cause weird behavior.
         if state.shape[0] != action.shape[0]:
@@ -271,6 +270,7 @@ class C4TensorMDP(MDP):
         
         return newstate, reward
 
+    # A shift function with truncation, like torch.roll except without the "rolling over"
     def shift(self, x: torch.Tensor, shift: int, axis: int) -> torch.Tensor:
         if shift == 0:
             return x
