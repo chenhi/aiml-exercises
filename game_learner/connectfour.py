@@ -267,7 +267,7 @@ class C4TensorMDP(MDP):
 
         # Invalid moves don't result in a change in the board.  However, we want to impose a penalty.
         # Shape (batch, 2)
-        reward = (self.is_valid_move(state, action) == False).to(dtype=float) * self.penalty * p_tensor
+        reward += (self.is_valid_move(state, action) == False).to(dtype=float) * self.penalty * p_tensor
         
         return newstate, reward
 
@@ -349,7 +349,7 @@ class C4TensorMDP(MDP):
 
         # Shape (16, batch, 6, 7)
         filter_tensor = torch.stack(filters)
-        
+
         # Sum along the board axes, check how many filters give rise to 4, then sum that number, then check if it is positive
         return ((player_board[None,:,:,:].expand(16, -1, -1, -1) * filter_tensor).sum((2,3)) == (torch.ones(16, dtype=float) * 4)[:,None].expand(-1, batches)).sum(0) > 0
     
