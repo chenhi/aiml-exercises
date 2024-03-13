@@ -172,11 +172,10 @@ class C4MDP(MDP):
 
 class C4TensorMDP(MDP):
     def __init__(self):
-        # State tensor (num_batches, player_channel, board_height, board_width)
-        # Mark the game as terminal by turning both players "on"
+        # State tensor (batches, player_channel, board_height, board_width)
         # Action tensor (num_batches, num_columns, )
         super().__init__(None, None, discount=1, num_players=2, state_shape=(2,6,7), action_shape=(7,))
-        self.symb = {'0': "O", '1': "X", '': "-"}
+        self.symb = {0: "O", 1: "X", None: "-"}
         self.penalty = -10000000.
 
     # Non-batch method, returns shape (1, 7) vector
@@ -212,7 +211,7 @@ class C4TensorMDP(MDP):
             if term[i].item():
                 s = s * -1
             out = ""
-            out += f"Current player: {self.symb[str(players[i].item())]}\n"
+            out += f"Current player: {self.symb[players[i].item()]}\n"
             pos0 = s[0, ...] > s[1, ...]
             pos1 = s[0, ...] < s[1, ...]
             #posvoid = board[0, ...] == board[1, ...]
@@ -222,11 +221,11 @@ class C4TensorMDP(MDP):
                 rowtext = "|"
                 for col in range(7):
                     if pos0[row, col].item():
-                        rowtext += self.symb["0"]
+                        rowtext += self.symb[0]
                     elif pos1[row, col].item():
-                        rowtext += self.symb["1"]
+                        rowtext += self.symb[1]
                     else:
-                        rowtext += self.symb['']
+                        rowtext += self.symb[None]
                     
                 out += rowtext + "|\n"
             out += "|1234567|"

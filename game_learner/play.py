@@ -200,6 +200,7 @@ elif shortname == "c4":
 elif shortname == "c4t":
     while True:
         if saveindex >= -1:
+            exit()
             res = input("Play as first or second player?  Enter '1' or '2' or 'q' to quit: ")
             if res == 'q':
                 exit()
@@ -219,9 +220,8 @@ elif shortname == "c4t":
             if p != comp:
                 re = input(f"Input column to play (1-7). ")
                 s, r = game.mdp.transition(s, game.mdp.get_single_action_vector(int(re) - 1))
-                print(r.shape, r[0,p])
                 if r[0,p].item() == 1.:
-                    print(f"\nThe winner is player {p} ({game.mdp.symb[str(p)]}).\n")
+                    print(f"\nThe winner is player {p} ({game.mdp.symb[p]}).\n")
             else:
                 for a in game.mdp.get_actions(s):
                     print(f"Value of action {a} is {game.qs[comp].get(s, a)}.")
