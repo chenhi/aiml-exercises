@@ -5,70 +5,8 @@ import torch
 from torch import nn
 from collections import namedtuple, deque
 
-# Returns the set of maximum arguments
-def argmax(args: list, f: callable):
-    maxval = None
-    output = []
-    for x in args:
-        y = f(x)
-        if maxval == None:
-            output.append(x)
-            maxval = y
-        elif y == maxval:
-            output.append(x)
-        elif y > maxval:
-            maxval = y
-            output = [x]
-    return output
-
-def valmax(args: list, f: callable):
-    maxval = None
-    for x in args:
-        y = f(x)
-        if maxval == None or y > maxval:
-            maxval = y
-    return maxval
-
-# Source, action, target, reward
-TransitionData = namedtuple('TransitionData', ('s', 'a', 't', 'r'))
-
-# Keeps the first action; the assumption is the later actions are "passive" (i.e. not performed by the given player)
-# Adds the rewards
-def compose_transition_tensor(first: TransitionData, second: TransitionData):
-    if first.t != second.t:
-        # Make this error non-fatal but make a note
-        warnings.warn("The source and target states do not match.")
-    return TransitionData(first.s, first.a, second.t, first.r + second.r)
 
 
-
-# When the deque hits memory limit, it removes the oldest item from the list
-class ExperienceReplay():
-    def __init__(self, memory: int):
-        self.memory = deque([], maxlen=memory)
-
-    # Push a single transition (comes in the form of a list)
-    def push(self, s, a, r, t):
-        self.memory.append(TransitionData(s,a,r,t))
-
-    def push_batch(self, source_batch, action_batch, target_batch, reward_batch):
-        if source_batch.size(0) != action_batch.size(0) or action_batch.size(0) != target_batch.size(0) or target_batch.size(0) != reward_batch.size(0):
-            raise Exception("Batch sizes do not agree.")
-        batch_size = source_batch.size(0)
-        for i in len(batch_size):
-            self.push(source_batch[i, ...], action_batch[i, ...], target_batch[i, ...], reward_batch[i, ...])
-
-            
-
-    def sample(self, num: int, batch=True) -> list:
-        if batch:
-            return torch.stack(random.sample(self.memory, num))
-        else:
-            return random.sample(self.memory, num)       
-    
-    def __len__(self):
-        return len(self.memory)
-    
 
 
 # WARNING: states and actions must be hashable if using with QFunction.
@@ -93,20 +31,17 @@ class MDP():
         if self.states != None:
             return True if state in self.states else False
         elif self.state_shape != None:
-            return True if state.shape == self.state_shape else False
+            return True if state[0].shape == self.state_shape else False
         else:
             return True
         
-    # Only need to define this if you are doing deep learning
-    def state_to_tensor(self, state):
-        raise NotImplementedError
-    
-    def action_to_tensor(self, action):
-        raise NotImplementedError
-    
-    # Action first because it's more similar to "batches"
-    def to_tensor(self, state, action):
-        return np.outer(self.action_to_tensor(action), self.state_to_tensor(state))
+    def is_action(self, action):
+        if self.actions != None:
+            return True if action in self.actions else False
+        elif self.action_shape != None:
+            return True if action[0].shape == self.action_shape else False
+        else:
+            return True
 
     # Takes in the "full" state and returns the status of the game
     def board_str(self, s) -> str:
@@ -123,9 +58,12 @@ class MDP():
             return self.actions
         else:
             raise NotImplementedError
+        
+    def is_valid_action(self, state, action):
+        return action in self.get_actions(state)
 
-    def get_random_action(self, s = None):
-        return random.choice(self.get_actions(s))
+    def get_random_action(self, state = None):
+        return random.choice(self.get_actions(state))
 
     # Returns: (next state, reward)
     def transition(self, s, a):
@@ -136,12 +74,42 @@ class MDP():
         raise NotImplementedError
 
     # Tells us if a state is terminal.
-    def is_terminal(self, s) -> bool:
+    def is_terminal(self, s):
         raise NotImplementedError
     
-    # Gets the current player of the given state.  TODO batch vs. non-batch
-    def get_player(self, state) -> int:
+    # Gets the current player of the given state.
+    def get_player(self, state):
         raise NotImplementedError
+
+
+
+
+#################### CLASSICAL Q-LEARNING ####################
+
+
+# Returns the set of maximum arguments
+def argmax(args: list, f: callable):
+    maxval = None
+    output = []
+    for x in args:
+        y = f(x)
+        if maxval == None:
+            output.append(x)
+            maxval = y
+        elif y == maxval:
+            output.append(x)
+        elif y > maxval:
+            maxval = y
+            output = [x]
+    return output
+
+def valmax(args: list, f: callable):
+    maxval = None
+    for x in args:
+        y = f(x)
+        if maxval == None or y > maxval:
+            maxval = y
+    return maxval
 
 
 # Q (Quality) function class
@@ -245,111 +213,17 @@ class ValueFunction(QFunction):
 
 
 
-# Essentially instantiates a model and contains some methods to run it.
-# Also, everything should be vectorized. TODO The mdp can't be?
-class NNQFunction(QFunction):
-    def __init__(self, mdp: MDP, q_model, lossfn, optimizer: torch.optim.Optimizer):
-        self.q = q_model()
-        self.mdp = mdp
-        self.lossfn = lossfn
-        self.optimizer = optimizer
-
-    # Input has shape (batches, ) + state_shape and (batches, ) + action_shape
-    def get(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
-        # The neural network produces a tensor of shape (batches, ) + action_shape
-        pred = self.q(self.mdp.state_to_tensor(state))
-        return pred * action
-
-    # Input is a tensor of shape (batches, ) + state.shape
-    # Output is a tensor of shape (batches, )
-    def val(self, state) -> torch.Tensor:
-        if self.mdp.is_terminal(state):
-            return 0
-        return torch.flatten(self.q(self.mdp.state_to_tensor(state)), 1, -1).max(1).values
-    
-    # Input indices shape (batch, linear length)
-    def flattened_index_to_shaped(self, indices: torch.Tensor, shape: tuple):
-        shapevol = 1
-        for s in shape:
-            shapevol *= s
-        if indices.size(1) != shapevol:
-            raise Exception("Linear length does not match shape volume.")
-        # Index [a,b,c] in shape (x, y, z) has linear index t = a + bx + cxy, so invert: a = t mod x, b = (t - a)//x mod y, c = (t - a - bx)//xy mod z
-        factors = []
-        units = []
-        shapeprod = 1
-        residue = torch.zeros(indices.shape, dtype=float)
-        for i in range(len(shape)):
-            val = ((indices - residue)//shapeprod) % shape[i]
-            # Shape (batch, shape_i)
-            factors.append(val)
-            residue += val
-            shapeprod *= shape[i]
-            # Create a tuple (1, 1, ..., s_i, 1, ...)
-            l = [1 for j in len(shape)]
-            l[i] = s[i]
-            units.append(tuple(l))
-
-        # Tensor up, move batch to last index
-        output = torch.tensor([], dtype=float)
-        for i in range(len(shape)-1, -1, -1):
-            output = output * factors[i].reshape(units[i])
-        return output
-
-    # Input is a batch of state vectors
-    # Returns the value of an optimal policy at a given state, shape (batches, ) + action_shape
-    def policy(self, state) -> torch.Tensor:
-        if self.mdp.is_terminal(s):
-            return self.mdp.get_random_action()
-        # The Q function outputs a tensor of shape (batch, ) + 
-        return self.flattened_index_to_shaped(torch.flatten(self.q(self.mdp.state_to_tensor(state)), 1, -1).max(1).indices, self.mdp.action_shape)
-
-
-    # TODO the following needs to be changed
-    # Does a Q-update based on some observed set of data
-    # Data is a list of the form (state, action, reward, next state)
-    def update(self, data: torch.Tensor, learn_rate):
-        # TODO ??
-        if not isinstance(self.q, nn.Module):
-            Exception("NNQFunction needs to have a class extending nn.Module.")
-        opt = self.optimizer(self.q.parameters(), lr=learn_rate)
-        X, y = data     # Data should be a tuple (tensor shape (batches, state shape, action shape), tensor shape (batches, reward, next state))
-        # TODO Actually have to compute y
-        pred = self.q(X)
-        # Don't call val, it means re-evaluating.  Just do it here.
-        #vals = pred.argmax(dim=1)
-
-
-        loss = self.lossfn(pred, y)
-
-        # Optimize
-        loss.backward()
-        opt.step()
-        opt.zero_grad()
-
-
-
-# Copy the weights of one NN to another
-def copy(source: NNQFunction, target: NNQFunction):
-    target.q.load_state_dict(source.q.state_dict())
-
 # Greedy function to use as a strategy.  Default is totally greedy.
 # This only works if the set of actions is defined and finite
-def greedy(q: QFunction, s, e = 0.):
-    return q.mdp.get_random_action(s) if random.random() < e else q.policy(s)
+def greedy(q: QFunction, state, eps = 0.):
+    return q.mdp.get_random_action(state) if random.random() < eps else q.policy(state)
 
 
-# Input shape (batch_size, ) + state_tensor
-# We implement a random tensor of 0's and 1's generating a random tensor of floats in [0, 1), then converting it to a bool, then back to a float.
-def greedy_tensor(q: NNQFunction, state, eps = 0.):
-    return (torch.rand(q.mdp.action_shape) < 0.5).to(dtype=float) if random.random() < e else q.policy(state)
 
 
-def get_greedy(q: QFunction, e: float) -> callable:
-    return lambda s: greedy(q, s, e)
+def get_greedy(q: QFunction, eps: float) -> callable:
+    return lambda s: greedy(q, s, eps)
 
-def get_greedy_tensor(eps: float) -> callable:
-    return lambda q, s: greedy_tensor(q, s, eps)
 
 
 # To each player, the game will act like a MDP; i.e. they do not distinguish between the opponents and the environment
@@ -441,66 +315,264 @@ class SimpleGame():
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#################### DEEP Q-LEARNING ####################
+
+
+
+# Source, action, target, reward
+TransitionData = namedtuple('TransitionData', ('s', 'a', 't', 'r'))
+
+# When the deque hits memory limit, it removes the oldest item from the list
+class ExperienceReplay():
+    def __init__(self, memory: int):
+        self.memory = deque([], maxlen=memory)
+
+    # Push a single transition (comes in the form of a list)
+    def push(self, s, a, r, t):
+        self.memory.append(TransitionData(s,a,r,t))
+
+    def push_batch(self, source_batch, action_batch, target_batch, reward_batch):
+        if source_batch.size(0) != action_batch.size(0) or action_batch.size(0) != target_batch.size(0) or target_batch.size(0) != reward_batch.size(0):
+            raise Exception("Batch sizes do not agree.")
+        batch_size = source_batch.size(0)
+        for i in len(batch_size):
+            self.push(TransitionData(source_batch[i, ...], action_batch[i, ...], target_batch[i, ...], reward_batch[i, ...]))
+
+            
+
+    def sample(self, num: int, batch=True) -> list:
+        if batch:
+            data = random.sample(self.memory, num)
+            s = torch.stack([datum[0] for datum in data])
+            return TransitionData(torch.stack([datum.s for datum in data]), torch.stack([datum.a for datum in data]), torch.stack([datum.t for datum in data]), torch.stack([datum.r for datum in data]))
+        else:
+            return random.sample(self.memory, num)       
+    
+    def __len__(self):
+        return len(self.memory)
+    
+
+
+
+
+
+
+# A Q-function where the inputs and outputs are all tensors
+class NNQFunction(QFunction):
+    def __init__(self, mdp: MDP, q_model, loss_fn, optimizer: torch.optim.Optimizer):
+        if mdp.state_shape == None or mdp.action_shape == None:
+            raise Exception("The input MDP must handle tensors.")
+        self.q = q_model()
+        self.mdp = mdp
+        self.loss_fn = loss_fn
+        self.optimizer = optimizer
+
+    # Input has shape (batches, ) + state_shape and (batches, ) + action_shape
+    def get(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
+        # The neural network produces a tensor of shape (batches, ) + action_shape
+        pred = self.q(state)
+        return pred * action
+
+    # Input is a tensor of shape (batches, ) + state.shape
+    # Output is a tensor of shape (batches, )
+    def val(self, state) -> torch.Tensor:
+        terminal = torch.flatten(self.mdp.is_terminal(state))
+        return torch.flatten(self.q(state), 1, -1).max(1).values * ~terminal
+    
+    # Input indices shape (batch, linear length)
+    def flattened_index_to_shaped(self, indices: torch.Tensor, shape: tuple):
+        shapevol = 1
+        for s in shape:
+            shapevol *= s
+        if indices.size(1) != shapevol:
+            raise Exception("Linear length does not match shape volume.")
+        # Index [a,b,c] in shape (x, y, z) has linear index t = a + bx + cxy, so invert: a = t mod x, b = (t - a)//x mod y, c = (t - a - bx)//xy mod z
+        factors = []
+        units = []
+        shapeprod = 1
+        residue = torch.zeros(indices.shape, dtype=float)
+        for i in range(len(shape)):
+            val = ((indices - residue)//shapeprod) % shape[i]
+            # Shape (batch, shape_i)
+            factors.append(val)
+            residue += val
+            shapeprod *= shape[i]
+            # Create a tuple (1, 1, ..., s_i, 1, ...)
+            l = [1 for j in len(shape)]
+            l[i] = s[i]
+            units.append(tuple(l))
+
+        # Tensor up, move batch to last index
+        output = torch.tensor([], dtype=float)
+        for i in range(len(shape)-1, -1, -1):
+            output = output * factors[i].reshape(units[i])
+        return output
+
+    # Input is a batch of state vectors
+    # Returns the value of an optimal policy at a given state, shape (batches, ) + action_shape
+    def policy(self, state) -> torch.Tensor:
+        return self.flattened_index_to_shaped(torch.flatten(self.q(state), 1, -1).max(1).indices, self.mdp.action_shape)
+
+
+    # TODO the following needs to be changed
+    # Does a Q-update based on some observed set of data
+    # TransitionData entries are tensors
+    def update(self, data: TransitionData, learn_rate):
+        if not isinstance(self.q, nn.Module):
+            Exception("NNQFunction needs to have a class extending nn.Module.")
+        opt = self.optimizer(self.q.parameters(), lr=learn_rate)
+        
+        pred = self.q(data.s) * data.a
+        y = data.r + self.val(data.t)
+
+        loss = self.loss_fn(pred, y)
+
+        # Optimize
+        loss.backward()
+        opt.step()
+        opt.zero_grad()
+
+
+
+
+
+
+# Input shape (batch_size, ) + state_tensor
+# We implement a random tensor of 0's and 1's generating a random tensor of floats in [0, 1), then converting it to a bool, then back to a float.
+def greedy_tensor(q: NNQFunction, state, eps = 0.):
+    return (torch.rand(q.mdp.action_shape) < 0.5).to(dtype=float) if random.random() < eps else q.policy(state)
+
+def get_greedy_tensor(eps: float) -> callable:
+    return lambda q, s: greedy_tensor(q, s, eps)
+
+
+
 # For now, for simplicity, fix a single strategy
 class DQN():
-    def __init__(self, mdp: MDP, q_model: nn.Module, memory_capacity: int):
+    def __init__(self, mdp: MDP, q_model: nn.Module, loss_fn, optimizer, memory_capacity: int):
         # An mdp that encodes the rules of the game.  The current player is part of the state, which is of the form (current player, actual state)
         self.mdp = mdp
-        self.target_qs = [NNQFunction(mdp, q_model) for i in range(mdp.num_players)]
-        self.policy_qs = [NNQFunction(mdp, q_model) for i in range(mdp.num_players)]
+        self.target_qs = [NNQFunction(mdp, q_model, loss_fn, optimizer) for i in range(mdp.num_players)]
+        self.policy_qs = [NNQFunction(mdp, q_model, loss_fn, optimizer) for i in range(mdp.num_players)]
         self.memories = [ExperienceReplay(memory_capacity) for i in range(mdp.num_players)]
 
     def set_greed(self, eps):
-        # if type(eps) == list:
-        #     self.strategies = [get_greedy_tensor(self.qs[i], eps[i]) for i in range(self.mdp.num_players)]
-        # else:
-        #     self.strategies = [get_greedy_tensor(self.qs[i], eps) for i in range(self.mdp.num_players)]
-        self.strategy = get_greedy_tensor(eps)
+        if type(eps) == list:
+            self.strategies = [get_greedy_tensor(self.qs[i], eps[i]) for i in range(self.mdp.num_players)]
+        else:
+            self.strategies = [get_greedy_tensor(self.qs[i], eps) for i in range(self.mdp.num_players)]
 
     def save_q(self, fname):
         for i in range(self.mdp.num_players):
-            model_scripted = torch.jit.script(self.policy_qs[i])
+            model_scripted = torch.jit.script(self.policy_qs[i].q)
             model_scripted.save(fname + f".p{i}")
 
     def load_q(self, fname):
         for i in range(self.mdp.num_players):
-            self.policy_qs[i] = torch.jit.load(fname + f"p{i}")
-            self.target_qs[i] = torch.jit.load(fname + f"p{i}")
-            self.policy_qs[i].eval()					# Set to evaluation mode
+            self.policy_qs[i].q = torch.jit.load(fname + f"p{i}")
+            self.target_qs[i].q = torch.jit.load(fname + f"p{i}")
+            self.policy_qs[i].q.eval()					# Set to evaluation mode
+
+    # Keeps the first action; the assumption is the later actions are "passive" (i.e. not performed by the given player)
+    # Adds the rewards
+    # Returns a tuple: (composition, to_memory)
+    def compose_transition_tensor(self, first: TransitionData, second: TransitionData, player_index: int):
+        if (torch.prod(first.t == second.s) == 0).item():
+            # Make this error non-fatal but make a note
+            warnings.warn("The source and target states do not match.")
+
+        # Two cases: say (s,a,r,t) composed (s',a',r',t')
+        # If player(t) = player_index, then (s',a',r',t') else (s,a,r+r',t')
+        # Note once we reach terminal state, 
+        filter = self.mdp.get_player(first.t) == player_index 
+        new_s = filter * second.s + (filter == False) * first.s
+        new_a = filter * second.a + (filter == False) * first.a
+        new_r = second.r + (filter == False) * first.r
+        new_t = second.t
+            
+        # After the above update, return rows where player(s) = player(t') = player_index OR where t' is terminal but s' is not (regardless of player)
+        filter = ((self.mdp.get_player(first.s) == player_index) & (self.mdp.get_player(second.t) == player_index)) | (self.mdp.is_terminal(second.t) & ~self.mdp.is_terminal(second.s))
+        return (TransitionData(new_s, new_a, new_r, new_t), TransitionData(new_s[filter], new_a[filter], new_r[filter], new_t[filter]))
+
+    # Copy the weights of one NN to another
+    def copy_policy_to_target(self):
+        for i in range(self.mdp.num_players):
+            self.target_qs[i].q.load_state_dict(self.policy_qs[i].q.state_dict())
+
 
     # Handling multiplayer: each player keeps their own "record", separate from memory
     # When any entry in the record has source = target, then the player "banks" it in their memory
     # The next time an action is taken, if the source = target, then it gets overwritten
-    def deep_learn(self, learn_rate: float, iterations: int, episodes: int, episode_length: int, batch_size: int, verbose=False):
+    def deep_learn(self, learn_rate: float, iterations: int, episodes: int, episode_length: int, batch_size: int, train_batch_size: int, copy_frequency: int, verbose=False):
         for i in range(iterations):
             for j in range(episodes):
+                # Make sure the target network is the same as the policy network
+                self.copy_policy_to_target()
+
                 s = self.mdp.get_initial_state(batch_size)
                 # "Records" for each player
-                player_source = [None for i in self.mdp.num_players]
-                player_action = [None for i in self.mdp.num_players]
-                player_target = [None for i in self.mdp.num_players]
-                player_reward = [None for i in self.mdp.num_players]
-
+                player_record = [None for i in self.mdp.num_players]
+                
                 for k in range(episode_length):  
                     # Execute the transition on the "actual" state
                     # To do this, we need to iterate over players, because each has a different q function for determining the strategy
                     p = self.mdp.get_player(s)                                  # p.shape = (batch, )       s.shape = (batch, 2, 6, 7)
 
-                    # To get the actions, we need to use each player's strategy # TODO ok it's not hard to make this so each player has its own strategy...
+                    # To get the actions, apply each player's strategy
                     a = torch.zeros((batch_size, ) + self.mdp.action_shape)
-                    for i in range(self.mdp.num_players):
-                        # TODO can we make this more efficient, i.e. just ignore the other ones and put it back in?
-                        player_a = self.strategy(s)
+                    for pi in range(self.mdp.num_players):
+                        # Get the indices corresponding to this player's turn
+                        indices = torch.arange(batch_size)[p == float(pi)].tolist()
 
-                        a += player_a * (p == float(i))[:, None]                    # Zero out actions on other players' turns # TODO how to broadcast to right
-                        
+                        # Apply thie player's strategy to their turns
+                        # Greedy is not parallelized, so there isn't efficiency loss with this
+                        player_actions = torch.stack([self.strategies[pi](s[l]) if l in indices else torch.zeros(self.mdp.action_shape) for l in range(batch_size)])
+                        a += player_actions
+                        #player_actions = self.strategies[i](s[indices, ...])
+                        #a += player_actions * (p == float(pi))[:, None]
+
+                    # Do the transition                       
                     t, r = self.mdp.transition(s, a)
 
-                    # Update player records
-                    # If a current record has player(s) = player(t), replace it
+                    # Update player records and memory
+                    for pi in range(self.mdp.num_players):
+                        # If it's the first move, just put the record in
+                        if player_record[pi] == None:
+                            player_record[pi] = TransitionData(s, a, r, t)
+                        else:
+                            player_record, to_memory = self.compose_transition_tensor(player_record[pi], TransitionData(s, a, r, t))
+                            self.memories[pi].push_batch(to_memory)
                     
-                    # Update memory
-                    # If an updated record has player(s) = player(t), put it into memory
+                    # Train the policy on a random sample in memory
+                    for i in range(self.mdp.num_players):
+                        self.policy_qs[i].update(self.memories[i].sample(train_batch_size), learn_rate)
+                            
+                    # Copy the target network to the policy network if it is time
+                    if (k+1) % copy_frequency == 0:
+                        self.copy_policy_to_target()
+                
+                
+
+                    
 
 
 

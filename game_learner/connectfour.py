@@ -4,6 +4,10 @@ import random, sys, warnings
 
 options = sys.argv[1:]
 
+
+#################### CLASSICAL IMPLEMENTATION ####################
+
+
 # Set of states: (player, 7-tuple of strings of 0 and 1 of length in [0, 6], winner or None if not terminal)
 # Set of actions: integers [0, 6]
 class C4MDP(MDP):
@@ -36,7 +40,7 @@ class C4MDP(MDP):
     
     def state_to_tensor(self, state):
         # Ignore player and winner
-        tensor = np.zeros((2,7,6), dtype=float)
+        tensor = np.zeros((2,7,6), dtype=int)
         for i in range(7):
             for j in range(len(state[1][i])):
                 tensor[int(state[1][i][j])][i][j] = 1.
@@ -185,6 +189,7 @@ class C4MDP(MDP):
 
 
 
+#################### TENSOR IMPLEMENTATION ####################
 
 
 
@@ -207,23 +212,26 @@ class C4TensorMDP(MDP):
 
     # Return shape (batch, 2, 1, 1)
     def get_player_vector(self, state: torch.Tensor) -> torch.Tensor:
-        return torch.eye(2, dtype=float)[self.get_player(state)[:, 0, 0, 0]][:,:,None, None] # TODO maybe improve this
+        return torch.eye(2, dtype=int)[self.get_player(state)[:, 0, 0, 0]][:,:,None, None] # TODO maybe improve this
 
     # Non-batch and not used in internal code, but might be useful
+    # Return shape (1, 7)
     def action_index_to_tensor(self, index: int):
         if index < 0 or index > 7:
             warnings.warn("Index out of range.")
-            return np.zeros((1, 7), dtype=float)
-        return torch.eye(7, dtype=float)[index:index+1,:]
+            return np.zeros((1, 7), dtype=int)
+        return torch.eye(7, dtype=int)[index:index+1,:]
 
-    # Input and output shape (batch, 2, 1, 1)
+    # Return shape (batch, 2, 1, 1)
     def swap_player(self, player_vector: torch.Tensor) -> torch.Tensor:
-        return torch.tensordot(player_vector, torch.tensor([[0,1],[1,0]], dtype=float), dims=([1], [0])).swapaxes(1, -1)
+        return torch.tensordot(player_vector, torch.tensor([[0,1],[1,0]], dtype=int), dims=([1], [0])).swapaxes(1, -1)
 
     # Player 0 is always the first player.
+    # Return shape (batch_size, 2, 6, 7)
     def get_initial_state(self, batch_size=1) -> torch.Tensor:
-        return torch.tensordot(torch.ones((batch_size, ), dtype=float), torch.zeros((2,6,7), dtype=float), 0)    
+        return torch.tensordot(torch.ones((batch_size, ), dtype=int), torch.zeros((2,6,7), dtype=int), 0)    
 
+    # Returns a pretty looking board in a string.
     def board_str(self, state: torch.Tensor) -> list[str]:
         # Iterate through the batches and return a list.
         outs = []
@@ -258,10 +266,10 @@ class C4TensorMDP(MDP):
 
     # Sum the channels and columns, add the action, should be <= 6.  Then, do an "and" along the rows.
     # Return shape (batch, 1, 1, 1)
-    def is_valid_move(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
+    def is_valid_action(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
         if state.shape[0] != action.shape[0]:
             raise Exception("Batch sizes must agree.")
-        return torch.prod(state.sum((1,2)) + action <= torch.ones(action.shape, dtype=float) * 6, 1)
+        return torch.prod(state.sum((1,2)) + action <= torch.ones(action.shape, dtype=int) * 6, 1)
 
     # Reward is 1 for winning the game, -1 for losing, and 0 for a tie; awarded upon entering terminal state
     # Return tuple of tensors with shape (batch, ) + state_shape for the next state and (batch, 2) for the reward
@@ -277,10 +285,10 @@ class C4TensorMDP(MDP):
 
         # Make the move!  Note this operation is safe: if the move is invalid, no move will be made.
         # First, get the position we want to add by summing the channels and columns: state.sum((1,2))
-        # This has shape (batch, 7); we extend it by ones to shape (batch, 6, 7): torch.tensordot(state.sum((1,2)), torch.ones(6, dtype=float), 0)
+        # This has shape (batch, 7); we extend it by ones to shape (batch, 6, 7): torch.tensordot(state.sum((1,2)), torch.ones(6, dtype=int), 0)
         coltotals = state.sum((1,2))[:,None,:].expand(-1,6,-1)
         # Then, we compare it to tensor of shape (7, 6) to get a tensor of shape (batch, 6, 7).  The result is a board with True along the correct row
-        rowcounter = torch.arange(6, dtype=float)[:,None].expand(-1,7)
+        rowcounter = torch.arange(6, dtype=int)[:,None].expand(-1,7)
         # Then, we multiply it with action to isolate the right column, shape (batch, 6, 7)
         newpos = action[:,None,:].expand(-1,6,-1)  * (coltotals == rowcounter)
         # Then, we put the player channel back in to get a shape (batch, 2, 7, 6)
@@ -292,14 +300,16 @@ class C4TensorMDP(MDP):
         winner = self.is_winner(newstate, p, newpos)
         # Also check if the board is full, meaning a draw
         full = self.is_full(newstate)
+        # Check if the original state was terminal
+        was_terminal = self.is_terminal(state)
 
-        # Make the state terminal if there is a winner or if the board is full
-        newstate = (1 - 2 * (winner | full)) * newstate
+        # Make the state terminal if there is a winner or if the board is full, and if it wasn't terminal to begin with
+        newstate = (1 - 2 * (~was_terminal & (winner | full))) * newstate
         
         # Give out a reward if there is a winner.
         reward = (winner.to(dtype=float) * p_tensor - winner * self.swap_player(p_tensor))[:,:,0,0]
         # Invalid moves don't result in a change in the board.  However, we want to impose a penalty.
-        reward += ((self.is_valid_move(state, action) == False).to(dtype=float) * self.penalty * p_tensor)[:,:,0,0]
+        reward += ((self.is_valid_action(state, action) == False).to(dtype=float) * self.penalty * p_tensor)[:,:,0,0]
         
         return newstate, reward
 
@@ -308,15 +318,15 @@ class C4TensorMDP(MDP):
         if shift == 0:
             return x
         if abs(shift) >= x.shape[axis]:
-            return torch.zeros(x.shape, dtype=float)
+            return torch.zeros(x.shape, dtype=int)
         
         zero_shape = list(x.shape)
         if shift > 0:
             zero_shape[axis] = shift
-            return torch.cat((torch.zeros(zero_shape, dtype=float), torch.index_select(x, axis, torch.arange(0, x.shape[axis] - shift))), axis)
+            return torch.cat((torch.zeros(zero_shape, dtype=int), torch.index_select(x, axis, torch.arange(0, x.shape[axis] - shift))), axis)
         else:
             zero_shape[axis] = -shift
-            return torch.cat((torch.index_select(x, axis, torch.arange(-shift, x.shape[axis])), torch.zeros(zero_shape, dtype=float)), axis)
+            return torch.cat((torch.index_select(x, axis, torch.arange(-shift, x.shape[axis])), torch.zeros(zero_shape, dtype=int)), axis)
 
     # Inputs: state has stape (batch, 2, 6, 7), player has shape (batch, ), and lastmove has shape (batch, 6, 7)
     # Returns a shape (batch, ) boolean saying whether the indicated player is a winner.
@@ -381,7 +391,7 @@ class C4TensorMDP(MDP):
         filter_tensor = torch.stack(filters)
 
         # Sum along the board axes, check how many filters give rise to 4, then sum that number, then check if it is positive
-        return (((player_board[None,:,:,:].expand(16, -1, -1, -1) * filter_tensor).sum((2,3)) == (torch.ones(16, dtype=float) * 4)[:,None].expand(-1, batches)).sum(0) > 0)[:,None, None, None]
+        return (((player_board[None,:,:,:].expand(16, -1, -1, -1) * filter_tensor).sum((2,3)) == (torch.ones(16, dtype=int) * 4)[:,None].expand(-1, batches)).sum(0) > 0)[:,None, None, None]
     
     # The game is short enough that maybe we don't care about intermediate states
     def get_random_state(self) -> torch.Tensor:
@@ -393,139 +403,247 @@ class C4TensorMDP(MDP):
     
     # Sum the channels, and board factors.  The result should be 1 * 1 * 6 * 7 = 42.  If it is greater, something went wrong and we won't account for it.
     def is_full(self, state: torch.Tensor) -> torch.Tensor:
-        return (state.sum((1,2,3)) == 42 * torch.ones(state.shape[0], dtype=float))[:, None, None, None]
+        return (abs(state.sum((1,2,3))) == 42 * torch.ones(state.shape[0], dtype=int))[:, None, None, None]
     
-
-
-# Testing
-if "test" in options:
-    # We can print everything or just the pass/fail statements.
-    verbose = True if "verbose" in options else False
-    mdp = C4TensorMDP()
-
-    # Test: batches
-    s = mdp.get_initial_state(batch_size=2)
-    print("Testing get_player and get_player_vector.  Player 0 taking a turn on board 0.")
-    s[0][0][0][0] = 1.
-    print("player", mdp.get_player(s))
-    print("player vector", mdp.get_player_vector(s))
-    print("Player 1 taking a turn on board 0.")
-    s[0][1][1][0] = 1.
-    print("player", mdp.get_player(s))
-    print("player vector", mdp.get_player_vector(s))
-    print("Player 0 taking a turn on board 1.")
-    s[1][0][0][3] = 1.
-    print("player", mdp.get_player(s))
-    print("player vector", mdp.get_player_vector(s))
-
-
-    print("\nTesting swap player.")
-    print("player", mdp.get_player_vector(s))
-    print("swap", mdp.swap_player(mdp.get_player_vector(s)))
- 
-    print("\nTesting printing board.")    
-    print(mdp.board_str(s)[0])
-    print(mdp.board_str(s)[1])
-
-    print("\nTesting transition.  Placing two pieces in column 1 on board 0, and a piece in column 6, then column 5 on board 1.")
-    t = mdp.get_initial_state(batch_size=2)
-    a = torch.zeros((2,7), dtype=float)
-    a[0, 1] = 1.
-    a[1, 6] = 1.
-    b = torch.zeros((2,7), dtype=float)
-    b[0, 1] = 1.
-    b[1, 5] = 1.
-    t1, _ = mdp.transition(t, a)
-    print(mdp.board_str(t1)[0] + "\n" + mdp.board_str(t1)[1])
-    t2, _ = mdp.transition(t1, b)
-    print(mdp.board_str(t2)[0] + "\n" + mdp.board_str(t2)[1])
-
-    print("\nTesting invalid move handling.  Players each play 4 times in column 0.  Print output of is_valid_move each time.")
-    v = mdp.get_initial_state()
-    a = torch.zeros((1,7), dtype=float)
-    a[0,0] = 1.
-    for i in range(6):
-        print("is_valid_move", mdp.is_valid_move(v, a))
-        v, pen = mdp.transition(v, a)
-        print(mdp.board_str(v)[0])
-        print("reward", pen)
-        print("")
-    
-    print("Now player 0 will attempt to play in column 0, then column 1.  Then player 1 will attempt to play in column 0.")
-    print("is_valid_move", mdp.is_valid_move(v, a))
-    v, pen = mdp.transition(v, a)
-    print(mdp.board_str(v)[0])
-    print("reward", pen)
-    print("")
-
-    b = torch.zeros((1,7), dtype=float)
-    b[0,1] = 1
-    print("is_valid_move", mdp.is_valid_move(v, b))
-    v, pen = mdp.transition(v, b)
-    print(mdp.board_str(v)[0])
-    print("reward", pen)
-    print("")
-    
-    print("is_valid_move", mdp.is_valid_move(v, a))
-    v, pen = mdp.transition(v, a)
-    print(mdp.board_str(v)[0])
-    print("reward", pen)
-
-    print("\nChecking win condition, and terminal state.  Player 0 and 1 will play in columns 0 and 1.  The game should enter a terminal state after play 7, and play 8 should not proceed.")
-    v = mdp.get_initial_state()
-    a = torch.tensor([[1,0,0,0,0,0,0]], dtype=float)
-    b = torch.tensor([[0,1,0,0,0,0,0]], dtype=float)
-    for i in range(4):
-        v, r = mdp.transition(v, a)
-        print(mdp.board_str(v)[0])
-        print(f"reward {r}, terminal {mdp.is_terminal(v)}")
-        v, r = mdp.transition(v, b)
-        print(mdp.board_str(v)[0])
-        print(f"reward {r}, terminal {mdp.is_terminal(v)}")
-        print("")
-
-    print("\nChecking full board condition.  Should enter a terminal state with no reward.")
-    v = mdp.get_initial_state()
-    for i in range(3):
-        a = mdp.action_index_to_tensor(i)
-        for j in range(6):
-            v, r = mdp.transition(v, a)
-            print(mdp.board_str(v)[0])
-            print(f"reward {r}, terminal {mdp.is_terminal(v)}")
-            print("")
-    print("Now avoiding a win...")
-    a = mdp.action_index_to_tensor(6)
-    v, r = mdp.transition(v, a)
-    print(mdp.board_str(v)[0])
-    print(f"reward {r}, terminal {mdp.is_terminal(v)}")
-    print("")
-    for i in range(3, 7):
-        a = mdp.action_index_to_tensor(i)
-        for i in range(6):
-            v, r = mdp.transition(v, a)
-            print(mdp.board_str(v)[0])
-            print(f"reward {r}, terminal {mdp.is_terminal(v)}")
-            print("")
-
-    print("\nBoard should be full and in a terminal state in the second to last play.  The last play should have proceeded with no penalty.")
 
 
 
 
 # Some prototyping the neural network
-# Input tensors have shape (batch, 7, 2, 7, 6)
+# Input tensors have shape (batch, 2, 7, 6)
 class C4NN(nn.Module):
     def __init__(self):
         self.stack = nn.Sequential(
-            nn.Flatten(0, 1),
             nn.Conv2d(2, 64, (4,4), padding='same'),
-            nn.Unflatten(0, (-1, 7)),
             nn.ReLU(),
             nn.Dropout(p=0.2),
             nn.BatchNorm2d(64),
             nn.Flatten(),
             nn.Linear(7*2*7*6*64, 7*2*7*6*64),
             nn.ReLU(),
-            nn.Linear(7*2*7*6*64, 7) # ok im still confused about whether we are learning q or learning p
+            nn.Linear(7*2*7*6*64, 7)
         )
 
+
+
+
+
+#################### TESTING ####################
+
+
+
+
+
+print("Can run with options: 'test', 'verbose'\n")
+
+
+# Testing
+if "test" in options:
+    print("\nRUNNING TESTS:\n")
+
+    # We can print everything or just the pass/fail statements.
+    verbose = True if "verbose" in options else False
+    mdp = C4TensorMDP()
+
+    s = mdp.get_initial_state(batch_size=2)
+    print("Testing batching, get_player and get_player_vector.")
+    if verbose:
+        print("Creating two boards.  The current player on both boards should be player 0.")
+    ok = True
+    if verbose:
+        print(mdp.get_player(s))
+        print(mdp.get_player_vector(s))
+    p = mdp.get_player(s)
+    pp = mdp.get_player_vector(s)
+    if not (p[0,0,0,0].item() == 0 and p[1,0,0,0].item() == 0 and pp[0,:,0,0].tolist() == [1, 0] and pp[1,:,0,0].tolist() == [1, 0]):
+        ok = False
+    
+    if verbose:
+        print("\nManually playing on board 0, but not board 1.  The current player on board 0 should be player 1, and on board 1 should be player 0.")
+    s[0][0][0][0] = 1.
+    if verbose:
+        print(mdp.get_player(s))
+        print(mdp.get_player_vector(s))
+    p = mdp.get_player(s)
+    pp = mdp.get_player_vector(s)
+    if not (p[0,0,0,0].item() == 1 and p[1,0,0,0].item() == 0 and pp[0,:,0,0].tolist() == [0, 1] and pp[1,:,0,0].tolist() == [1, 0]):
+        ok = False
+
+    if ok:
+        print ("PASS")
+    else:
+        print("FAIL!!!")
+
+
+    print("\nTesting swap player.")   
+    if verbose:
+        print("initial players:", mdp.get_player_vector(s))
+        print("swapped:", mdp.swap_player(mdp.get_player_vector(s)))
+    pp = mdp.swap_player(mdp.get_player_vector(s))
+    if pp[0,:,0,0].tolist() == [1, 0] and pp[1,:,0,0].tolist() == [0, 1]:
+         print("PASS")
+    else:
+        print("FAIL!!!")
+
+    print("\nTesting printing board and initial state.  The following should be a nicely decorated empty board.")   
+    s = mdp.get_initial_state()
+    print(mdp.board_str(s)[0])
+
+
+    print("\nTesting transitions.")
+    if verbose:
+        print("Board 0: two plays in column 1.  Board 1: a play in column 6, then column 5.")
+    t = mdp.get_initial_state(batch_size=2)
+    a = torch.zeros((2,7), dtype=int)
+    a[0, 1] = 1.
+    a[1, 6] = 1.
+    b = torch.zeros((2,7), dtype=int)
+    b[0, 1] = 1.
+    b[1, 5] = 1.
+    t1, _ = mdp.transition(t, a)
+    if verbose:
+        print(mdp.board_str(t1)[0] + "\n" + mdp.board_str(t1)[1])
+    t2, _ = mdp.transition(t1, b)
+    if verbose:
+        print(mdp.board_str(t2)[0] + "\n" + mdp.board_str(t2)[1])
+    if t2[0,0,0,1].item() == 1 and t2[0,1,1,1].item() == 1 and t2[1,0,0,6].item() == 1 and t2[1,1,0,5] == 1:
+        print("PASS")
+    else:
+        print("FAIL!!!")
+
+    print("\nTesting invalid move handling and negative rewards.")
+    if verbose:
+        print("Players each play 4 times in column 0.  The last two should be reported invalid.")
+    v = mdp.get_initial_state()
+    a = torch.zeros((1,7), dtype=int)
+    a[0,0] = 1.
+    ok = True
+    for i in range(6):
+        if verbose:
+            print("is_valid_action", mdp.is_valid_action(v, a))
+        if mdp.is_valid_action(v, a) == False:
+            ok = False
+        v, pen = mdp.transition(v, a)
+        if verbose:
+            print(mdp.board_str(v)[0])
+            print("reward", pen)
+            print("")
+        if pen[0,0].item() != 0 and pen[0,1].item != 0:
+            ok = False
+
+    if verbose:
+        print("Now player 0 will attempt to play in column 0, then column 1.  Then player 1 will attempt to play in column 0.")
+        print("is_valid_action", mdp.is_valid_action(v, a))
+    if mdp.is_valid_action(v, a).item() == True:
+        ok = False
+    v, pen = mdp.transition(v, a)
+    if verbose:
+        print(mdp.board_str(v)[0])
+        print("reward", pen)
+        print("")
+    if pen[0,0].item() >= 0 and pen[0,1].item() != 0:
+        ok = False
+
+    b = torch.zeros((1,7), dtype=int)
+    b[0,1] = 1
+    if verbose:
+        print("is_valid_action", mdp.is_valid_action(v, b))
+    if mdp.is_valid_action(v, b).item() == False:
+        ok = False
+    v, pen = mdp.transition(v, b)
+    if verbose:
+        print(mdp.board_str(v)[0])
+        print("reward", pen)
+        print("")
+    if pen[0,0].item() != 0 and pen[0,1].item != 0:
+        ok = False
+    
+    if verbose:
+        print("is_valid_action", mdp.is_valid_action(v, a))
+    if mdp.is_valid_action(v, a).item() == True:
+        ok = False
+    v, pen = mdp.transition(v, a)
+    if verbose:
+        print(mdp.board_str(v)[0])
+        print("reward", pen)
+    if pen[0,0].item() != 0 and pen[0,1].item >= 0:
+        ok = False
+
+    if ok:
+        print("PASS")
+    else:
+        print("FAIL!!!")
+
+    print("\nChecking win condition and reward, and terminal state.")
+    if verbose:
+        print("Player 0 and 1 will play in columns 0 and 1.  The game should enter a terminal state after play 7, and play 8 should not proceed.")
+    v = mdp.get_initial_state()
+    a = torch.tensor([[1,0,0,0,0,0,0]], dtype=int)
+    b = torch.tensor([[0,1,0,0,0,0,0]], dtype=int)
+    ok = True
+    for i in range(4):
+        v, r = mdp.transition(v, a)
+        if verbose:
+            print(mdp.board_str(v)[0])
+            print(f"reward {r}, terminal {mdp.is_terminal(v)}")
+        if i == 3 and (mdp.is_terminal(v).item() == False or r[0,0].item() != 1 or r[0,1].item() != -1):
+            ok = False
+            print("fail 1")
+        v, r = mdp.transition(v, b)
+        if verbose:
+            print(mdp.board_str(v)[0])
+            print(f"reward {r}, terminal {mdp.is_terminal(v)}")
+            print("")
+        if i == 3 and (mdp.is_terminal(v).item() == False or r[0,0].item() != 0 or r[0,1].item() != 0):
+            ok = False
+    
+    if ok:
+        print("PASS")
+    else:
+        print("FAIL!!!")
+        
+        
+
+    print("\nChecking full board condition and reward.")
+    ok = True
+    if verbose:
+        print("Should enter a terminal state with no reward.")
+    v = mdp.get_initial_state()
+    for i in range(3):
+        a = mdp.action_index_to_tensor(i)
+        for j in range(6):
+            v, r = mdp.transition(v, a)
+            if verbose:
+                print(mdp.board_str(v)[0])
+                print(f"reward {r}, terminal {mdp.is_terminal(v)}")
+                print("")
+    if verbose:
+        print("Now avoiding a win...")
+    a = mdp.action_index_to_tensor(6)
+    v, r = mdp.transition(v, a)
+    if verbose:
+        print(mdp.board_str(v)[0])
+        print(f"reward {r}, terminal {mdp.is_terminal(v)}")
+        print("")
+    for i in range(3, 7):
+        a = mdp.action_index_to_tensor(i)
+        for j in range(6):
+            v, r = mdp.transition(v, a)
+            if verbose:
+                print(mdp.board_str(v)[0])
+                print(f"reward {r}, terminal {mdp.is_terminal(v)}")
+                print("")
+            if (i, j) == (6, 4) and (mdp.is_full(v).item() != True or mdp.is_terminal(v).item() != True or r[0,0].item() != 0 or r[0,1].item() != 0):
+                ok = False
+            elif (i, j) == (6, 5) and (mdp.is_full(v).item() != True or mdp.is_terminal(v).item() != True or r[0,0].item() != 0 or r[0, 1].item() != 0):
+                ok = False
+    if verbose:
+        print("\nBoard should be full and in a terminal state in the second to last play.  The last play should have proceeded with no penalty.")
+
+    if ok:
+        print("PASS")
+    else:
+        print("FAIL!!!")
+
+    print("\nThe following should be a full board with no winner.")
+    print(mdp.board_str(v)[0])

@@ -1,7 +1,7 @@
 import connectfour as c4
 import tictactoe as ttt
 from qlearn import *
-import os, datetime, re, sys
+import os, datetime, re, sys, torch
 
 
 tttmdp = ttt.TTTMDP()
@@ -11,8 +11,9 @@ c4tmdp = c4.C4TensorMDP()
 names = ["Tic-Tac-Toe", "Connect Four", "Tensor Connect Four"]
 shortnames = ["ttt", "c4", "c4t"]
 mdps = [tttmdp, c4mdp, c4tmdp]
-games = [SimpleGame(tttmdp), SimpleGame(c4mdp), SimpleGame(c4tmdp)]
+games = [SimpleGame(tttmdp), SimpleGame(c4mdp), DQN(c4tmdp, c4.C4NN, torch.nn.HuberLoss, torch.optim.Adam, 10000)]
 file_exts = ['.ttt.pkl', '.c4.pkl', '.c4t.pkl']
+types = ["classical", "classical", "deep"]
 
 option = sys.argv[1]
 res = None
@@ -33,6 +34,7 @@ try:
     game = games[game_index]
     file_ext = file_exts[game_index]
     shortname = shortnames[game_index]
+    type = types[game_index]
 except:
     print("Don't know what you mean.  Exiting.")
     exit()
@@ -67,54 +69,59 @@ if saveindex >= 0:
 elif saveindex == -1:
     # Train AI
 
-    default=0.5
-    res = input(f"How greedy should it be?  A number in [0, 1] (default {default}): ")
-    try:
-        expl = 1. - float(res)
-        if expl < 0 or expl > 1:
-            raise Exception
-    except:
-        print(f"Not a valid value.  Setting greed to {default}.")
-        expl = default
+    if type == "clasical":
+        default=0.5
+        res = input(f"How greedy should it be?  A number in [0, 1] (default {default}): ")
+        try:
+            expl = 1. - float(res)
+            if expl < 0 or expl > 1:
+                raise Exception
+        except:
+            print(f"Not a valid value.  Setting greed to {default}.")
+            expl = default
 
-    default=0.1
-    res = input(f"Learning rate? A number in [0, 1] (default {default}): ")
-    try:
-        lr = float(res)
-        if lr < 0 or lr > 1:
-            raise Exception
-    except:
-        print(f"Not a valid value.  Setting learning rate to {default}.")
-        lr = default
+        default=0.1
+        res = input(f"Learning rate? A number in [0, 1] (default {default}): ")
+        try:
+            lr = float(res)
+            if lr < 0 or lr > 1:
+                raise Exception
+        except:
+            print(f"Not a valid value.  Setting learning rate to {default}.")
+            lr = default
 
-    default = 64
-    res = input(f"How many game runs between AI updates (default {default}): ")
-    try:
-        eps = int(res)
-        if eps < 1:
-            raise Exception
-    except:
-        print(f"Not a valid value.  Setting episodes to {default}.")
-        eps = default
+        default = 64
+        res = input(f"How many game runs between AI updates (default {default}): ")
+        try:
+            eps = int(res)
+            if eps < 1:
+                raise Exception
+        except:
+            print(f"Not a valid value.  Setting episodes to {default}.")
+            eps = default
 
-    default = 100
-    res = input(f"How many AI updates (default {default}): ")
-    try:
-        its = int(res)
-        if its < 1:
-            raise Exception
-    except:
-        print(f"Not a valid value.  Setting iterations to {default}.")
-        its = default
-    
-    res = input("Name of file (alphanumeric only, max length 64, w/o extension): ")
-    fname = 'bots/' + re.sub(r'\W+', '', res)[0:64] + f"-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}{file_ext}"
-    
-    game.set_greed(expl)
-    game.batch_learn(lr, its, eps, 1000, verbose=True, savefile=fname + ".exp")
+        default = 100
+        res = input(f"How many AI updates (default {default}): ")
+        try:
+            its = int(res)
+            if its < 1:
+                raise Exception
+        except:
+            print(f"Not a valid value.  Setting iterations to {default}.")
+            its = default
+        
+        res = input("Name of file (alphanumeric only, max length 64, w/o extension): ")
+        fname = 'bots/' + re.sub(r'\W+', '', res)[0:64] + f"-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}{file_ext}"
+        
+        game.set_greed(expl)
+        game.batch_learn(lr, its, eps, 1000, verbose=True, savefile=fname + ".exp")
 
-    # Save the AI
-    game.save_q(fname)
+        # Save the AI
+        game.save_q(fname)
+    elif type == "deep":
+        game.set_greed(0.5)
+        game.memory_capacity = 10000
+        game.deep_learn(learn_rate=0.1, iterations=100, episodes=100, episode_length=1000, batch_size=64, train_batch_size=64, copy_frequency=100)
 
 
 
