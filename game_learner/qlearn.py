@@ -1,9 +1,9 @@
-import random
+import random, warnings
 import numpy as np
 import pickle
 import torch
 from torch import nn
-from collections import namedtuple
+from collections import namedtuple, deque
 
 # Returns the set of maximum arguments
 def argmax(args: list, f: callable):
@@ -29,14 +29,55 @@ def valmax(args: list, f: callable):
             maxval = y
     return maxval
 
+# Source, action, target, reward
+TransitionData = namedtuple('TransitionData', ('s', 'a', 't', 'r'))
+
+# Keeps the first action; the assumption is the later actions are "passive" (i.e. not performed by the given player)
+# Adds the rewards
+def compose_transition_tensor(first: TransitionData, second: TransitionData):
+    if first.t != second.t:
+        # Make this error non-fatal but make a note
+        warnings.warn("The source and target states do not match.")
+    return TransitionData(first.s, first.a, second.t, first.r + second.r)
+
+
+
+# When the deque hits memory limit, it removes the oldest item from the list
+class ExperienceReplay():
+    def __init__(self, memory: int):
+        self.memory = deque([], maxlen=memory)
+
+    # Push a single transition (comes in the form of a list)
+    def push(self, s, a, r, t):
+        self.memory.append(TransitionData(s,a,r,t))
+
+    def push_batch(self, source_batch, action_batch, target_batch, reward_batch):
+        if source_batch.size(0) != action_batch.size(0) or action_batch.size(0) != target_batch.size(0) or target_batch.size(0) != reward_batch.size(0):
+            raise Exception("Batch sizes do not agree.")
+        batch_size = source_batch.size(0)
+        for i in len(batch_size):
+            self.push(source_batch[i, ...], action_batch[i, ...], target_batch[i, ...], reward_batch[i, ...])
+
+            
+
+    def sample(self, num: int, batch=True) -> list:
+        if batch:
+            return torch.stack(random.sample(self.memory, num))
+        else:
+            return random.sample(self.memory, num)       
+    
+    def __len__(self):
+        return len(self.memory)
+    
 
 
 # WARNING: states and actions must be hashable if using with QFunction.
 class MDP():
-    def __init__(self, states, actions, discount=1, num_players=1, state_shape = None, action_shape = None):
+    def __init__(self, states, actions, discount=1, num_players=1, state_shape = None, action_shape = None, batched=False):
         self.actions = actions
         self.discount = discount
         self.num_players = num_players
+        self.batched = batched
 
         # The states do not literally have to be tensors for the state_shape to be defined.  This just specifies, when they are turned into tensors, what shape they should be have, ignoring batch dimension
         self.states = states
@@ -98,7 +139,7 @@ class MDP():
     def is_terminal(self, s) -> bool:
         raise NotImplementedError
     
-    # Gets the current player of the given state
+    # Gets the current player of the given state.  TODO batch vs. non-batch
     def get_player(self, state) -> int:
         raise NotImplementedError
 
@@ -213,36 +254,57 @@ class NNQFunction(QFunction):
         self.lossfn = lossfn
         self.optimizer = optimizer
 
-    # TODO idk if we need this
-    #def get(self, s, a) -> float:
-    #    return self.get(self.mdp.state_to_tensor(s), self.mdp.action_to_tensor(a))
-    
     # Input has shape (batches, ) + state_shape and (batches, ) + action_shape
-    # Action should basically be boolean-valued
-    def get(self, state: torch.Tensor, action: torch.Tensor) -> float:
-        pred = self.q(self.mdp.state_to_tensor(state))                                      # Shape (batches, ) + action_shape; each entry is the value of Q for that action
-        #return torch.gather(torch.flatten(pred, 1, -1), 1, torch.flatten(action, 1, -1))     # Shape (batches, 1)
-        # TODO this isnt right -- probably what i want is "mask"?
-        return torch.sum(pred * action, tuple([i for i in range(1, len(action.shape))]))
+    def get(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
+        # The neural network produces a tensor of shape (batches, ) + action_shape
+        pred = self.q(self.mdp.state_to_tensor(state))
+        return pred * action
 
     # Input is a tensor of shape (batches, ) + state.shape
+    # Output is a tensor of shape (batches, )
     def val(self, state) -> torch.Tensor:
         if self.mdp.is_terminal(state):
             return 0
         return torch.flatten(self.q(self.mdp.state_to_tensor(state)), 1, -1).max(1).values
     
+    # Input indices shape (batch, linear length)
+    def flattened_index_to_shaped(self, indices: torch.Tensor, shape: tuple):
+        shapevol = 1
+        for s in shape:
+            shapevol *= s
+        if indices.size(1) != shapevol:
+            raise Exception("Linear length does not match shape volume.")
+        # Index [a,b,c] in shape (x, y, z) has linear index t = a + bx + cxy, so invert: a = t mod x, b = (t - a)//x mod y, c = (t - a - bx)//xy mod z
+        factors = []
+        units = []
+        shapeprod = 1
+        residue = torch.zeros(indices.shape, dtype=float)
+        for i in range(len(shape)):
+            val = ((indices - residue)//shapeprod) % shape[i]
+            # Shape (batch, shape_i)
+            factors.append(val)
+            residue += val
+            shapeprod *= shape[i]
+            # Create a tuple (1, 1, ..., s_i, 1, ...)
+            l = [1 for j in len(shape)]
+            l[i] = s[i]
+            units.append(tuple(l))
 
+        # Tensor up, move batch to last index
+        output = torch.tensor([], dtype=float)
+        for i in range(len(shape)-1, -1, -1):
+            output = output * factors[i].reshape(units[i])
+        return output
 
     # Input is a batch of state vectors
-    # Returns the value of an optimal policy at a given state
+    # Returns the value of an optimal policy at a given state, shape (batches, ) + action_shape
     def policy(self, state) -> torch.Tensor:
         if self.mdp.is_terminal(s):
             return self.mdp.get_random_action()
-        return torch.flatten(self.q(self.mdp.state_to_tensor(state)), 1, -1).max(1).indices
+        # The Q function outputs a tensor of shape (batch, ) + 
+        return self.flattened_index_to_shaped(torch.flatten(self.q(self.mdp.state_to_tensor(state)), 1, -1).max(1).indices, self.mdp.action_shape)
 
-    #TODO need to batch-ize greed?
 
-    
     # TODO the following needs to be changed
     # Does a Q-update based on some observed set of data
     # Data is a list of the form (state, action, reward, next state)
@@ -266,6 +328,11 @@ class NNQFunction(QFunction):
         opt.zero_grad()
 
 
+
+# Copy the weights of one NN to another
+def copy(source: NNQFunction, target: NNQFunction):
+    target.q.load_state_dict(source.q.state_dict())
+
 # Greedy function to use as a strategy.  Default is totally greedy.
 # This only works if the set of actions is defined and finite
 def greedy(q: QFunction, s, e = 0.):
@@ -273,14 +340,16 @@ def greedy(q: QFunction, s, e = 0.):
 
 
 # Input shape (batch_size, ) + state_tensor
-def greedy_tensor(q: NNQFunction, state_tensor, eps = 0.):
-    pass
+# We implement a random tensor of 0's and 1's generating a random tensor of floats in [0, 1), then converting it to a bool, then back to a float.
+def greedy_tensor(q: NNQFunction, state, eps = 0.):
+    return (torch.rand(q.mdp.action_shape) < 0.5).to(dtype=float) if random.random() < e else q.policy(state)
 
 
 def get_greedy(q: QFunction, e: float) -> callable:
     return lambda s: greedy(q, s, e)
 
-
+def get_greedy_tensor(eps: float) -> callable:
+    return lambda q, s: greedy_tensor(q, s, eps)
 
 
 # To each player, the game will act like a MDP; i.e. they do not distinguish between the opponents and the environment
@@ -298,77 +367,6 @@ class SimpleGame():
         self.state = None
 
     def set_greed(self, eps):
-        self.strategies = [get_greedy(self.qs[i], eps[i]) for i in range(self.mdp.num_players)]
-
-    def save_q(self, fname):
-        with open(fname, 'wb') as f:
-            pickle.dump(self.qs, f)
-        
-    def load_q(self, fname):
-        with open(fname, 'rb') as f:
-            self.qs = pickle.load(f)
-    
-    def current_player(self, s) -> int:
-        return None if s == None else s[0]
-
-    # Player data is (start state, action taken, all reward before next action, starting state for next action)
-    def batch_learn(self, learn_rate: float, iterations: int, episodes: int, episode_length: int, verbose=False, savefile=None):
-        player_experiences = [[] for i in range(self.mdp.num_players)]
-        for i in range(iterations):
-            for j in range(episodes):
-                if verbose and j % 10 == 9:
-                    print(f"Training iteration {i+1}, episode {j+1}", end='\r')
-                s = self.mdp.get_initial_state()
-                queue =[None for k in range(self.mdp.num_players)]
-                for k in range(episode_length):
-                    p = self.current_player(s)
-                    a = self.strategies[p](s)
-                    t, r = self.mdp.transition(s, a)
-
-                    # For this player, bump the queue and add
-                    if queue[p] != None:
-                        player_experiences[p].append(tuple(queue[p]) + (s,))
-                    if self.mdp.is_terminal(t):
-                        player_experiences[p].append((s,a,r[p],t))
-                    else:
-                        queue[p] = [s, a, r[p]]
-                    
-
-                    # Update rewards for all other players; if the player hasn't taken an action yet, no reward (but is accounted somewhat by zero sum nature)
-                    # If the state is terminal, also append
-                    for l in range(self.mdp.num_players):
-                        if l != p and queue[l] != None:
-                            queue[l][2] += r[l]
-                            if self.mdp.is_terminal(t):
-                                player_experiences[l].append(tuple(queue[l]) + (t,))
-
-                    # If terminal state, then stop the episode.  Otherwise, update state and continue playing 
-                    if self.mdp.is_terminal(t):
-                        break
-                    s = t
-            # Do an update for each player
-            for p in range(self.mdp.num_players):
-                self.qs[p].update(player_experiences[p], learn_rate)
-        if verbose:
-            total = 0
-            for e in player_experiences:
-                total += len(e)
-            print(f"Trained on {total} experiences.")
-        if savefile != None:
-            with open(savefile, 'wb') as f:
-                pickle.dump(player_experiences, f)
-                if verbose:
-                    print(f"Saved experiences to {savefile}")
-
-
-class SimpleGameNN():
-    def __init__(self, mdp: MDP, q_model: nn.Module, state_shape: tuple, action_shape: tuple):
-        # An mdp that encodes the rules of the game.  The current player is part of the state, which is of the form (current player, actual state)
-        self.mdp = mdp
-        self.target_qs = [NNQFunction(mdp, q_model) for i in range(mdp.num_players)]
-        self.policy_qs = [NNQFunction(mdp, q_model) for i in range(mdp.num_players)]
-
-    def set_greed(self, eps):
         if type(eps) == list:
             self.strategies = [get_greedy(self.qs[i], eps[i]) for i in range(self.mdp.num_players)]
         else:
@@ -381,12 +379,15 @@ class SimpleGameNN():
     def load_q(self, fname):
         with open(fname, 'rb') as f:
             self.qs = pickle.load(f)
-
-    def transition(self, p, s, a) -> tuple[int, object, np.ndarray]:
-        return self.mdp.transition((p, s), a)
     
+    # Non-batched method
     def current_player(self, s) -> int:
-        return None if s == None else self.mdp.get_player(s)[0]
+        if s == None:
+            return None
+        if self.mdp.batched:
+            return self.mdp.get_player(s).item()
+        else:
+            return self.mdp.get_player(s)
 
     # Player data is (start state, action taken, all reward before next action, starting state for next action)
     def batch_learn(self, learn_rate: float, iterations: int, episodes: int, episode_length: int, verbose=False, savefile=None):
@@ -437,5 +438,116 @@ class SimpleGameNN():
                 if verbose:
                     print(f"Saved experiences to {savefile}")
 
-    def deep_learn():
-        pass
+
+
+
+# For now, for simplicity, fix a single strategy
+class DQN():
+    def __init__(self, mdp: MDP, q_model: nn.Module, memory_capacity: int):
+        # An mdp that encodes the rules of the game.  The current player is part of the state, which is of the form (current player, actual state)
+        self.mdp = mdp
+        self.target_qs = [NNQFunction(mdp, q_model) for i in range(mdp.num_players)]
+        self.policy_qs = [NNQFunction(mdp, q_model) for i in range(mdp.num_players)]
+        self.memories = [ExperienceReplay(memory_capacity) for i in range(mdp.num_players)]
+
+    def set_greed(self, eps):
+        # if type(eps) == list:
+        #     self.strategies = [get_greedy_tensor(self.qs[i], eps[i]) for i in range(self.mdp.num_players)]
+        # else:
+        #     self.strategies = [get_greedy_tensor(self.qs[i], eps) for i in range(self.mdp.num_players)]
+        self.strategy = get_greedy_tensor(eps)
+
+    def save_q(self, fname):
+        for i in range(self.mdp.num_players):
+            model_scripted = torch.jit.script(self.policy_qs[i])
+            model_scripted.save(fname + f".p{i}")
+
+    def load_q(self, fname):
+        for i in range(self.mdp.num_players):
+            self.policy_qs[i] = torch.jit.load(fname + f"p{i}")
+            self.target_qs[i] = torch.jit.load(fname + f"p{i}")
+            self.policy_qs[i].eval()					# Set to evaluation mode
+
+    # Handling multiplayer: each player keeps their own "record", separate from memory
+    # When any entry in the record has source = target, then the player "banks" it in their memory
+    # The next time an action is taken, if the source = target, then it gets overwritten
+    def deep_learn(self, learn_rate: float, iterations: int, episodes: int, episode_length: int, batch_size: int, verbose=False):
+        for i in range(iterations):
+            for j in range(episodes):
+                s = self.mdp.get_initial_state(batch_size)
+                # "Records" for each player
+                player_source = [None for i in self.mdp.num_players]
+                player_action = [None for i in self.mdp.num_players]
+                player_target = [None for i in self.mdp.num_players]
+                player_reward = [None for i in self.mdp.num_players]
+
+                for k in range(episode_length):  
+                    # Execute the transition on the "actual" state
+                    # To do this, we need to iterate over players, because each has a different q function for determining the strategy
+                    p = self.mdp.get_player(s)                                  # p.shape = (batch, )       s.shape = (batch, 2, 6, 7)
+
+                    # To get the actions, we need to use each player's strategy # TODO ok it's not hard to make this so each player has its own strategy...
+                    a = torch.zeros((batch_size, ) + self.mdp.action_shape)
+                    for i in range(self.mdp.num_players):
+                        # TODO can we make this more efficient, i.e. just ignore the other ones and put it back in?
+                        player_a = self.strategy(s)
+
+                        a += player_a * (p == float(i))[:, None]                    # Zero out actions on other players' turns # TODO how to broadcast to right
+                        
+                    t, r = self.mdp.transition(s, a)
+
+                    # Update player records
+                    # If a current record has player(s) = player(t), replace it
+                    
+                    # Update memory
+                    # If an updated record has player(s) = player(t), put it into memory
+
+
+
+    # Player data is (start state, action taken, all reward before next action, starting state for next action)
+    def batch_learn(self, learn_rate: float, iterations: int, episodes: int, episode_length: int, verbose=False, savefile=None):
+        player_experiences = [[] for i in range(self.mdp.num_players)]
+        for i in range(iterations):
+            for j in range(episodes):
+                if verbose and j % 10 == 9:
+                    print(f"Training iteration {i+1}, episode {j+1}", end='\r')
+                s = self.mdp.get_initial_state()
+                queue =[None for k in range(self.mdp.num_players)]
+                for k in range(episode_length):
+                    a = self.strategies[p](s)
+                    t, r = self.mdp.transition(s, a)
+
+                    # For this player, bump the queue and add
+                    if queue[p] != None:
+                        player_experiences[p].append(tuple(queue[p]) + (s,))
+                    if self.mdp.is_terminal(t):
+                        player_experiences[p].append((s,a,r[p],t))
+                    else:
+                        queue[p] = [s, a, r[p]]
+                    
+
+                    # Update rewards for all other players; if the player hasn't taken an action yet, no reward (but is accounted somewhat by zero sum nature)
+                    # If the state is terminal, also append
+                    for l in range(self.mdp.num_players):
+                        if l != p and queue[l] != None:
+                            queue[l][2] += r[l]
+                            if self.mdp.is_terminal(t):
+                                player_experiences[l].append(tuple(queue[l]) + (t,))
+
+                    # If terminal state, then stop the episode.  Otherwise, update state and continue playing 
+                    if self.mdp.is_terminal(t):
+                        break
+                    s = t
+            # Do an update for each player
+            for p in range(self.mdp.num_players):
+                self.qs[p].update(player_experiences[p], learn_rate)
+        if verbose:
+            total = 0
+            for e in player_experiences:
+                total += len(e)
+            print(f"Trained on {total} experiences.")
+        if savefile != None:
+            with open(savefile, 'wb') as f:
+                pickle.dump(player_experiences, f)
+                if verbose:
+                    print(f"Saved experiences to {savefile}")

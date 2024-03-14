@@ -1,12 +1,11 @@
 from qlearn import *
 import numpy as np
-import random, sys
+import random, sys, warnings
 
 options = sys.argv[1:]
 
 # Set of states: (player, 7-tuple of strings of 0 and 1 of length in [0, 6], winner or None if not terminal)
 # Set of actions: integers [0, 6]
-
 class C4MDP(MDP):
     def __init__(self):
         super().__init__(None, range(0, 7), discount=1, num_players=2, state_shape=(2,7,6), action_shape=(7,))
@@ -167,34 +166,59 @@ class C4MDP(MDP):
         return True
     
     def get_player(self, state):
-        return [state[0]]
+        return state[0]
     
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# TODO I think the data types can be ints, no need for float except for rewards (because those are tied to values)
+# State tensor shape (batches, player_channel = 2, row = 6, column = 7)
+# Action tensor (batches, column = 7)
+# Reward tensor (batches, )
 class C4TensorMDP(MDP):
     def __init__(self):
-        # State tensor (batches, player_channel, board_height, board_width)
-        # Action tensor (num_batches, num_columns, )
-        super().__init__(None, None, discount=1, num_players=2, state_shape=(2,6,7), action_shape=(7,))
+        super().__init__(None, None, discount=1, num_players=2, state_shape=(2,6,7), action_shape=(7,), batched=True)
         self.symb = {0: "O", 1: "X", None: "-"}
-        self.penalty = -10000000.
+        self.penalty = -1000.
 
-    # Non-batch method, returns shape (1, 7) vector
-    def get_single_action_vector(self, action: int) -> torch.Tensor:
-        return torch.eye(7, dtype=float)[action][None, :]
-
-    # If player 0 has placed more than player 1, then it's player 1's turn.  Otherwise, it's player 0's turn.
-    # Returns a tensor of shape (batch, )
+    # Logic: if player 0 has more pieces than player 1, then it's player 1's turn.  Otherwise, it's player 0's turn.
+    # Return shape (batch, 1, 1, 1)
     def get_player(self, state: torch.Tensor) -> torch.Tensor:
         summed = state.sum((2,3))
-        return 1 * (summed[:,0] > summed[:,1])
+        return (1 * (summed[:,0] > summed[:,1])).to(dtype=int)[:, None, None, None]
 
-    # Returns a tensor of shape (batch, 2)
+    # Return shape (batch, 2, 1, 1)
     def get_player_vector(self, state: torch.Tensor) -> torch.Tensor:
-        return torch.eye(2, dtype=float)[self.get_player(state)]
+        return torch.eye(2, dtype=float)[self.get_player(state)[:, 0, 0, 0]][:,:,None, None] # TODO maybe improve this
 
-    # Input and output shape (batch, 2)
+    # Non-batch and not used in internal code, but might be useful
+    def action_index_to_tensor(self, index: int):
+        if index < 0 or index > 7:
+            warnings.warn("Index out of range.")
+            return np.zeros((1, 7), dtype=float)
+        return torch.eye(7, dtype=float)[index:index+1,:]
+
+    # Input and output shape (batch, 2, 1, 1)
     def swap_player(self, player_vector: torch.Tensor) -> torch.Tensor:
-        return torch.tensordot(player_vector, torch.tensor([[0,1],[1,0]], dtype=float), dims=([1], [0]))
+        return torch.tensordot(player_vector, torch.tensor([[0,1],[1,0]], dtype=float), dims=([1], [0])).swapaxes(1, -1)
 
     # Player 0 is always the first player.
     def get_initial_state(self, batch_size=1) -> torch.Tensor:
@@ -228,12 +252,12 @@ class C4TensorMDP(MDP):
                         rowtext += self.symb[None]
                     
                 out += rowtext + "|\n"
-            out += "|1234567|"
+            out += "|=======|\n|1234567|"
             outs.append(out)
         return outs
 
     # Sum the channels and columns, add the action, should be <= 6.  Then, do an "and" along the rows.
-    # Return shape (batch, )
+    # Return shape (batch, 1, 1, 1)
     def is_valid_move(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
         if state.shape[0] != action.shape[0]:
             raise Exception("Batch sizes must agree.")
@@ -247,7 +271,7 @@ class C4TensorMDP(MDP):
             raise Exception("Batch sizes must agree.")
         
         # If the state is terminal, don't do anything.  Zero out the corresponding actions.
-        action = (self.is_terminal(state) == False)[:, None] * action
+        action = (self.is_terminal(state) == False)[:, :, 0, 0] * action
         p = self.get_player(state)
         p_tensor = self.get_player_vector(state)
 
@@ -260,19 +284,22 @@ class C4TensorMDP(MDP):
         # Then, we multiply it with action to isolate the right column, shape (batch, 6, 7)
         newpos = action[:,None,:].expand(-1,6,-1)  * (coltotals == rowcounter)
         # Then, we put the player channel back in to get a shape (batch, 2, 7, 6)
-        newpiece = p_tensor[:,:,None, None].expand(-1,-1,6,7) * newpos[:,None,:,:].expand(-1,2,-1,-1)
+        newpiece = p_tensor * newpos[:,None,:,:].expand(-1,2,-1,-1)
         # Then, we add it to the state
         newstate = state + newpiece
 
         # Check whether the current player is a winner after playing at position newpos
-        winner = self.is_winner(newstate, p, newpos).to(dtype=float)
-        # Make the state terminal if there is a winner
-        newstate = (1 - 2 * winner)[:,None, None, None] * newstate
+        winner = self.is_winner(newstate, p, newpos)
+        # Also check if the board is full, meaning a draw
+        full = self.is_full(newstate)
+
+        # Make the state terminal if there is a winner or if the board is full
+        newstate = (1 - 2 * (winner | full)) * newstate
         
         # Give out a reward if there is a winner.
-        reward = winner * p_tensor - winner * self.swap_player(p_tensor)
+        reward = (winner.to(dtype=float) * p_tensor - winner * self.swap_player(p_tensor))[:,:,0,0]
         # Invalid moves don't result in a change in the board.  However, we want to impose a penalty.
-        reward += (self.is_valid_move(state, action) == False).to(dtype=float) * self.penalty * p_tensor
+        reward += ((self.is_valid_move(state, action) == False).to(dtype=float) * self.penalty * p_tensor)[:,:,0,0]
         
         return newstate, reward
 
@@ -298,9 +325,8 @@ class C4TensorMDP(MDP):
             raise Exception("Batch sizes must agree.")
         batches = state.shape[0]
 
-        p = self.get_player(state)
         # Get the channel for the indicated player, shape (batch, 6, 7)
-        player_board = state[torch.arange(batches), player,:,:]
+        player_board = state[torch.arange(batches), player[:,0,0,0],:,:]
 
         filters = []
         # Make the horizontal filters
@@ -355,7 +381,7 @@ class C4TensorMDP(MDP):
         filter_tensor = torch.stack(filters)
 
         # Sum along the board axes, check how many filters give rise to 4, then sum that number, then check if it is positive
-        return ((player_board[None,:,:,:].expand(16, -1, -1, -1) * filter_tensor).sum((2,3)) == (torch.ones(16, dtype=float) * 4)[:,None].expand(-1, batches)).sum(0) > 0
+        return (((player_board[None,:,:,:].expand(16, -1, -1, -1) * filter_tensor).sum((2,3)) == (torch.ones(16, dtype=float) * 4)[:,None].expand(-1, batches)).sum(0) > 0)[:,None, None, None]
     
     # The game is short enough that maybe we don't care about intermediate states
     def get_random_state(self) -> torch.Tensor:
@@ -363,18 +389,21 @@ class C4TensorMDP(MDP):
 
     # Indicate a terminal state by negating everything.  So, if the maximum value of the negation is positive, then it is a terminal state.
     def is_terminal(self, state: torch.Tensor) -> torch.Tensor:
-        return (state * -1).flatten(1,3).max(1).values > 0
+        return ((state * -1).flatten(1,3).max(1).values > 0)[:, None, None, None]
     
     # Sum the channels, and board factors.  The result should be 1 * 1 * 6 * 7 = 42.  If it is greater, something went wrong and we won't account for it.
     def is_full(self, state: torch.Tensor) -> torch.Tensor:
-        return state.sum((1,2,3)) == 42 * torch.ones(state.shape[0], dtype=float)
+        return (state.sum((1,2,3)) == 42 * torch.ones(state.shape[0], dtype=float))[:, None, None, None]
     
 
 
 # Testing
 if "test" in options:
+    # We can print everything or just the pass/fail statements.
+    verbose = True if "verbose" in options else False
     mdp = C4TensorMDP()
 
+    # Test: batches
     s = mdp.get_initial_state(batch_size=2)
     print("Testing get_player and get_player_vector.  Player 0 taking a turn on board 0.")
     s[0][0][0][0] = 1.
@@ -389,10 +418,11 @@ if "test" in options:
     print("player", mdp.get_player(s))
     print("player vector", mdp.get_player_vector(s))
 
+
     print("\nTesting swap player.")
     print("player", mdp.get_player_vector(s))
     print("swap", mdp.swap_player(mdp.get_player_vector(s)))
-
+ 
     print("\nTesting printing board.")    
     print(mdp.board_str(s)[0])
     print(mdp.board_str(s)[1])
@@ -419,17 +449,23 @@ if "test" in options:
         v, pen = mdp.transition(v, a)
         print(mdp.board_str(v)[0])
         print("reward", pen)
+        print("")
+    
     print("Now player 0 will attempt to play in column 0, then column 1.  Then player 1 will attempt to play in column 0.")
     print("is_valid_move", mdp.is_valid_move(v, a))
     v, pen = mdp.transition(v, a)
     print(mdp.board_str(v)[0])
     print("reward", pen)
+    print("")
+
     b = torch.zeros((1,7), dtype=float)
     b[0,1] = 1
     print("is_valid_move", mdp.is_valid_move(v, b))
     v, pen = mdp.transition(v, b)
     print(mdp.board_str(v)[0])
     print("reward", pen)
+    print("")
+    
     print("is_valid_move", mdp.is_valid_move(v, a))
     v, pen = mdp.transition(v, a)
     print(mdp.board_str(v)[0])
@@ -446,6 +482,33 @@ if "test" in options:
         v, r = mdp.transition(v, b)
         print(mdp.board_str(v)[0])
         print(f"reward {r}, terminal {mdp.is_terminal(v)}")
+        print("")
+
+    print("\nChecking full board condition.  Should enter a terminal state with no reward.")
+    v = mdp.get_initial_state()
+    for i in range(3):
+        a = mdp.action_index_to_tensor(i)
+        for j in range(6):
+            v, r = mdp.transition(v, a)
+            print(mdp.board_str(v)[0])
+            print(f"reward {r}, terminal {mdp.is_terminal(v)}")
+            print("")
+    print("Now avoiding a win...")
+    a = mdp.action_index_to_tensor(6)
+    v, r = mdp.transition(v, a)
+    print(mdp.board_str(v)[0])
+    print(f"reward {r}, terminal {mdp.is_terminal(v)}")
+    print("")
+    for i in range(3, 7):
+        a = mdp.action_index_to_tensor(i)
+        for i in range(6):
+            v, r = mdp.transition(v, a)
+            print(mdp.board_str(v)[0])
+            print(f"reward {r}, terminal {mdp.is_terminal(v)}")
+            print("")
+
+    print("\nBoard should be full and in a terminal state in the second to last play.  The last play should have proceeded with no penalty.")
+
 
 
 

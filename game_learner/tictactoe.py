@@ -118,7 +118,7 @@ class TTTMDP(MDP):
         return True
     
     def get_player(self, state):
-        return [state[0]]
+        return state[0]
 
 
 
