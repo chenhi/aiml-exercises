@@ -232,7 +232,11 @@ elif shortname == "c4t":
                 print(game.qs[comp].q(s.float()))
                 a = game.qs[comp].policy(s.float())
                 print(f"Chosen action: {a}.\n")
-                s, _ = game.mdp.transition(s, a)
-        
+                t, _ = game.mdp.transition(s, a)
+                while torch.sum(t - s == 0).item() == 0:
+                    print("Bot tried to make an illegal move.  Playing randomly.")
+                    a = game.mdp.get_random_action(s)
+                    t, _ = game.mdp.transition(s, a)
+                s = t
 
 
