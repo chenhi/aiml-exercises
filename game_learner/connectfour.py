@@ -710,16 +710,16 @@ if "test" in options:
         print("Q(s,a) and Q(t,a):")
         print(q.get(s,a))
         print(q.get(t,a))
+
+    before = q.get(s,a)
+    if verbose:
         print("Before Q(s,a):")
-        before = q.get(s,a)
         print(before)
-        #print("Transition:")
-        #print(d)
     
     q.update(d, learn_rate=0.5)
+    after = q.get(s,a)
     if verbose:
         print("After Q(s,a):")
-        after = q.get(s,a)
         print(after)
         print("You might have noticed the values are large.") # TODO ???
 
@@ -745,7 +745,9 @@ if "test" in options:
     # TODO should i be using numpy isntead of torch?
     # TODO why does adam optimizer cause huge values?
 
+
+    print("\nTesting if deep Q-learning algorithm throws errors.")
     dqn = DQN(mdp, C4NN, torch.nn.HuberLoss(), torch.optim.SGD, 1000)
     dqn.set_greed(0.5)
     dqn.deep_learn(0.5, 1, 10, 10, 4, 4, 10)
-
+    print("PASS.  Things ran to completion, at least.")
