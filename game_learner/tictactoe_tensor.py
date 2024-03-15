@@ -2,34 +2,13 @@ from qlearn import *
 import numpy as np
 import random
 
-# State format: (player, 9-tuple)
-# While this is finite, we will just model it as a 10 dimensional vector.
-example_state = (1, (1, 0, -1, 1, 1, 0, 0, -1, 0))
-#         x |   | o
-#         x | x | 
-#           | o |
-# It's o's turn
 
-# The set of actions is (at most) the set of spaces in the 3x3 grid.  If a player attempts to place in an invalid spot, the state does not change.
-ttt_actions = [(i, j) for i in range(3) for j in range(3)]
-
-
-# The players are 1, and -1 in that order
-class TTTMDP(MDP):
+class TTTTensorMDP(MDP):
     def __init__(self):
         self.symb = {0: "X", 1: "O", -1: "."}
-        super().__init__(None, ttt_actions, discount=1, num_players=2)
+        super().__init__(None, None, discount=1, num_players=2, state_shape=(2,3,3), action_shape=(3,3), batched=True)
 
-    # States are tuples (0 or 1, 9-tuples of 1,0,-1). Arrays are tuples (1 or -1, 3x3 array).
-    def state_to_array(self, state):
-        return [[state[i % 3 + j * 3] for i in range(3)] for j in range(3)]
-    
-    def array_to_state(self, arr):
-        flattened = []
-        for row in arr:
-            flattened += row
-        return tuple(flattened)
-    
+
     def board_str(self, s):
         out = ""
         p, arr = s[0], self.state_to_array(s[1])
@@ -40,13 +19,15 @@ class TTTMDP(MDP):
             out += "\n"
         return out
 
+    def is_valid_action(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
+        if state.shape[0] != action.shape[0]:
+            raise Exception("Batch sizes must agree.")
+        return torch.prod(torch.prod(state.sum(1) + action <= 1, dim=1), dim=1) == 1
+
     # Reward is 1 for winning the game, -1 for losing, and 0 for a tie; awarded upon entering terminal state
     def transition(self, state, a):
-        # Copy it
-            
-        # Check if move is valid
-        # If it's not a valid move, give a penalty (a large penality; it should learn to never make these moves)
-        # In practice, this penalty should never appear due to the get_actions method.  If it does, there's a bug that should be fixed.
+
+
         if state[1][3*a[0] + a[1]] != -1:
             if state[0] == 0:
                 penalty = (-1000, 0)
