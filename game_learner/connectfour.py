@@ -662,7 +662,7 @@ if "test" in options:
 
 
     print("\nTesting get_random_action() and NNQFunction.get().")
-    q = NNQFunction(mdp, C4NN, torch.nn.HuberLoss(), torch.optim.Adam)
+    q = NNQFunction(mdp, C4NN, torch.nn.HuberLoss(), torch.optim.SGD)
     s = torch.zeros((64, 2, 6, 7)).float()
     a = mdp.get_random_action(s)
     
@@ -729,15 +729,21 @@ if "test" in options:
         print("FAIL!!! No update, very unlikely.")
 
 
-    # TODO???
-    print("\nRunning update 100 times.")
+    print("\nRunning update 100 times and checking for convergence.")
     for i in range(0, 100):
         q.update(d, learn_rate=1)
     if verbose:
-        print(q.get(s,a))
-    
+        after2 = q.get(s,a)
+        print(after2)
+        print("The values should have decreased in magnitude.")
+
+    if torch.prod(abs(after2) < abs(after)) == 1:
+        print("PASS")
+    else:
+        print("FAIL!!!")
 
     # TODO should i be using numpy isntead of torch?
+    # TODO why does adam optimizer cause huge values?
 
 
 
