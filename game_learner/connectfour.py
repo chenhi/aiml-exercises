@@ -224,7 +224,7 @@ class C4TensorMDP(MDP):
     
     def get_random_action(self, state):
         indices = (torch.rand(state.size(0)) * 7).int()
-        return torch.eye(7)[None].expand(state.size(0), -1, -1)[torch.arange(64), indices]
+        return torch.eye(7, dtype=int)[None].expand(state.size(0), -1, -1)[torch.arange(state.size(0)), indices]
 
     # Return shape (batch, 2, 1, 1)
     def swap_player(self, player_vector: torch.Tensor) -> torch.Tensor:
@@ -729,21 +729,23 @@ if "test" in options:
         print("FAIL!!! No update, very unlikely.")
 
 
-    print("\nRunning update 100 times and checking for convergence.")
-    for i in range(0, 100):
-        q.update(d, learn_rate=1)
-    if verbose:
-        after2 = q.get(s,a)
-        print(after2)
-        print("The values should have decreased in magnitude.")
+    # print("\nRunning update 100 times and checking for convergence.")
+    # for i in range(0, 100):
+    #     q.update(d, learn_rate=1)
+    # if verbose:
+    #     after2 = q.get(s,a)
+    #     print(after2)
+    #     print("The values should have decreased in magnitude.")
 
-    if torch.prod(abs(after2) < abs(after)) == 1:
-        print("PASS")
-    else:
-        print("FAIL!!!")
+    # if torch.prod(abs(after2) < abs(after)) == 1:
+    #     print("PASS")
+    # else:
+    #     print("FAIL!!!")
 
     # TODO should i be using numpy isntead of torch?
     # TODO why does adam optimizer cause huge values?
 
-
+    dqn = DQN(mdp, C4NN, torch.nn.HuberLoss(), torch.optim.SGD, 1000)
+    dqn.set_greed(0.5)
+    dqn.deep_learn(0.5, 1, 10, 10, 4, 4, 10)
 

@@ -347,16 +347,19 @@ class ExperienceReplay():
     def __init__(self, memory: int):
         self.memory = deque([], maxlen=memory)
 
+    def size(self):
+        return len(self.memory)
+
     # Push a single transition (comes in the form of a list)
     def push(self, s, a, r, t):
-        self.memory.append(TransitionData(s,a,r,t))
+        self.memory.append(TransitionData(s,a,t,r))
 
-    def push_batch(self, source_batch, action_batch, target_batch, reward_batch):
-        if source_batch.size(0) != action_batch.size(0) or action_batch.size(0) != target_batch.size(0) or target_batch.size(0) != reward_batch.size(0):
+    def push_batch(self, data: TransitionData):
+        if data.s.size(0) != data.a.size(0) or data.a.size(0) != data.t.size(0) or data.t.size(0) != data.r.size(0):
             raise Exception("Batch sizes do not agree.")
-        batch_size = source_batch.size(0)
-        for i in len(batch_size):
-            self.push(TransitionData(source_batch[i, ...], action_batch[i, ...], target_batch[i, ...], reward_batch[i, ...]))
+        batch_size = data.s.size(0)
+        for i in range(batch_size):
+            self.push(TransitionData(data.s[i, ...], data.a[i, ...], data.t[i, ...], data.r[i, ...]))
 
             
 
@@ -444,8 +447,8 @@ class NNQFunction(QFunction):
 def greedy_tensor(q: NNQFunction, state, eps = 0.):
     return q.mdp.get_random_action(state) if random.random() < eps else q.policy(state)
 
-def get_greedy_tensor(eps: float) -> callable:
-    return lambda q, s: greedy_tensor(q, s, eps)
+def get_greedy_tensor(q: NNQFunction, eps: float) -> callable:
+    return lambda s: greedy_tensor(q, s, eps)
 
 
 
@@ -458,11 +461,12 @@ class DQN():
         self.policy_qs = [NNQFunction(mdp, q_model, loss_fn, optimizer) for i in range(mdp.num_players)]
         self.memories = [ExperienceReplay(memory_capacity) for i in range(mdp.num_players)]
 
+    # Note that greedy involves values, so it should refer to the target network
     def set_greed(self, eps):
         if type(eps) == list:
-            self.strategies = [get_greedy_tensor(self.qs[i], eps[i]) for i in range(self.mdp.num_players)]
+            self.strategies = [get_greedy_tensor(self.target_qs[i], eps[i]) for i in range(self.mdp.num_players)]
         else:
-            self.strategies = [get_greedy_tensor(self.qs[i], eps) for i in range(self.mdp.num_players)]
+            self.strategies = [get_greedy_tensor(self.target_qs[i], eps) for i in range(self.mdp.num_players)]
 
     def save_q(self, fname):
         for i in range(self.mdp.num_players):
@@ -479,7 +483,7 @@ class DQN():
     # Adds the rewards
     # Returns a tuple: (composition, to_memory)
     def compose_transition_tensor(self, first: TransitionData, second: TransitionData, player_index: int):
-        if (torch.prod(first.t == second.s) == 0).item():
+        if torch.prod((first.t == second.s) == 0).item():
             # Make this error non-fatal but make a note
             warnings.warn("The source and target states do not match.")
 
@@ -493,8 +497,8 @@ class DQN():
         new_t = second.t
             
         # After the above update, return rows where player(s) = player(t') = player_index OR where t' is terminal but s' is not (regardless of player)
-        filter = ((self.mdp.get_player(first.s) == player_index) & (self.mdp.get_player(second.t) == player_index)) | (self.mdp.is_terminal(second.t) & ~self.mdp.is_terminal(second.s))
-        return (TransitionData(new_s, new_a, new_r, new_t), TransitionData(new_s[filter], new_a[filter], new_r[filter], new_t[filter]))
+        filter = (((self.mdp.get_player(first.s) == player_index) & (self.mdp.get_player(second.t) == player_index)) | (self.mdp.is_terminal(second.t) & ~self.mdp.is_terminal(second.s))).flatten()
+        return (TransitionData(new_s, new_a, new_t, new_r), TransitionData(new_s[filter], new_a[filter], new_t[filter], new_r[filter]))
 
     # Copy the weights of one NN to another
     def copy_policy_to_target(self):
@@ -513,7 +517,7 @@ class DQN():
 
                 s = self.mdp.get_initial_state(batch_size)
                 # "Records" for each player
-                player_record = [None for i in self.mdp.num_players]
+                player_record = [None for i in range(self.mdp.num_players)]
                 
                 for k in range(episode_length):  
                     # Execute the transition on the "actual" state
@@ -524,30 +528,32 @@ class DQN():
                     a = torch.zeros((batch_size, ) + self.mdp.action_shape)
                     for pi in range(self.mdp.num_players):
                         # Get the indices corresponding to this player's turn
-                        indices = torch.arange(batch_size)[p == float(pi)].tolist()
-
+                        indices = torch.arange(batch_size)[p.flatten() == float(pi)].tolist()
+                        
                         # Apply thie player's strategy to their turns
                         # Greedy is not parallelized, so there isn't efficiency loss with this
-                        player_actions = torch.stack([self.strategies[pi](s[l]) if l in indices else torch.zeros(self.mdp.action_shape) for l in range(batch_size)])
+                        player_actions = torch.cat([self.strategies[pi](s[l:l+1]) if l in indices else torch.zeros((1, ) + self.mdp.action_shape) for l in range(batch_size)], 0)
                         a += player_actions
                         #player_actions = self.strategies[i](s[indices, ...])
                         #a += player_actions * (p == float(pi))[:, None]
 
+
                     # Do the transition                       
                     t, r = self.mdp.transition(s, a)
-
+                    
                     # Update player records and memory
                     for pi in range(self.mdp.num_players):
                         # If it's the first move, just put the record in
                         if player_record[pi] == None:
-                            player_record[pi] = TransitionData(s, a, r, t)
+                            player_record[pi] = TransitionData(s, a, t, r)
                         else:
-                            player_record, to_memory = self.compose_transition_tensor(player_record[pi], TransitionData(s, a, r, t))
+                            player_record[pi], to_memory = self.compose_transition_tensor(player_record[pi], TransitionData(s, a, t, r), pi)
                             self.memories[pi].push_batch(to_memory)
                     
-                    # Train the policy on a random sample in memory
+                    # Train the policy on a random sample in memory (once the memory bank is big enough)
                     for i in range(self.mdp.num_players):
-                        self.policy_qs[i].update(self.memories[i].sample(train_batch_size), learn_rate)
+                        if self.memories[i].size() >= train_batch_size:
+                            self.policy_qs[i].update(self.memories[i].sample(train_batch_size), learn_rate)
                             
                     # Copy the target network to the policy network if it is time
                     if (k+1) % copy_frequency == 0:
