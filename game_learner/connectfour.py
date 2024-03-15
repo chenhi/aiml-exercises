@@ -721,11 +721,21 @@ if "test" in options:
         print("After Q(s,a):")
         after = q.get(s,a)
         print(after)
+        print("You might have noticed the values are large.") # TODO ???
 
     if torch.prod(before - after != torch.tensor([0])) == True:
         print("PASS.  A change happened, but maybe not the right one.")
     else:
         print("FAIL!!! No update, very unlikely.")
+
+
+    # TODO???
+    print("\nRunning update 100 times.")
+    for i in range(0, 100):
+        q.update(d, learn_rate=1)
+    if verbose:
+        print(q.get(s,a))
+    
 
     # TODO should i be using numpy isntead of torch?
 
