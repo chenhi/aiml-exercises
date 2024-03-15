@@ -221,6 +221,10 @@ class C4TensorMDP(MDP):
             warnings.warn("Index out of range.")
             return np.zeros((1, 7), dtype=int)
         return torch.eye(7, dtype=int)[index:index+1,:]
+    
+    def get_random_action(self, state):
+        indices = (torch.rand(state.size(0)) * 7).int()
+        return torch.eye(7)[None].expand(state.size(0), -1, -1)[torch.arange(64), indices]
 
     # Return shape (batch, 2, 1, 1)
     def swap_player(self, player_vector: torch.Tensor) -> torch.Tensor:
@@ -307,9 +311,9 @@ class C4TensorMDP(MDP):
         newstate = (1 - 2 * (~was_terminal & (winner | full))) * newstate
         
         # Give out a reward if there is a winner.
-        reward = (winner.to(dtype=float) * p_tensor - winner * self.swap_player(p_tensor))[:,:,0,0]
+        reward = (winner.float() * p_tensor - winner * self.swap_player(p_tensor))[:,:,0,0]
         # Invalid moves don't result in a change in the board.  However, we want to impose a penalty.
-        reward += ((self.is_valid_action(state, action) == False).to(dtype=float) * self.penalty * p_tensor)[:,:,0,0]
+        reward += ((self.is_valid_action(state, action) == False).float() * self.penalty * p_tensor)[:,:,0,0]
         
         return newstate, reward
 
@@ -413,16 +417,22 @@ class C4TensorMDP(MDP):
 # Input tensors have shape (batch, 2, 7, 6)
 class C4NN(nn.Module):
     def __init__(self):
+        super().__init__()
         self.stack = nn.Sequential(
-            nn.Conv2d(2, 64, (4,4), padding='same'),
+            nn.Conv2d(2, 64, (5,5), padding='same'),
             nn.ReLU(),
-            nn.Dropout(p=0.2),
+            #nn.Dropout(p=0.2),             # Dropout introduces randomness into the Q function.  Not sure if this is desirable.
             nn.BatchNorm2d(64),
             nn.Flatten(),
-            nn.Linear(7*2*7*6*64, 7*2*7*6*64),
+            nn.Linear(64*7*6, 64*7*6),
             nn.ReLU(),
-            nn.Linear(7*2*7*6*64, 7)
+            nn.BatchNorm1d(64*7*6),
+            nn.Linear(64*7*6, 7),
+            nn.BatchNorm1d(7)
         )
+    
+    def forward(self, x):
+        return self.stack(x)
 
 
 
@@ -647,3 +657,77 @@ if "test" in options:
 
     print("\nThe following should be a full board with no winner.")
     print(mdp.board_str(v)[0])
+
+
+
+
+    print("\nTesting get_random_action() and NNQFunction.get().")
+    q = NNQFunction(mdp, C4NN, torch.nn.HuberLoss(), torch.optim.Adam)
+    s = torch.zeros((64, 2, 6, 7)).float()
+    a = mdp.get_random_action(s)
+    
+    if verbose:
+        print("State s, action a, and Q(s,a):")
+        print(s, a)
+        print(q.get(s, a))
+    if q.get(s,a).shape == (64,):
+        print("PASS")
+    else:
+        print("FAIL!!!")
+
+    print("\nTesting basic execution of val() and policy().")
+    ok = True
+    s = torch.zeros((7, 2, 6, 7)).float()
+    a = torch.eye(7).float()
+    if verbose:
+        print("This list is q(s, a), with a ranging through all actions.")
+        print(q.get(s, a))
+        print("This is the value of s.  It should be the maximum in the list.")
+        print(q.val(s)[0])
+    if max(q.get(s, a).tolist()) != q.val(s)[0].item():
+        ok = False
+
+    if verbose:
+        print("The policy should also match the above.")
+        print(q.policy(s)[0])
+
+    if q.get(s, q.policy(s)[0:1]).item() != q.val(s)[0].item():
+        ok = False
+
+    if ok:
+        print("PASS")
+    else:
+        print("FAIL!!! (Note can sometimes fail due to rounding error.)")
+
+
+    print("\nTesting update.")
+    s = s
+    a = a
+    t, r = mdp.transition(s, a)
+    d = TransitionData(s, a, t, r[:,0])
+
+    if verbose:
+        print("Q(s,a) and Q(t,a):")
+        print(q.get(s,a))
+        print(q.get(t,a))
+        print("Before Q(s,a):")
+        before = q.get(s,a)
+        print(before)
+        #print("Transition:")
+        #print(d)
+    
+    q.update(d, learn_rate=0.5)
+    if verbose:
+        print("After Q(s,a):")
+        after = q.get(s,a)
+        print(after)
+
+    if torch.prod(before - after != torch.tensor([0])) == True:
+        print("PASS.  A change happened, but maybe not the right one.")
+    else:
+        print("FAIL!!! No update, very unlikely.")
+
+    # TODO should i be using numpy isntead of torch?
+
+
+

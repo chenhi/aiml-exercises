@@ -56,7 +56,8 @@ class GoHomeMDP(MDP):
     
     def get_initial_state(self):
         return self.start
-    
+
+
     
 # get command line options
 options = sys.argv[1:]

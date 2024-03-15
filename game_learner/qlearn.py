@@ -58,6 +58,7 @@ class MDP():
             return self.actions
         else:
             raise NotImplementedError
+
         
     def is_valid_action(self, state, action):
         return action in self.get_actions(state)
@@ -378,71 +379,51 @@ class ExperienceReplay():
 
 # A Q-function where the inputs and outputs are all tensors
 class NNQFunction(QFunction):
-    def __init__(self, mdp: MDP, q_model, loss_fn, optimizer: torch.optim.Optimizer):
+    def __init__(self, mdp: MDP, q_model, loss_fn, optimizer_class: torch.optim.Optimizer):
         if mdp.state_shape == None or mdp.action_shape == None:
             raise Exception("The input MDP must handle tensors.")
         self.q = q_model()
+        self.q.eval()
         self.mdp = mdp
         self.loss_fn = loss_fn
-        self.optimizer = optimizer
+        self.optimizer = optimizer_class
 
     # Input has shape (batches, ) + state_shape and (batches, ) + action_shape
     def get(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
         # The neural network produces a tensor of shape (batches, ) + action_shape
-        pred = self.q(state)
-        return pred * action
+        pred = self.q(state.float())
+        # A little inefficient because we only take the diagonals, 
+        return torch.tensordot(pred, action.float().T, 1).diagonal()
 
     # Input is a tensor of shape (batches, ) + state.shape
     # Output is a tensor of shape (batches, )
     def val(self, state) -> torch.Tensor:
-        terminal = torch.flatten(self.mdp.is_terminal(state))
-        return torch.flatten(self.q(state), 1, -1).max(1).values * ~terminal
+        terminal = torch.flatten(self.mdp.is_terminal(state.float()))
+        return torch.flatten(self.q(state.float()), 1, -1).max(1).values * ~terminal
     
-    # Input indices shape (batch, linear length)
-    def flattened_index_to_shaped(self, indices: torch.Tensor, shape: tuple):
-        shapevol = 1
-        for s in shape:
-            shapevol *= s
-        if indices.size(1) != shapevol:
-            raise Exception("Linear length does not match shape volume.")
-        # Index [a,b,c] in shape (x, y, z) has linear index t = a + bx + cxy, so invert: a = t mod x, b = (t - a)//x mod y, c = (t - a - bx)//xy mod z
-        factors = []
-        units = []
-        shapeprod = 1
-        residue = torch.zeros(indices.shape, dtype=float)
-        for i in range(len(shape)):
-            val = ((indices - residue)//shapeprod) % shape[i]
-            # Shape (batch, shape_i)
-            factors.append(val)
-            residue += val
-            shapeprod *= shape[i]
-            # Create a tuple (1, 1, ..., s_i, 1, ...)
-            l = [1 for j in len(shape)]
-            l[i] = s[i]
-            units.append(tuple(l))
-
-        # Tensor up, move batch to last index
-        output = torch.tensor([], dtype=float)
-        for i in range(len(shape)-1, -1, -1):
-            output = output * factors[i].reshape(units[i])
-        return output
-
     # Input is a batch of state vectors
     # Returns the value of an optimal policy at a given state, shape (batches, ) + action_shape
     def policy(self, state) -> torch.Tensor:
-        return self.flattened_index_to_shaped(torch.flatten(self.q(state), 1, -1).max(1).indices, self.mdp.action_shape)
+        flattened_indices = torch.flatten(self.q(state.float()), 1, -1).max(1).indices
+        linear_dim = 0
+        for d in self.mdp.action_shape:
+            linear_dim += d
+        indices_onehot = (torch.eye(linear_dim)[None] * torch.ones((state.size(0), 1, 1)))[torch.arange(state.size(0)), flattened_indices]
+        return indices_onehot.reshape((state.size(0), ) + self.mdp.action_shape)
 
 
-    # TODO the following needs to be changed
     # Does a Q-update based on some observed set of data
     # TransitionData entries are tensors
     def update(self, data: TransitionData, learn_rate):
         if not isinstance(self.q, nn.Module):
             Exception("NNQFunction needs to have a class extending nn.Module.")
+
+        self.q.train()
+
         opt = self.optimizer(self.q.parameters(), lr=learn_rate)
         
-        pred = self.q(data.s) * data.a
-        y = data.r + self.val(data.t)
+        pred = self.get(data.s.float(), data.a)
+        y = data.r + self.val(data.t.float())
 
         loss = self.loss_fn(pred, y)
 
@@ -450,6 +431,8 @@ class NNQFunction(QFunction):
         loss.backward()
         opt.step()
         opt.zero_grad()
+
+        self.q.eval()
 
 
 
@@ -459,7 +442,7 @@ class NNQFunction(QFunction):
 # Input shape (batch_size, ) + state_tensor
 # We implement a random tensor of 0's and 1's generating a random tensor of floats in [0, 1), then converting it to a bool, then back to a float.
 def greedy_tensor(q: NNQFunction, state, eps = 0.):
-    return (torch.rand(q.mdp.action_shape) < 0.5).to(dtype=float) if random.random() < eps else q.policy(state)
+    return q.mdp.get_random_action(state) if random.random() < eps else q.policy(state)
 
 def get_greedy_tensor(eps: float) -> callable:
     return lambda q, s: greedy_tensor(q, s, eps)
