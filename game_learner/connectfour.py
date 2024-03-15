@@ -419,9 +419,12 @@ class C4NN(nn.Module):
     def __init__(self):
         super().__init__()
         self.stack = nn.Sequential(
-            nn.Conv2d(2, 64, (5,5), padding='same'),
+            nn.Conv2d(2, 32, (3,3), padding='same'),
             nn.ReLU(),
             #nn.Dropout(p=0.2),             # Dropout introduces randomness into the Q function.  Not sure if this is desirable.
+            nn.BatchNorm2d(32),
+            nn.Conv2d(32, 64, (5,5), padding='same'),
+            nn.ReLU(),
             nn.BatchNorm2d(64),
             nn.Flatten(),
             nn.Linear(64*7*6, 64*7*6),
@@ -749,8 +752,24 @@ if "test" in options:
     print("\nTesting if deep Q-learning algorithm throws errors.")
     dqn = DQN(mdp, C4NN, torch.nn.HuberLoss(), torch.optim.SGD, 1000)
     dqn.set_greed(0.5)
-    dqn.deep_learn(0.5, 1, 10, 10, 4, 4, 10)
+    dqn.deep_learn(0.5, 10, 10, 4, 4, 10)
     print("PASS.  Things ran to completion, at least.")
 
     print("\nTesting saving and loading.")
+    
     dqn.save_q("temp.pt")
+    new_dqn = DQN(mdp, C4NN, torch.nn.HuberLoss(), torch.optim.SGD, 1000)
+    new_dqn.load_q("temp.pt")
+
+    if verbose:
+        print("Old:")
+        print(dqn.qs[0].get(s, a))
+        print("Saved and loaded:")
+        print(new_dqn.qs[0].get(s,a))
+    if torch.sum(dqn.qs[0].get(s, a) - new_dqn.qs[0].get(s, a)) == 0:
+        print("PASS")
+    else:
+        print("FAIL!!!")
+
+    
+

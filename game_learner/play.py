@@ -12,7 +12,7 @@ names = ["Tic-Tac-Toe", "Connect Four", "Tensor Connect Four"]
 shortnames = ["ttt", "c4", "c4t"]
 mdps = [tttmdp, c4mdp, c4tmdp]
 games = [SimpleGame(tttmdp), SimpleGame(c4mdp), DQN(c4tmdp, c4.C4NN, torch.nn.HuberLoss(), torch.optim.SGD, 10000)]
-file_exts = ['.ttt.pkl', '.c4.pkl', '.c4t.pkl']
+file_exts = ['.ttt.pkl', '.c4.pkl', '.c4t.pt']
 types = ["classical", "classical", "deep"]
 
 option = sys.argv[1]
@@ -121,7 +121,10 @@ elif saveindex == -1:
     elif type == "deep":
         game.set_greed(0.5)
         game.memory_capacity = 10000
-        game.deep_learn(learn_rate=0.1, iterations=1, episodes=10, episode_length=60, batch_size=4, train_batch_size=4, copy_frequency=10)
+        game.deep_learn(learn_rate=0.1, episodes=20, episode_length=60, batch_size=64, train_batch_size=64, copy_frequency=60)
+        res = "tempname"
+        fname = 'bots/' + re.sub(r'\W+', '', res)[0:64] + f"-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}{file_ext}"
+        game.save_q(fname)
 
 
 
@@ -225,18 +228,18 @@ elif shortname == "c4t":
             if p != comp:
                 re = input(f"Input column to play (1-7). ")
                 s, r = game.mdp.transition(s, game.mdp.action_index_to_tensor(int(re) - 1))
-                if r[0,p].item() == 1.:
-                    print(f"\nThe winner is player {p} ({game.mdp.symb[p]}).\n")
             else:
                 print("Action values:")
                 print(game.qs[comp].q(s.float()))
                 a = game.qs[comp].policy(s.float())
                 print(f"Chosen action: {a}.\n")
                 t, _ = game.mdp.transition(s, a)
-                while torch.sum(t - s == 0).item() == 0:
+                while torch.sum(t).item() == torch.sum(s).item():
                     print("Bot tried to make an illegal move.  Playing randomly.")
                     a = game.mdp.get_random_action(s)
                     t, _ = game.mdp.transition(s, a)
                 s = t
+            if r[0,p].item() == 1.:
+                print(f"\nThe winner is player {p} ({game.mdp.symb[p]}).\n")
 
 

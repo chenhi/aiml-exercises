@@ -1,6 +1,6 @@
 import random, warnings
 import numpy as np
-import pickle
+import pickle, zipfile, os
 import torch
 from torch import nn
 from collections import namedtuple, deque
@@ -470,15 +470,22 @@ class DQN():
             self.strategies = [get_greedy_tensor(self.target_qs[i], eps) for i in range(self.mdp.num_players)]
 
     def save_q(self, fname):
+        zf = zipfile.ZipFile(fname, mode="w")
         for i in range(self.mdp.num_players):
             model_scripted = torch.jit.script(self.qs[i].q)
-            model_scripted.save(fname + f".p{i}")
+            model_scripted.save(f"{i}.{fname}")
+            zf.write(f"{i}.{fname}", f"{i}.pt", compress_type=zipfile.ZIP_STORED)
+            os.remove(f"{i}.{fname}")
+        zf.close()
+
+            
 
     def load_q(self, fname):
         for i in range(self.mdp.num_players):
-            self.qs[i].q = torch.jit.load(fname + f"p{i}")
-            self.target_qs[i].q = torch.jit.load(fname + f"p{i}")
+            self.qs[i].q = torch.jit.load(f"p{i}.{fname}")
+            self.copy_policy_to_target()
             self.qs[i].q.eval()					# Set to evaluation mode
+
 
     # Keeps the first action; the assumption is the later actions are "passive" (i.e. not performed by the given player)
     # Adds the rewards
@@ -510,53 +517,56 @@ class DQN():
     # Handling multiplayer: each player keeps their own "record", separate from memory
     # When any entry in the record has source = target, then the player "banks" it in their memory
     # The next time an action is taken, if the source = target, then it gets overwritten
-    def deep_learn(self, learn_rate: float, iterations: int, episodes: int, episode_length: int, batch_size: int, train_batch_size: int, copy_frequency: int, verbose=False):
-        for i in range(iterations):
-            for j in range(episodes):
-                # Make sure the target network is the same as the policy network
-                self.copy_policy_to_target()
+    def deep_learn(self, learn_rate: float, episodes: int, episode_length: int, batch_size: int, train_batch_size: int, copy_frequency: int, verbose=False):
+        for j in range(episodes):
+            # Make sure the target network is the same as the policy network
+            self.copy_policy_to_target()
 
-                s = self.mdp.get_initial_state(batch_size)
-                # "Records" for each player
-                player_record = [None for i in range(self.mdp.num_players)]
+            s = self.mdp.get_initial_state(batch_size)
+            # "Records" for each player
+            player_record = [None for i in range(self.mdp.num_players)]
+            
+            for k in range(episode_length):  
+                # Execute the transition on the "actual" state
+                # To do this, we need to iterate over players, because each has a different q function for determining the strategy
+                p = self.mdp.get_player(s)                                  # p.shape = (batch, )       s.shape = (batch, 2, 6, 7)
+
+                # To get the actions, apply each player's strategy
+                a = torch.zeros((batch_size, ) + self.mdp.action_shape)
+                for pi in range(self.mdp.num_players):
+                    # Get the indices corresponding to this player's turn
+                    indices = torch.arange(batch_size)[p.flatten() == float(pi)].tolist()
+                    
+                    # Apply thie player's strategy to their turns
+                    # Greedy is not parallelized, so there isn't efficiency loss with this
+                    player_actions = torch.cat([self.strategies[pi](s[l:l+1]) if l in indices else torch.zeros((1, ) + self.mdp.action_shape) for l in range(batch_size)], 0)
+                    a += player_actions
+                    #player_actions = self.strategies[i](s[indices, ...])
+                    #a += player_actions * (p == float(pi))[:, None]
+
+
+                # Do the transition                       
+                t, r = self.mdp.transition(s, a)
                 
-                for k in range(episode_length):  
-                    # Execute the transition on the "actual" state
-                    # To do this, we need to iterate over players, because each has a different q function for determining the strategy
-                    p = self.mdp.get_player(s)                                  # p.shape = (batch, )       s.shape = (batch, 2, 6, 7)
-
-                    # To get the actions, apply each player's strategy
-                    a = torch.zeros((batch_size, ) + self.mdp.action_shape)
-                    for pi in range(self.mdp.num_players):
-                        # Get the indices corresponding to this player's turn
-                        indices = torch.arange(batch_size)[p.flatten() == float(pi)].tolist()
+                # Update player records and memory
+                for pi in range(self.mdp.num_players):
+                    # If it's the first move, just put the record in
+                    if player_record[pi] == None:
+                        player_record[pi] = TransitionData(s, a, t, r)
+                    else:
+                        player_record[pi], to_memory = self.compose_transition_tensor(player_record[pi], TransitionData(s, a, t, r), pi)
+                        self.memories[pi].push_batch(to_memory)
+                
+                # Train the policy on a random sample in memory (once the memory bank is big enough)
+                for i in range(self.mdp.num_players):
+                    if self.memories[i].size() >= train_batch_size:
+                        self.qs[i].update(self.memories[i].sample(train_batch_size), learn_rate)
                         
-                        # Apply thie player's strategy to their turns
-                        # Greedy is not parallelized, so there isn't efficiency loss with this
-                        player_actions = torch.cat([self.strategies[pi](s[l:l+1]) if l in indices else torch.zeros((1, ) + self.mdp.action_shape) for l in range(batch_size)], 0)
-                        a += player_actions
-                        #player_actions = self.strategies[i](s[indices, ...])
-                        #a += player_actions * (p == float(pi))[:, None]
+                # Copy the target network to the policy network if it is time
+                if (k+1) % copy_frequency == 0:
+                    self.copy_policy_to_target()
+                    
 
 
-                    # Do the transition                       
-                    t, r = self.mdp.transition(s, a)
-                    
-                    # Update player records and memory
-                    for pi in range(self.mdp.num_players):
-                        # If it's the first move, just put the record in
-                        if player_record[pi] == None:
-                            player_record[pi] = TransitionData(s, a, t, r)
-                        else:
-                            player_record[pi], to_memory = self.compose_transition_tensor(player_record[pi], TransitionData(s, a, t, r), pi)
-                            self.memories[pi].push_batch(to_memory)
-                    
-                    # Train the policy on a random sample in memory (once the memory bank is big enough)
-                    for i in range(self.mdp.num_players):
-                        if self.memories[i].size() >= train_batch_size:
-                            self.qs[i].update(self.memories[i].sample(train_batch_size), learn_rate)
-                            
-                    # Copy the target network to the policy network if it is time
-                    if (k+1) % copy_frequency == 0:
-                        self.copy_policy_to_target()
-        # TODO saving stuff
+# TODO carefuly about eval vs train
+# TODO zip players
