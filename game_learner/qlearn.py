@@ -453,12 +453,13 @@ def get_greedy_tensor(q: NNQFunction, eps: float) -> callable:
 
 
 # For now, for simplicity, fix a single strategy
+# Note that qs is policy_qs
 class DQN():
     def __init__(self, mdp: MDP, q_model: nn.Module, loss_fn, optimizer, memory_capacity: int):
         # An mdp that encodes the rules of the game.  The current player is part of the state, which is of the form (current player, actual state)
         self.mdp = mdp
         self.target_qs = [NNQFunction(mdp, q_model, loss_fn, optimizer) for i in range(mdp.num_players)]
-        self.policy_qs = [NNQFunction(mdp, q_model, loss_fn, optimizer) for i in range(mdp.num_players)]
+        self.qs = [NNQFunction(mdp, q_model, loss_fn, optimizer) for i in range(mdp.num_players)]
         self.memories = [ExperienceReplay(memory_capacity) for i in range(mdp.num_players)]
 
     # Note that greedy involves values, so it should refer to the target network
@@ -470,14 +471,14 @@ class DQN():
 
     def save_q(self, fname):
         for i in range(self.mdp.num_players):
-            model_scripted = torch.jit.script(self.policy_qs[i].q)
+            model_scripted = torch.jit.script(self.qs[i].q)
             model_scripted.save(fname + f".p{i}")
 
     def load_q(self, fname):
         for i in range(self.mdp.num_players):
-            self.policy_qs[i].q = torch.jit.load(fname + f"p{i}")
+            self.qs[i].q = torch.jit.load(fname + f"p{i}")
             self.target_qs[i].q = torch.jit.load(fname + f"p{i}")
-            self.policy_qs[i].q.eval()					# Set to evaluation mode
+            self.qs[i].q.eval()					# Set to evaluation mode
 
     # Keeps the first action; the assumption is the later actions are "passive" (i.e. not performed by the given player)
     # Adds the rewards
@@ -503,7 +504,7 @@ class DQN():
     # Copy the weights of one NN to another
     def copy_policy_to_target(self):
         for i in range(self.mdp.num_players):
-            self.target_qs[i].q.load_state_dict(self.policy_qs[i].q.state_dict())
+            self.target_qs[i].q.load_state_dict(self.qs[i].q.state_dict())
 
 
     # Handling multiplayer: each player keeps their own "record", separate from memory
@@ -553,7 +554,7 @@ class DQN():
                     # Train the policy on a random sample in memory (once the memory bank is big enough)
                     for i in range(self.mdp.num_players):
                         if self.memories[i].size() >= train_batch_size:
-                            self.policy_qs[i].update(self.memories[i].sample(train_batch_size), learn_rate)
+                            self.qs[i].update(self.memories[i].sample(train_batch_size), learn_rate)
                             
                     # Copy the target network to the policy network if it is time
                     if (k+1) % copy_frequency == 0:

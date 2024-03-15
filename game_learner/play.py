@@ -11,7 +11,7 @@ c4tmdp = c4.C4TensorMDP()
 names = ["Tic-Tac-Toe", "Connect Four", "Tensor Connect Four"]
 shortnames = ["ttt", "c4", "c4t"]
 mdps = [tttmdp, c4mdp, c4tmdp]
-games = [SimpleGame(tttmdp), SimpleGame(c4mdp), DQN(c4tmdp, c4.C4NN, torch.nn.HuberLoss, torch.optim.Adam, 10000)]
+games = [SimpleGame(tttmdp), SimpleGame(c4mdp), DQN(c4tmdp, c4.C4NN, torch.nn.HuberLoss(), torch.optim.SGD, 10000)]
 file_exts = ['.ttt.pkl', '.c4.pkl', '.c4t.pkl']
 types = ["classical", "classical", "deep"]
 
@@ -121,7 +121,7 @@ elif saveindex == -1:
     elif type == "deep":
         game.set_greed(0.5)
         game.memory_capacity = 10000
-        game.deep_learn(learn_rate=0.1, iterations=100, episodes=100, episode_length=1000, batch_size=64, train_batch_size=64, copy_frequency=100)
+        game.deep_learn(learn_rate=0.1, iterations=1, episodes=10, episode_length=60, batch_size=4, train_batch_size=4, copy_frequency=10)
 
 
 
@@ -200,14 +200,12 @@ elif shortname == "c4":
                 a = game.qs[comp].policy(s)
                 print(f"Chosen action: {a}.\n")
                 s, _ = game.mdp.transition(s, a)
-                print(game.mdp.state_to_tensor(s), game.mdp.action_to_tensor(a))
             
 
         print(f"{game.mdp.board_str(s)}The winner is {game.mdp.symb[str(s[2])]}.\n\n")
 elif shortname == "c4t":
     while True:
         if saveindex >= -1:
-            exit()
             res = input("Play as first or second player?  Enter '1' or '2' or 'q' to quit: ")
             if res == 'q':
                 exit()
@@ -226,16 +224,15 @@ elif shortname == "c4t":
             print(game.mdp.board_str(s)[0])
             if p != comp:
                 re = input(f"Input column to play (1-7). ")
-                s, r = game.mdp.transition(s, game.mdp.get_single_action_vector(int(re) - 1))
+                s, r = game.mdp.transition(s, game.mdp.action_index_to_tensor(int(re) - 1))
                 if r[0,p].item() == 1.:
                     print(f"\nThe winner is player {p} ({game.mdp.symb[p]}).\n")
             else:
-                for a in game.mdp.get_actions(s):
-                    print(f"Value of action {a} is {game.qs[comp].get(s, a)}.")
-                a = game.qs[comp].policy(s)
+                print("Action values:")
+                print(game.qs[comp].q(s.float()))
+                a = game.qs[comp].policy(s.float())
                 print(f"Chosen action: {a}.\n")
                 s, _ = game.mdp.transition(s, a)
-                print(game.mdp.state_to_tensor(s), game.mdp.action_to_tensor(a))
         
 
 

@@ -751,3 +751,6 @@ if "test" in options:
     dqn.set_greed(0.5)
     dqn.deep_learn(0.5, 1, 10, 10, 4, 4, 10)
     print("PASS.  Things ran to completion, at least.")
+
+    print("\nTesting saving and loading.")
+    dqn.save_q("temp.pt")
