@@ -6,7 +6,7 @@ from qlearn import *
 from deepqlearn import *
 import os, datetime, re, sys, torch
 
-open_str = '\nCommand-line options: python play.py <game> <play/train/simulate> <number of simulations>\n\
+open_str = '\nCommand-line options: python play.py <game> <play/train/simulate>\n\
     If play (default), only play against one model.\n\
     If train, continue to play after training.\n\
     If simulate, allow choosing different models.\n\n'
@@ -216,32 +216,31 @@ elif load_index != -1:
 
 
 #==================== PLAY THE GAME ====================#
-# TODO: random not actually random bc when zeroed, it just plays first col
-# TODO and whats the point of multiple simulations if they're deterministic?
 
 # Simulation:
 if simulate:
-    if len(sys.argv) >= 4:
-        res = sys.argv[3]
-    else:
-        res = input(f"How many simulations?  Enter -1 for step-through mode. ")
-    try:
-        num_sim = int(res)
-        if num_sim < 0:
-            raise Exception()
-    except:
-        print("Couldn't interpret the passed argument for number of simulations.  Defaulting to step-through simulations.")
-        num_sim = -1
+    # if len(sys.argv) >= 4:
+    #     res = sys.argv[3]
+    # else:
+    #     res = input(f"How many simulations?  Enter -1 for step-through mode. ")
+    # try:
+    #     num_sim = int(res)
+    #     if num_sim < 0:
+    #         raise Exception()
+    # except:
+    #     print("Couldn't interpret the passed argument for number of simulations.  Defaulting to step-through simulations.")
+    #     num_sim = -1
 
-    if num_sim > 0:
-        game.simulate_game(num_sim, 1000)
-        exit()
-    elif num_sim < 0:
-        while True:
-            game.stepthru_game()
-            res = input("\nAnother round? (y/n) ")
-            if res == 'n':
-                exit()
+    # if num_sim > 0:
+    #     game.simulate_game(num_sim, 1000)
+    #     exit()
+    # elif num_sim < 0:
+    #while True:
+    game.stepthru_game()
+    #res = input("\nAnother round? (y/n) ")
+    #    if res == 'n':
+    input("Any input to exit. ") 
+    exit()
 
 
 

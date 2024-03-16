@@ -174,39 +174,40 @@ class DQN():
         for i in range(self.mdp.num_players):
             self.target_qs[i].q.load_state_dict(self.qs[i].q.state_dict())
 
-    # TODO handle illegal moves
-    def simulate_game(self, num_simulations: int, max_turns: int, handle_illegal_moves = True, save_log=True, verbose=True):
-        logstr = ""
-        total_rewards = torch.zeros(self.mdp.num_players)
-        wins = [0 for i in range(self.mdp.num_players)]
-        illegals = [0 for i in range(self.mdp.num_players)]
-        # TODO figure out how to handle wins/penalties
-        for i in range(num_simulations):
-            logstr += log(f"SIMULATION {i+1} START", verbose)
-            s = self.mdp.get_initial_state()
-            logstr += log(f"Initial state:\n{self.mdp.board_str(s)[0]}", verbose)
-            for j in range(max_turns):
-                if self.mdp.is_terminal(s):
-                    logstr += log(f"Terminal state reached.", verbose)
-                    break
-                p = self.mdp.get_player(s)[0].item()
-                logstr += log(f"Turn {j+1}, player {p+1} ({self.mdp.symb[p]}).", verbose)
-                # TODO write all the action values
-                a = self.qs[p].policy(s)
-                logstr += log(f"Chosen action: {self.mdp.action_str(a)[0]}", verbose)
-                s, r = self.mdp.transition(s, a)
-                total_rewards += r[0]
-                logstr += log(f"Next state:\n{self.mdp.board_str(s)[0]}", verbose)
-                logstr += log(f"Rewards for players: {r[0].tolist()}", verbose)
-            logstr += log(f"SIMULATION {i+1} END\n\n", verbose)
+    # # TODO handle illegal moves
+    # # TODO as is this is kind of pointless since they act deterministically.  make it simulate against random?  but that's also pointless?
+    # def simulate_game(self, num_simulations: int, max_turns: int, handle_illegal_moves = True, save_log=True, verbose=True):
+    #     logstr = ""
+    #     total_rewards = torch.zeros(self.mdp.num_players)
+    #     wins = [0 for i in range(self.mdp.num_players)]
+    #     illegals = [0 for i in range(self.mdp.num_players)]
+    #     # TODO figure out how to handle wins/penalties
+    #     for i in range(num_simulations):
+    #         logstr += log(f"SIMULATION {i+1} START", verbose)
+    #         s = self.mdp.get_initial_state()
+    #         logstr += log(f"Initial state:\n{self.mdp.board_str(s)[0]}", verbose)
+    #         for j in range(max_turns):
+    #             if self.mdp.is_terminal(s):
+    #                 logstr += log(f"Terminal state reached.", verbose)
+    #                 break
+    #             p = self.mdp.get_player(s)[0].item()
+    #             logstr += log(f"Turn {j+1}, player {p+1} ({self.mdp.symb[p]}).", verbose)
+    #             # TODO write all the action values
+    #             a = self.qs[p].policy(s)
+    #             logstr += log(f"Chosen action: {self.mdp.action_str(a)[0]}", verbose)
+    #             s, r = self.mdp.transition(s, a)
+    #             total_rewards += r[0]
+    #             logstr += log(f"Next state:\n{self.mdp.board_str(s)[0]}", verbose)
+    #             logstr += log(f"Rewards for players: {r[0].tolist()}", verbose)
+    #         logstr += log(f"SIMULATION {i+1} END\n\n", verbose)
         
-        logstr += log(f"Total statistics:\nWins by player: {wins}\nRewards by player: {total_rewards.tolist()}\nIllegal plays by player: {illegals}\n\n")
+    #     logstr += log(f"Total statistics:\nWins by player: {wins}\nRewards by player: {total_rewards.tolist()}\nIllegal plays by player: {illegals}\n\n")
 
-        if save_log:
-            logpath = f"logs/simulation_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.log"
-            with open(logpath, "w") as f:
-                logstr += log(f"Saved logs to {logpath}")
-                f.write(logstr)
+    #     if save_log:
+    #         logpath = f"logs/simulation_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.log"
+    #         with open(logpath, "w") as f:
+    #             logstr += log(f"Saved logs to {logpath}")
+    #             f.write(logstr)
                 
     def stepthru_game(self):
         s = self.mdp.get_initial_state()
