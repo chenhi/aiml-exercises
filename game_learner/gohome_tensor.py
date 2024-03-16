@@ -68,7 +68,7 @@ class GoHomeTensorMDP(MDP):
         return torch.zeros(state.shape, dtype=int) == 0
     
     def transition(self, state: torch.Tensor, action: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        
+        pass #TODO!!!
 
     def is_terminal(self, s):
         return (s == self.home_state) | (s == torch.zeros(self.size, dtype=int))

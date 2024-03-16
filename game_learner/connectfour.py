@@ -1,6 +1,6 @@
 from qlearn import *
 import numpy as np
-import random, sys, warnings
+import random, sys, torch
 
 options = sys.argv[1:]
 
@@ -12,8 +12,8 @@ options = sys.argv[1:]
 # Set of actions: integers [0, 6]
 class C4MDP(MDP):
     def __init__(self):
-        super().__init__(None, range(0, 7), discount=1, num_players=2, state_shape=(2,7,6), action_shape=(7,))
-        self.symb = {'0': "O", '1': "X", '': "-"}
+        super().__init__(None, range(0, 7), discount=1, num_players=2, state_shape=(2,7,6), action_shape=(7,), \
+                         symb={'0': "O", '1': "X", '': "-"}, input_str="Input column to play (1-7). ")
 
     def board_str(self, s):
         rows = ["|" for i in range(6)]

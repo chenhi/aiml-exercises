@@ -4,6 +4,12 @@ import numpy as np
 import sys, warnings
 import torch
 
+# Testing options
+# 'test' to test
+# 'verbose' to print more messages
+# 'slow' to do a slow simulation of Q-updates
+# 'saveload' to test saving and loading
+
 options = sys.argv[1:]
 
 
@@ -12,14 +18,14 @@ options = sys.argv[1:]
 # Reward tensor (batches, )
 class C4TensorMDP(MDP):
     def __init__(self):
-        super().__init__(None, None, discount=1, num_players=2, state_shape=(2,6,7), action_shape=(7,), batched=True)
-        self.symb = {0: "O", 1: "X", None: "-"}
-        self.penalty = -1000.
+        super().__init__(None, None, discount=1, num_players=2, state_shape=(2,6,7), action_shape=(7,), batched=True, \
+                         symb = {0: "O", 1: "X", None: "-"}, input_str = "Input column to play (1-7). ")
+
 
     # Logic: if player 0 has more pieces than player 1, then it's player 1's turn.  Otherwise, it's player 0's turn.
     # Return shape (batch, 1, 1, 1)
     def get_player(self, state: torch.Tensor) -> torch.Tensor:
-        summed = state.sum((2,3))
+        summed = abs(state.sum((2,3)))
         return (1 * (summed[:,0] > summed[:,1])).to(dtype=int)[:, None, None, None]
 
     # Return shape (batch, 2, 1, 1)
@@ -28,14 +34,29 @@ class C4TensorMDP(MDP):
 
     # Non-batch and not used in internal code, but might be useful
     # Return shape (1, 7)
-    def action_index_to_tensor(self, index: int):
+    def int_to_action(self, index: int):
         if index < 0 or index > 7:
             warnings.warn("Index out of range.")
             return np.zeros((1, 7), dtype=int)
         return torch.eye(7, dtype=int)[index:index+1,:]
     
+    def str_to_action(self, input: str) -> torch.Tensor:
+        try:
+            i = int(input)
+            if i < 0 or i > 7:
+                raise Exception()
+        except:
+            return None
+        return self.int_to_action(i)
+    
+    # Return shape (batch, 7), boolean type
+    def valid_action_filter(self, state: torch.Tensor):
+        return state.sum((1,2)) < 6
+
+    # Gets a random valid action; if there are none, then it plays in the 0th column. #TODO make it return 0 instead
     def get_random_action(self, state):
-        indices = (torch.rand(state.size(0)) * 7).int()
+        #indices = (torch.rand(state.size(0)) * 7).int()
+        indices = (torch.rand((state.size(0), 7)) * self.valid_action_filter(state).int()).max(1).indices
         return torch.eye(7, dtype=int)[None].expand(state.size(0), -1, -1)[torch.arange(state.size(0)), indices]
 
     # Return shape (batch, 2, 1, 1)
@@ -45,7 +66,16 @@ class C4TensorMDP(MDP):
     # Player 0 is always the first player.
     # Return shape (batch_size, 2, 6, 7)
     def get_initial_state(self, batch_size=1) -> torch.Tensor:
-        return torch.tensordot(torch.ones((batch_size, ), dtype=int), torch.zeros((2,6,7), dtype=int), 0)    
+        return torch.zeros((batch_size, 2, 6, 7), dtype=int)
+#        return torch.tensordot(torch.ones((batch_size, ), dtype=int), torch.zeros((2,6,7), dtype=int), 0)    
+
+    def action_str(self, action: torch.Tensor) -> list[str]:
+        outs = []
+        for i in range(action.shape[0]):
+            a = action[i, :].max(0).indices.item()
+            outs.append(f"column {a+1}")
+        return outs
+
 
     # Returns a pretty looking board in a string.
     def board_str(self, state: torch.Tensor) -> list[str]:
@@ -54,15 +84,14 @@ class C4TensorMDP(MDP):
         players = self.get_player(state)
         term = self.is_terminal(state)
         for i in range(state.shape[0]):
-            s = state[i, ...]
+            s = state[i]
             # We indicate a terminal state by negating everything, so if the state is terminal we need to undo it
             if term[i].item():
                 s = s * -1
             out = ""
             out += f"Current player: {self.symb[players[i].item()]}\n"
-            pos0 = s[0, ...] > s[1, ...]
-            pos1 = s[0, ...] < s[1, ...]
-            #posvoid = board[0, ...] == board[1, ...]
+            pos0 = s[0] > s[1]
+            pos1 = s[0] < s[1]
 
             # Start from the top row
             for row in range(5, -1, -1):
@@ -81,11 +110,12 @@ class C4TensorMDP(MDP):
         return outs
 
     # Sum the channels and columns, add the action, should be <= 6.  Then, do an "and" along the rows.
-    # Return shape (batch, 1, 1, 1)
+    # Input shape (batch, 2, 6, 7) and (batch, 7)
+    # Return shape (batch, 1)
     def is_valid_action(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
         if state.shape[0] != action.shape[0]:
             raise Exception("Batch sizes must agree.")
-        return torch.prod(state.sum((1,2)) + action <= torch.ones(action.shape, dtype=int) * 6, 1)
+        return torch.prod(state.sum((1,2)) + action <= 6, 1)
 
     # Reward is 1 for winning the game, -1 for losing, and 0 for a tie; awarded upon entering terminal state
     # Return tuple of tensors with shape (batch, ) + state_shape for the next state and (batch, 2) for the reward
@@ -152,7 +182,7 @@ class C4TensorMDP(MDP):
         batches = state.shape[0]
 
         # Get the channel for the indicated player, shape (batch, 6, 7)
-        player_board = state[torch.arange(batches), player[:,0,0,0],:,:]
+        player_board = state[torch.arange(batches), player[:,0,0,0]]
 
         filters = []
         # Make the horizontal filters
@@ -234,18 +264,27 @@ class C4NN(nn.Module):
             nn.Conv2d(2, 32, (3,3), padding='same'),
             nn.ReLU(),
             #nn.Dropout(p=0.2),             # Dropout introduces randomness into the Q function.  Not sure if this is desirable.
-            nn.BatchNorm2d(32),
+            #nn.BatchNorm2d(32),
             nn.Conv2d(32, 64, (5,5), padding='same'),
             nn.ReLU(),
-            nn.BatchNorm2d(64),
+            #nn.BatchNorm2d(64),
             nn.Flatten(),
             nn.Linear(64*7*6, 64*7*6),
             nn.ReLU(),
-            nn.BatchNorm1d(64*7*6),
-            nn.Linear(64*7*6, 7),
-            nn.BatchNorm1d(7)
+            #nn.BatchNorm1d(64*7*6),
+            nn.Linear(64*7*6, 7)
         )
     
+    def zero_out(self):
+        nn.init.zeros_(self.stack[0].weight)
+        nn.init.zeros_(self.stack[0].bias)
+        nn.init.zeros_(self.stack[2].weight)
+        nn.init.zeros_(self.stack[2].bias)
+        nn.init.zeros_(self.stack[5].weight)
+        nn.init.zeros_(self.stack[5].bias)
+        nn.init.zeros_(self.stack[7].weight)
+        nn.init.zeros_(self.stack[7].bias)
+
     def forward(self, x):
         return self.stack(x)
 
@@ -254,12 +293,6 @@ class C4NN(nn.Module):
 
 
 #################### TESTING ####################
-
-
-
-
-
-print("Can run with options: 'test', 'verbose'\n")
 
 
 # Testing
@@ -413,7 +446,6 @@ if "test" in options:
             print(f"reward {r}, terminal {mdp.is_terminal(v)}")
         if i == 3 and (mdp.is_terminal(v).item() == False or r[0,0].item() != 1 or r[0,1].item() != -1):
             ok = False
-            print("fail 1")
         v, r = mdp.transition(v, b)
         if verbose:
             print(mdp.board_str(v)[0])
@@ -429,13 +461,13 @@ if "test" in options:
         
         
 
-    print("\nChecking full board condition and reward.")
+    print("\nChecking full board condition and reward.  Also, checks valid_action_filter()")
     ok = True
     if verbose:
         print("Should enter a terminal state with no reward.")
     v = mdp.get_initial_state()
     for i in range(3):
-        a = mdp.action_index_to_tensor(i)
+        a = mdp.int_to_action(i)
         for j in range(6):
             v, r = mdp.transition(v, a)
             if verbose:
@@ -444,20 +476,24 @@ if "test" in options:
                 print("")
     if verbose:
         print("Now avoiding a win...")
-    a = mdp.action_index_to_tensor(6)
+    a = mdp.int_to_action(6)
     v, r = mdp.transition(v, a)
     if verbose:
         print(mdp.board_str(v)[0])
         print(f"reward {r}, terminal {mdp.is_terminal(v)}")
         print("")
     for i in range(3, 7):
-        a = mdp.action_index_to_tensor(i)
+        a = mdp.int_to_action(i)
         for j in range(6):
             v, r = mdp.transition(v, a)
             if verbose:
                 print(mdp.board_str(v)[0])
                 print(f"reward {r}, terminal {mdp.is_terminal(v)}")
                 print("")
+            x = mdp.get_random_action(v)
+            if (i, j) == (6, 1) and torch.prod(x == mdp.int_to_action(6)).item() != 1:
+                print(f"{x.tolist()} is not an allowable action.  Only {mdp.int_to_action(6).tolist()} is.")
+                ok = False
             if (i, j) == (6, 4) and (mdp.is_full(v).item() != True or mdp.is_terminal(v).item() != True or r[0,0].item() != 0 or r[0,1].item() != 0):
                 ok = False
             elif (i, j) == (6, 5) and (mdp.is_full(v).item() != True or mdp.is_terminal(v).item() != True or r[0,0].item() != 0 or r[0, 1].item() != 0):
@@ -543,10 +579,13 @@ if "test" in options:
     else:
         print("FAIL!!! No update, very unlikely.")
 
+    q = NNQFunction(mdp, C4NN, torch.nn.MSELoss(), torch.optim.SGD)
     if "slow" in options:
+        print("\nCurrent values:")
+        print(q.val(t))
         print("\nRunning update 100 times and checking for convergence.")
-        for i in range(0, 100):
-            q.update(d, learn_rate=1)
+        for i in range(0, 500):
+            q.update(d, learn_rate=0.01)
             print(q.get(s,a))
 
 
@@ -555,27 +594,28 @@ if "test" in options:
     print("\nTesting if deep Q-learning algorithm throws errors.")
     dqn = DQN(mdp, C4NN, torch.nn.HuberLoss(), torch.optim.SGD, 1000)
     dqn.set_greed(0.5)
-    dqn.deep_learn(0.5, 10, 10, 4, 4, 10)
+    dqn.deep_learn(0.5, 10, 100, 1, 4, 10, verbose=verbose)
     print("PASS.  Things ran to completion, at least.")
 
-    print("\nTesting saving and loading.")
-    
-    dqn.save_q("temp.pt")
-    new_dqn = DQN(mdp, C4NN, torch.nn.HuberLoss(), torch.optim.SGD, 1000)
-    new_dqn.load_q("temp.pt")
-    os.remove("temp.pt")
+    if "saveload" in options:
+        print("\nTesting saving and loading.")
+        
+        dqn.save_q("temp.pt")
+        new_dqn = DQN(mdp, C4NN, torch.nn.HuberLoss(), torch.optim.SGD, 1000)
+        new_dqn.load_q("temp.pt")
+        os.remove("temp.pt")
 
-    if verbose:
-        print("Old:")
-        print(dqn.qs[0].get(s, a))
-        print(list(dqn.qs[0].q.parameters())[1])
-        print("Saved and loaded:")
-        print(new_dqn.qs[0].get(s,a))
-        print(list(new_dqn.qs[0].q.parameters())[1])
-    if torch.sum(dqn.qs[0].get(s, a) - new_dqn.qs[0].get(s, a)) == 0:
-        print("PASS")
-    else:
-        print("FAIL!!!")
+        if verbose:
+            print("Old:")
+            print(dqn.qs[0].get(s, a))
+            print(list(dqn.qs[0].q.parameters())[1])
+            print("Saved and loaded:")
+            print(new_dqn.qs[0].get(s,a))
+            print(list(new_dqn.qs[0].q.parameters())[1])
+        if torch.sum(dqn.qs[0].get(s, a) - new_dqn.qs[0].get(s, a)) == 0:
+            print("PASS")
+        else:
+            print("FAIL!!!")
 
     
 

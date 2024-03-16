@@ -3,21 +3,36 @@ import random, pickle
 
 # WARNING: states and actions must be hashable if using with QFunction.
 class MDP():
-    def __init__(self, states, actions, discount=1, num_players=1, state_shape = None, action_shape = None, batched=False):
+    def __init__(self, states, actions, discount=1, num_players=1, state_shape = None, action_shape = None, penalty = -1000, symb = {}, input_str = "", batched=False):
         self.actions = actions
         self.discount = discount
         self.num_players = num_players
         self.batched = batched
+        self.penalty=penalty
+        self.symb = symb
+        self.input_str = input_str
 
         # The states do not literally have to be tensors for the state_shape to be defined.  This just specifies, when they are turned into tensors, what shape they should be have, ignoring batch dimension
         self.states = states
         self.state_shape = state_shape
         self.actions = actions
         self.action_shape = action_shape
-        
 
-    def copy(self):
+        # Useful for getting things in the right shape
+        if self.state_shape != None:
+            self.state_projshape = tuple([1 for i in self.state_shape])
+        if self.action_shape != None:
+            self.action_projshape = tuple([1 for i in self.action_shape])
+        
+    def str_to_action(self, input: str):
         raise NotImplementedError
+    
+    def board_str(self, state) -> str:
+        raise NotImplementedError
+    
+
+
+
 
     def is_state(self, state):
         if self.states != None:
@@ -35,9 +50,10 @@ class MDP():
         else:
             return True
 
-    # Takes in the "full" state and returns the status of the game
-    def board_str(self, s) -> str:
+    def action_str(self, action) -> str:
         raise NotImplementedError
+
+
         
     def get_random_state(self):
         if self.states != None:
@@ -226,7 +242,7 @@ def get_greedy(q: QFunction, eps: float) -> callable:
 # Requirements for the MDP:
 # The state must be a tuple, whose first entry is the current player
 # The rewards are returned as a tuple, corresponding to rewards for each player
-class SimpleGame():
+class QLearn():
     def __init__(self, mdp: MDP):
         # An mdp that encodes the rules of the game.  The current player is part of the state, which is of the form (current player, actual state)
         self.mdp = mdp
@@ -243,9 +259,13 @@ class SimpleGame():
         with open(fname, 'wb') as f:
             pickle.dump(self.qs, f)
         
-    def load_q(self, fname):
+    def load_q(self, fname, index=None):
         with open(fname, 'rb') as f:
-            self.qs = pickle.load(f)
+            temp_qs = pickle.load(f)
+        if index == None:
+            self.qs = temp_qs
+        else:
+            self.qs[index] = temp_qs[index]
     
     # Non-batched method
     def current_player(self, s) -> int:

@@ -17,8 +17,8 @@ ttt_actions = [(i, j) for i in range(3) for j in range(3)]
 # The players are 1, and -1 in that order
 class TTTMDP(MDP):
     def __init__(self):
-        self.symb = {0: "X", 1: "O", -1: "."}
-        super().__init__(None, ttt_actions, discount=1, num_players=2)
+        super().__init__(None, ttt_actions, discount=1, num_players=2, \
+                         symb = {0: "X", 1: "O", -1: "-"}, input_str = "Input position to play, e.g. '1, 3' for the 1st row and 3rd column: ")
 
     # States are tuples (0 or 1, 9-tuples of 1,0,-1). Arrays are tuples (1 or -1, 3x3 array).
     def state_to_array(self, state):
@@ -30,6 +30,15 @@ class TTTMDP(MDP):
             flattened += row
         return tuple(flattened)
     
+    def str_to_action(self, input: str) -> tuple:
+        coords = input.split(',')
+        try:
+            i = int(coords[0]) - 1
+            j = int(coords[1]) - 1
+        except:
+            return None
+        return (i, j)
+
     def board_str(self, s):
         out = ""
         p, arr = s[0], self.state_to_array(s[1])
