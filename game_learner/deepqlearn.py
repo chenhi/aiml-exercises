@@ -15,6 +15,8 @@ import matplotlib.pyplot as plt
 
 
 
+
+
 # Source, action, target, reward
 TransitionData = namedtuple('TransitionData', ('s', 'a', 't', 'r'))
 
@@ -52,12 +54,12 @@ class ExperienceReplay():
     
 
 
-
+#class TensorMDP(MDP):
+#    def 
 
 
 
 # A Q-function where the inputs and outputs are all tensors
-# q_model = None means play randomly and all values 0.
 class NNQFunction(QFunction):
     def __init__(self, mdp: MDP, q_model, loss_fn, optimizer_class: torch.optim.Optimizer):
         if mdp.state_shape == None or mdp.action_shape == None:
@@ -68,7 +70,12 @@ class NNQFunction(QFunction):
         self.loss_fn = loss_fn
         self.optimizer = optimizer_class
 
-    # Output shape (batch, ) if action is not None, otherwise (batch, + action_shape
+    # Make the Q function perform randomly.
+    def lobotomize(self):
+        self.q = None
+
+    # If input action = None, then return the entire vector of action values of shape (batch, ) + action_shape
+    # Otherwise, output shape (batch, )
     def get(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
         if self.q == None:
             pred = self.mdp.get_random_action(state)    
@@ -90,7 +97,7 @@ class NNQFunction(QFunction):
     
     # Input is a batch of state vectors
     # Returns the value of an optimal policy at a given state, shape (batches, ) + action_shape
-    def policy(self, state) -> torch.Tensor:
+    def policy(self, state) -> torch.Tensor:                        # TODO how does it choose from multiple?
         if self.q == None:
             return self.mdp.get_random_action(state)
         
@@ -184,7 +191,7 @@ class DQN():
     def null_q(self, indices = None):
         for i in range(self.mdp.num_players):
             if indices == None or i in indices:
-                self.qs[i].q = None
+                self.qs[i].lobotomize()
 
     # Copy the weights of one NN to another
     def copy_policy_to_target(self):
@@ -283,9 +290,10 @@ class DQN():
         
         logtext = ""
         if verbose or savelog != None:
-            logtext += log(f"Model:\n{str(self.qs[0].q)}", verbose)
-            logtext += log(f"Loss function:\n{str(self.qs[0].loss_fn)}", verbose)
-            logtext += log(f"Optimizer:\n{str(self.qs[0].optimizer)}", verbose)
+            logtext += log(f"MDP:\n{self.mdp}", verbose)
+            logtext += log(f"Model:\n{self.qs[0].q}", verbose)
+            logtext += log(f"Loss function:\n{self.qs[0].loss_fn}", verbose)
+            logtext += log(f"Optimizer:\n{self.qs[0].optimizer}", verbose)
             logtext += log(f"Learn rate: {learn_rate}, start and end greed: {greed_start}->{greed_end}, episodes: {episodes}, episode length: {episode_length}, batch size: {batch_size}, training batch size: {train_batch_size}, memory training threshold: {episodes_before_train}, copy frequency: {copy_frequency}.", verbose)
             wins = [0] * self.mdp.num_players
             penalties = [0] * self.mdp.num_players

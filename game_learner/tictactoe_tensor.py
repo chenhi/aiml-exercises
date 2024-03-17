@@ -8,7 +8,10 @@ options = sys.argv[1:]
 class TTTTensorMDP(MDP):
     def __init__(self):
         super().__init__(None, None, discount=1, num_players=2, state_shape=(2,3,3), action_shape=(3,3), batched=True, \
-                         symb = {0: "X", 1: "O", None: "-"}, input_str = "Input position to play, e.g. '1, 3' for the 1st row and 3rd column: ", penalty=-1)
+                         symb = {0: "X", 1: "O", None: "-"}, input_str = "Input position to play, e.g. '1, 3' for the 1st row and 3rd column: ", penalty=-2)
+
+    def __str__(self):
+        return f"TTTTensorMDP: discount={self.discount}, penalty={self.penalty}"
 
     def str_to_action(self, input: str) -> torch.Tensor:
         coords = input.split(',')
@@ -48,10 +51,12 @@ class TTTTensorMDP(MDP):
     def get_player_vector(self, state: torch.Tensor) -> torch.Tensor:
         return torch.eye(2, dtype=int)[self.get_player(state)[:, 0, 0, 0]][:,:,None, None]
 
-    def valid_action_filter(self, state: torch.Tensor):
+
+
+    def valid_action_filter(self, state: torch.Tensor) -> torch.Tensor:
         return state.sum((1)) == 0
     
-    def get_random_action(self, state, max_tries=100):
+    def get_random_action(self, state, max_tries=100) -> torch.Tensor:
         filter = self.valid_action_filter(state)
         tries = 0
         while (filter.count_nonzero(dim=(1,2)) <= 1).prod().item() != 1:                             # Almost always terminates after one step
@@ -62,7 +67,6 @@ class TTTTensorMDP(MDP):
                 break
         return filter.int()
     
-
     def is_valid_action(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
         if state.shape[0] != action.shape[0]:
             raise Exception("Batch sizes must agree.")

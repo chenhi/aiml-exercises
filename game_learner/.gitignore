@@ -2,3 +2,5 @@ __pycache__
 bots/*.exp
 bots/temp*
 temp*
+bots/old
+bots/cutoff*

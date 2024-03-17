@@ -21,7 +21,7 @@ options = sys.argv[1:]
 class C4TensorMDP(MDP):
     def __init__(self):
         super().__init__(None, None, discount=1, num_players=2, state_shape=(2,6,7), action_shape=(7,), batched=True, \
-                         symb = {0: "O", 1: "X", None: "-"}, input_str = "Input column to play (1-7). ")
+                         symb = {0: "O", 1: "X", None: "-"}, input_str = "Input column to play (1-7). ", penalty=-2)
 
     # Logic: if player 0 has more pieces than player 1, then it's player 1's turn.  Otherwise, it's player 0's turn.
     # Return shape (batch, 1, 1, 1)

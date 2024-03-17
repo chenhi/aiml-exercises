@@ -19,7 +19,9 @@ The Q-values generally got lower.  Somtimes they became more differentiated, and
 * I had trouble getting the deep Connect Four network to actually learn things, so I tried it on tic-tac-toe.  I tried: replacing ReLU with LeakyReLU, adding more layers, scaling the greed, imposing a memory threshold for training.  Tried making it update less but that made it worse.  I plotted a graph of the losses and indeed they are diverging.  The fix ended up being: I had imposed a large penalty, like -1000 (vs. -1 for a loss) for playing illegally to discourage it, which was skewing the weights.  I changed it to -1 and the model was close to optimal after 15 minutes of training.  I called this model "almostoptimal".
 * I bumped the learning rate up from 0.0001 to 0.001 and ran it again.  It improved on one case, but still not optimal, and still sometimes tries to make illegal moves (one of which results in a loss).  I called this model "almostoptimal2".
 * I noticed that the loss would dive down but then slowly start to climb.  I trained another model, this time stopping where the loss minimized.  The resulting AI was quite bad.  Possible reason: the loss decreases as the policy network learns to play against its own weights, but climbs as it starts to learn against itself.  When the learning rate was 0.0001, the loss didn't rise and kept going down.
-* 
+* Tried 0.0005, the loss seemed to converge but it failed the corner test unfortunately.
+* Tried 0.001 and upped the penalty to -2.  This decreased the number of penalties but still the AI isn't playing optimally.  I retrained it once barely changing the parameters and it became optimal.
+
 
 Connect Four:
 * 100 episodes, 1000 iterations is taking maybe 2 hours.  The AI is not great because there are large branches of the tree it hasn't explored at all.  Will try training it with a neural network.

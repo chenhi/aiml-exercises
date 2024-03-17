@@ -139,7 +139,7 @@ if train_new:
         logpath = fname + ".log"
         
         #game.deep_learn(learn_rate=0.0001, greed_start = 1, greed_end = 0.3, episodes=5000, episode_length=20, batch_size=4, episodes_before_train=500, train_batch_size=32, copy_frequency=250, savelog=logpath, verbose=True)
-        game.deep_learn(learn_rate=0.0005, greed_start = 1, greed_end = 0.3, episodes=2000, episode_length=20, batch_size=4, episodes_before_train=200, train_batch_size=32, copy_frequency=250, savelog=logpath, verbose=True)
+        game.deep_learn(learn_rate=0.0001, greed_start = 1, greed_end = 0.1, episodes=2000, episode_length=20, batch_size=4, episodes_before_train=200, train_batch_size=32, copy_frequency=250, savelog=logpath, verbose=True)
         
         #game.deep_learn(learn_rate=0.0001, greed_start = 1, greed_end = 0.3, episodes=500, episode_length=20, batch_size=4, episodes_before_train=50, train_batch_size=32, copy_frequency=25, savelog=logpath, verbose=True)
         game.save_q(fname)
