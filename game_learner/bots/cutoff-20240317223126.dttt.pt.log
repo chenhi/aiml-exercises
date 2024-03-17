@@ -1,0 +1,1221 @@
+Model:
+TTTNN(
+  (stack): Sequential(
+    (0): Conv2d(2, 32, kernel_size=(3, 3), stride=(1, 1), padding=same)
+    (1): LeakyReLU(negative_slope=0.01)
+    (2): Conv2d(32, 64, kernel_size=(3, 3), stride=(1, 1), padding=same)
+    (3): LeakyReLU(negative_slope=0.01)
+    (4): Conv2d(64, 128, kernel_size=(3, 3), stride=(1, 1), padding=same)
+    (5): LeakyReLU(negative_slope=0.01)
+    (6): Conv2d(128, 256, kernel_size=(3, 3), stride=(1, 1), padding=same)
+    (7): LeakyReLU(negative_slope=0.01)
+    (8): Conv2d(256, 1, kernel_size=(3, 3), stride=(1, 1), padding=same)
+  )
+)
+Loss function:
+HuberLoss()
+Optimizer:
+<class 'torch.optim.adam.Adam'>
+Learn rate: 0.001, start and end greed: 1->0.3, episodes: 700, episode length: 20, batch size: 4, training batch size: 32, memory training threshold: 200, copy frequency: 250.
+Initializing episode 1. Greed 0.00000. Batch size 4. Memory [0, 0]. Player wins [0, 0], penalties [0, 0].
+Initializing episode 2. Greed 0.00000. Batch size 4. Memory [17, 13]. Player wins [4, 0], penalties [0, 4].
+Initializing episode 3. Greed 0.00000. Batch size 4. Memory [33, 26]. Player wins [7, 1], penalties [1, 7].
+Initializing episode 4. Greed 0.00000. Batch size 4. Memory [50, 40]. Player wins [9, 2], penalties [2, 9].
+Initializing episode 5. Greed 0.00000. Batch size 4. Memory [68, 55]. Player wins [12, 3], penalties [3, 12].
+Initializing episode 6. Greed 0.00000. Batch size 4. Memory [85, 69]. Player wins [14, 4], penalties [4, 14].
+Initializing episode 7. Greed 0.00000. Batch size 4. Memory [102, 83]. Player wins [17, 5], penalties [5, 17].
+Initializing episode 8. Greed 0.00000. Batch size 4. Memory [116, 95]. Player wins [19, 7], penalties [7, 19].
+Initializing episode 9. Greed 0.00000. Batch size 4. Memory [134, 110]. Player wins [20, 8], penalties [8, 20].
+Initializing episode 10. Greed 0.00000. Batch size 4. Memory [151, 124]. Player wins [22, 9], penalties [9, 22].
+Initializing episode 11. Greed 0.00000. Batch size 4. Memory [167, 138]. Player wins [24, 11], penalties [11, 24].
+Initializing episode 12. Greed 0.00000. Batch size 4. Memory [184, 152]. Player wins [27, 12], penalties [12, 27].
+Initializing episode 13. Greed 0.00000. Batch size 4. Memory [203, 168]. Player wins [29, 13], penalties [13, 29].
+Initializing episode 14. Greed 0.00000. Batch size 4. Memory [218, 180]. Player wins [32, 14], penalties [14, 32].
+Initializing episode 15. Greed 0.00000. Batch size 4. Memory [234, 194]. Player wins [33, 16], penalties [16, 33].
+Initializing episode 16. Greed 0.00000. Batch size 4. Memory [250, 208]. Player wins [35, 18], penalties [18, 35].
+Initializing episode 17. Greed 0.00000. Batch size 4. Memory [266, 221]. Player wins [38, 19], penalties [19, 38].
+Initializing episode 18. Greed 0.00000. Batch size 4. Memory [283, 234]. Player wins [41, 19], penalties [19, 41].
+Initializing episode 19. Greed 0.00000. Batch size 4. Memory [299, 246]. Player wins [44, 19], penalties [19, 44].
+Initializing episode 20. Greed 0.00000. Batch size 4. Memory [314, 258]. Player wins [47, 20], penalties [20, 47].
+Initializing episode 21. Greed 0.00000. Batch size 4. Memory [332, 273]. Player wins [48, 21], penalties [21, 48].
+Initializing episode 22. Greed 0.00000. Batch size 4. Memory [349, 286]. Player wins [52, 21], penalties [21, 52].
+Initializing episode 23. Greed 0.00000. Batch size 4. Memory [368, 301]. Player wins [55, 21], penalties [21, 55].
+Initializing episode 24. Greed 0.00000. Batch size 4. Memory [383, 313]. Player wins [58, 22], penalties [22, 58].
+Initializing episode 25. Greed 0.00000. Batch size 4. Memory [401, 329]. Player wins [59, 24], penalties [24, 59].
+Initializing episode 26. Greed 0.00000. Batch size 4. Memory [419, 345]. Player wins [61, 26], penalties [26, 61].
+Initializing episode 27. Greed 0.00000. Batch size 4. Memory [436, 360]. Player wins [63, 28], penalties [28, 63].
+Initializing episode 28. Greed 0.00000. Batch size 4. Memory [454, 374]. Player wins [66, 28], penalties [28, 66].
+Initializing episode 29. Greed 0.00000. Batch size 4. Memory [468, 385]. Player wins [69, 29], penalties [29, 69].
+Initializing episode 30. Greed 0.00000. Batch size 4. Memory [486, 400]. Player wins [72, 30], penalties [30, 72].
+Initializing episode 31. Greed 0.00000. Batch size 4. Memory [503, 413]. Player wins [76, 30], penalties [30, 76].
+Initializing episode 32. Greed 0.00000. Batch size 4. Memory [520, 428]. Player wins [78, 32], penalties [32, 78].
+Initializing episode 33. Greed 0.00000. Batch size 4. Memory [534, 440]. Player wins [80, 34], penalties [34, 80].
+Initializing episode 34. Greed 0.00000. Batch size 4. Memory [550, 453]. Player wins [83, 35], penalties [35, 83].
+Initializing episode 35. Greed 0.00000. Batch size 4. Memory [568, 468]. Player wins [86, 36], penalties [36, 86].
+Initializing episode 36. Greed 0.00000. Batch size 4. Memory [586, 483]. Player wins [88, 37], penalties [37, 88].
+Initializing episode 37. Greed 0.00000. Batch size 4. Memory [603, 497]. Player wins [89, 38], penalties [38, 89].
+Initializing episode 38. Greed 0.00000. Batch size 4. Memory [619, 510]. Player wins [92, 39], penalties [39, 92].
+Initializing episode 39. Greed 0.00000. Batch size 4. Memory [635, 522]. Player wins [96, 39], penalties [39, 96].
+Initializing episode 40. Greed 0.00000. Batch size 4. Memory [648, 531]. Player wins [100, 39], penalties [39, 100].
+Initializing episode 41. Greed 0.00000. Batch size 4. Memory [665, 547]. Player wins [101, 42], penalties [42, 101].
+Initializing episode 42. Greed 0.00000. Batch size 4. Memory [680, 560]. Player wins [103, 44], penalties [44, 103].
+Initializing episode 43. Greed 0.00000. Batch size 4. Memory [696, 573]. Player wins [106, 45], penalties [45, 106].
+Initializing episode 44. Greed 0.00000. Batch size 4. Memory [711, 584]. Player wins [110, 45], penalties [45, 110].
+Initializing episode 45. Greed 0.00000. Batch size 4. Memory [725, 595]. Player wins [113, 46], penalties [46, 113].
+Initializing episode 46. Greed 0.00000. Batch size 4. Memory [743, 609]. Player wins [116, 46], penalties [46, 116].
+Initializing episode 47. Greed 0.00000. Batch size 4. Memory [759, 622]. Player wins [118, 47], penalties [47, 118].
+Initializing episode 48. Greed 0.00000. Batch size 4. Memory [775, 636]. Player wins [120, 49], penalties [49, 120].
+Initializing episode 49. Greed 0.00000. Batch size 4. Memory [792, 651]. Player wins [122, 51], penalties [51, 122].
+Initializing episode 50. Greed 0.00000. Batch size 4. Memory [808, 664]. Player wins [125, 52], penalties [52, 125].
+Initializing episode 51. Greed 0.00000. Batch size 4. Memory [823, 676]. Player wins [128, 53], penalties [53, 128].
+Initializing episode 52. Greed 0.00000. Batch size 4. Memory [840, 690]. Player wins [131, 54], penalties [54, 131].
+Initializing episode 53. Greed 0.00000. Batch size 4. Memory [857, 706]. Player wins [132, 57], penalties [57, 132].
+Initializing episode 54. Greed 0.00000. Batch size 4. Memory [875, 721]. Player wins [135, 58], penalties [58, 135].
+Initializing episode 55. Greed 0.00000. Batch size 4. Memory [893, 736]. Player wins [138, 59], penalties [59, 138].
+Initializing episode 56. Greed 0.00000. Batch size 4. Memory [908, 748]. Player wins [141, 60], penalties [60, 141].
+Initializing episode 57. Greed 0.00000. Batch size 4. Memory [925, 762]. Player wins [143, 61], penalties [61, 143].
+Initializing episode 58. Greed 0.00000. Batch size 4. Memory [940, 776]. Player wins [144, 64], penalties [64, 144].
+Initializing episode 59. Greed 0.00000. Batch size 4. Memory [958, 792]. Player wins [146, 66], penalties [66, 146].
+Initializing episode 60. Greed 0.00000. Batch size 4. Memory [977, 807]. Player wins [149, 66], penalties [66, 149].
+Initializing episode 61. Greed 0.00000. Batch size 4. Memory [990, 817]. Player wins [152, 67], penalties [67, 152].
+Initializing episode 62. Greed 0.00000. Batch size 4. Memory [1005, 831]. Player wins [153, 70], penalties [70, 153].
+Initializing episode 63. Greed 0.00000. Batch size 4. Memory [1023, 845]. Player wins [156, 70], penalties [70, 156].
+Initializing episode 64. Greed 0.00000. Batch size 4. Memory [1040, 859]. Player wins [158, 71], penalties [71, 158].
+Initializing episode 65. Greed 0.00000. Batch size 4. Memory [1055, 871]. Player wins [161, 72], penalties [72, 161].
+Initializing episode 66. Greed 0.00000. Batch size 4. Memory [1071, 884]. Player wins [164, 73], penalties [73, 164].
+Initializing episode 67. Greed 0.00000. Batch size 4. Memory [1084, 895]. Player wins [166, 75], penalties [75, 166].
+Initializing episode 68. Greed 0.00000. Batch size 4. Memory [1102, 911]. Player wins [168, 77], penalties [77, 168].
+Initializing episode 69. Greed 0.00000. Batch size 4. Memory [1119, 924]. Player wins [172, 77], penalties [77, 172].
+Initializing episode 70. Greed 0.00000. Batch size 4. Memory [1136, 938]. Player wins [174, 78], penalties [78, 174].
+Initializing episode 71. Greed 0.00000. Batch size 4. Memory [1151, 950]. Player wins [177, 79], penalties [79, 177].
+Initializing episode 72. Greed 0.00000. Batch size 4. Memory [1169, 966]. Player wins [179, 81], penalties [81, 179].
+Initializing episode 73. Greed 0.00000. Batch size 4. Memory [1186, 980]. Player wins [182, 82], penalties [82, 182].
+Initializing episode 74. Greed 0.00000. Batch size 4. Memory [1202, 994]. Player wins [183, 84], penalties [84, 183].
+Initializing episode 75. Greed 0.00000. Batch size 4. Memory [1221, 1009]. Player wins [185, 84], penalties [84, 185].
+Initializing episode 76. Greed 0.00000. Batch size 4. Memory [1239, 1024]. Player wins [188, 85], penalties [85, 188].
+Initializing episode 77. Greed 0.00000. Batch size 4. Memory [1257, 1039]. Player wins [190, 86], penalties [86, 190].
+Initializing episode 78. Greed 0.00000. Batch size 4. Memory [1274, 1054]. Player wins [191, 88], penalties [88, 191].
+Initializing episode 79. Greed 0.00000. Batch size 4. Memory [1294, 1070]. Player wins [192, 88], penalties [88, 192].
+Initializing episode 80. Greed 0.00000. Batch size 4. Memory [1311, 1084]. Player wins [195, 89], penalties [89, 195].
+Initializing episode 81. Greed 0.00000. Batch size 4. Memory [1327, 1097]. Player wins [198, 90], penalties [90, 198].
+Initializing episode 82. Greed 0.00000. Batch size 4. Memory [1346, 1112]. Player wins [202, 90], penalties [90, 202].
+Initializing episode 83. Greed 0.00000. Batch size 4. Memory [1363, 1125]. Player wins [204, 90], penalties [90, 204].
+Initializing episode 84. Greed 0.00000. Batch size 4. Memory [1380, 1140]. Player wins [206, 92], penalties [92, 206].
+Initializing episode 85. Greed 0.00000. Batch size 4. Memory [1398, 1155]. Player wins [207, 93], penalties [93, 207].
+Initializing episode 86. Greed 0.00000. Batch size 4. Memory [1412, 1166]. Player wins [210, 94], penalties [94, 210].
+Initializing episode 87. Greed 0.00000. Batch size 4. Memory [1427, 1180]. Player wins [210, 97], penalties [97, 210].
+Initializing episode 88. Greed 0.00000. Batch size 4. Memory [1443, 1193]. Player wins [213, 98], penalties [98, 213].
+Initializing episode 89. Greed 0.00000. Batch size 4. Memory [1462, 1209]. Player wins [215, 99], penalties [99, 215].
+Initializing episode 90. Greed 0.00000. Batch size 4. Memory [1481, 1225]. Player wins [218, 100], penalties [100, 218].
+Initializing episode 91. Greed 0.00000. Batch size 4. Memory [1497, 1238]. Player wins [221, 101], penalties [101, 221].
+Initializing episode 92. Greed 0.00000. Batch size 4. Memory [1515, 1252]. Player wins [225, 101], penalties [101, 225].
+Initializing episode 93. Greed 0.00000. Batch size 4. Memory [1532, 1265]. Player wins [229, 101], penalties [101, 229].
+Initializing episode 94. Greed 0.00000. Batch size 4. Memory [1549, 1280]. Player wins [231, 103], penalties [103, 231].
+Initializing episode 95. Greed 0.00000. Batch size 4. Memory [1564, 1292]. Player wins [234, 104], penalties [104, 234].
+Initializing episode 96. Greed 0.00000. Batch size 4. Memory [1580, 1306]. Player wins [236, 106], penalties [106, 236].
+Initializing episode 97. Greed 0.00000. Batch size 4. Memory [1595, 1318]. Player wins [239, 107], penalties [107, 239].
+Initializing episode 98. Greed 0.00000. Batch size 4. Memory [1610, 1331]. Player wins [240, 109], penalties [109, 240].
+Initializing episode 99. Greed 0.00000. Batch size 4. Memory [1629, 1346]. Player wins [241, 109], penalties [109, 241].
+Initializing episode 100. Greed 0.00000. Batch size 4. Memory [1647, 1362]. Player wins [242, 111], penalties [111, 242].
+Initializing episode 101. Greed 0.00000. Batch size 4. Memory [1663, 1375]. Player wins [245, 112], penalties [112, 245].
+Initializing episode 102. Greed 0.00000. Batch size 4. Memory [1680, 1390]. Player wins [246, 114], penalties [114, 246].
+Initializing episode 103. Greed 0.00000. Batch size 4. Memory [1699, 1406]. Player wins [248, 115], penalties [115, 248].
+Initializing episode 104. Greed 0.00000. Batch size 4. Memory [1717, 1421]. Player wins [249, 116], penalties [116, 249].
+Initializing episode 105. Greed 0.00000. Batch size 4. Memory [1736, 1436]. Player wins [251, 116], penalties [116, 251].
+Initializing episode 106. Greed 0.00000. Batch size 4. Memory [1753, 1451]. Player wins [252, 118], penalties [118, 252].
+Initializing episode 107. Greed 0.00000. Batch size 4. Memory [1770, 1465]. Player wins [254, 119], penalties [119, 254].
+Initializing episode 108. Greed 0.00000. Batch size 4. Memory [1788, 1479]. Player wins [257, 119], penalties [119, 257].
+Initializing episode 109. Greed 0.00000. Batch size 4. Memory [1806, 1493]. Player wins [261, 119], penalties [119, 261].
+Initializing episode 110. Greed 0.00000. Batch size 4. Memory [1822, 1507]. Player wins [263, 121], penalties [121, 263].
+Initializing episode 111. Greed 0.00000. Batch size 4. Memory [1842, 1523]. Player wins [266, 121], penalties [121, 266].
+Initializing episode 112. Greed 0.00000. Batch size 4. Memory [1858, 1538]. Player wins [267, 124], penalties [124, 267].
+Initializing episode 113. Greed 0.00000. Batch size 4. Memory [1877, 1553]. Player wins [270, 124], penalties [124, 270].
+Initializing episode 114. Greed 0.00000. Batch size 4. Memory [1891, 1564]. Player wins [273, 125], penalties [125, 273].
+Initializing episode 115. Greed 0.00000. Batch size 4. Memory [1908, 1579]. Player wins [275, 127], penalties [127, 275].
+Initializing episode 116. Greed 0.00000. Batch size 4. Memory [1925, 1592]. Player wins [279, 127], penalties [127, 279].
+Initializing episode 117. Greed 0.00000. Batch size 4. Memory [1940, 1605]. Player wins [281, 129], penalties [129, 281].
+Initializing episode 118. Greed 0.00000. Batch size 4. Memory [1958, 1621]. Player wins [282, 131], penalties [131, 282].
+Initializing episode 119. Greed 0.00000. Batch size 4. Memory [1977, 1636]. Player wins [286, 131], penalties [131, 286].
+Initializing episode 120. Greed 0.00000. Batch size 4. Memory [1994, 1650]. Player wins [289, 132], penalties [132, 289].
+Initializing episode 121. Greed 0.00000. Batch size 4. Memory [2012, 1664]. Player wins [293, 132], penalties [132, 293].
+Initializing episode 122. Greed 0.00000. Batch size 4. Memory [2026, 1674]. Player wins [297, 132], penalties [132, 297].
+Initializing episode 123. Greed 0.00000. Batch size 4. Memory [2045, 1690]. Player wins [300, 133], penalties [133, 300].
+Initializing episode 124. Greed 0.00000. Batch size 4. Memory [2064, 1706]. Player wins [302, 134], penalties [134, 302].
+Initializing episode 125. Greed 0.00000. Batch size 4. Memory [2079, 1720]. Player wins [303, 137], penalties [137, 303].
+Initializing episode 126. Greed 0.00000. Batch size 4. Memory [2097, 1734]. Player wins [307, 137], penalties [137, 307].
+Initializing episode 127. Greed 0.00000. Batch size 4. Memory [2116, 1749]. Player wins [309, 137], penalties [137, 309].
+Initializing episode 128. Greed 0.00000. Batch size 4. Memory [2130, 1760]. Player wins [312, 138], penalties [138, 312].
+Initializing episode 129. Greed 0.00000. Batch size 4. Memory [2146, 1773]. Player wins [314, 139], penalties [139, 314].
+Initializing episode 130. Greed 0.00000. Batch size 4. Memory [2160, 1784]. Player wins [317, 140], penalties [140, 317].
+Initializing episode 131. Greed 0.00000. Batch size 4. Memory [2175, 1799]. Player wins [317, 144], penalties [144, 317].
+Initializing episode 132. Greed 0.00000. Batch size 4. Memory [2191, 1811]. Player wins [321, 144], penalties [144, 321].
+Initializing episode 133. Greed 0.00000. Batch size 4. Memory [2209, 1826]. Player wins [323, 145], penalties [145, 323].
+Initializing episode 134. Greed 0.00000. Batch size 4. Memory [2226, 1840]. Player wins [326, 146], penalties [146, 326].
+Initializing episode 135. Greed 0.00000. Batch size 4. Memory [2244, 1854]. Player wins [329, 146], penalties [146, 329].
+Initializing episode 136. Greed 0.00000. Batch size 4. Memory [2260, 1868]. Player wins [331, 148], penalties [148, 331].
+Initializing episode 137. Greed 0.00000. Batch size 4. Memory [2276, 1880]. Player wins [335, 148], penalties [148, 335].
+Initializing episode 138. Greed 0.00000. Batch size 4. Memory [2292, 1893]. Player wins [338, 149], penalties [149, 338].
+Initializing episode 139. Greed 0.00000. Batch size 4. Memory [2308, 1906]. Player wins [341, 150], penalties [150, 341].
+Initializing episode 140. Greed 0.00000. Batch size 4. Memory [2326, 1921]. Player wins [343, 151], penalties [151, 343].
+Initializing episode 141. Greed 0.00000. Batch size 4. Memory [2342, 1935]. Player wins [345, 153], penalties [153, 345].
+Initializing episode 142. Greed 0.00000. Batch size 4. Memory [2359, 1950]. Player wins [346, 155], penalties [155, 346].
+Initializing episode 143. Greed 0.00000. Batch size 4. Memory [2375, 1963]. Player wins [349, 156], penalties [156, 349].
+Initializing episode 144. Greed 0.00000. Batch size 4. Memory [2390, 1975]. Player wins [351, 157], penalties [157, 351].
+Initializing episode 145. Greed 0.00000. Batch size 4. Memory [2406, 1989]. Player wins [353, 159], penalties [159, 353].
+Initializing episode 146. Greed 0.00000. Batch size 4. Memory [2422, 2003]. Player wins [354, 161], penalties [161, 354].
+Initializing episode 147. Greed 0.00000. Batch size 4. Memory [2439, 2018]. Player wins [356, 163], penalties [163, 356].
+Initializing episode 148. Greed 0.00000. Batch size 4. Memory [2454, 2031]. Player wins [358, 165], penalties [165, 358].
+Initializing episode 149. Greed 0.00000. Batch size 4. Memory [2470, 2044]. Player wins [360, 166], penalties [166, 360].
+Initializing episode 150. Greed 0.00000. Batch size 4. Memory [2487, 2058]. Player wins [362, 167], penalties [167, 362].
+Initializing episode 151. Greed 0.00000. Batch size 4. Memory [2506, 2074]. Player wins [365, 168], penalties [168, 365].
+Initializing episode 152. Greed 0.00000. Batch size 4. Memory [2521, 2086]. Player wins [368, 169], penalties [169, 368].
+Initializing episode 153. Greed 0.00000. Batch size 4. Memory [2537, 2099]. Player wins [371, 170], penalties [170, 371].
+Initializing episode 154. Greed 0.00000. Batch size 4. Memory [2554, 2114]. Player wins [373, 172], penalties [172, 373].
+Initializing episode 155. Greed 0.00000. Batch size 4. Memory [2572, 2129]. Player wins [376, 173], penalties [173, 376].
+Initializing episode 156. Greed 0.00000. Batch size 4. Memory [2588, 2141]. Player wins [380, 173], penalties [173, 380].
+Initializing episode 157. Greed 0.00000. Batch size 4. Memory [2605, 2156]. Player wins [382, 175], penalties [175, 382].
+Initializing episode 158. Greed 0.00000. Batch size 4. Memory [2621, 2170]. Player wins [382, 177], penalties [177, 382].
+Initializing episode 159. Greed 0.00000. Batch size 4. Memory [2639, 2186]. Player wins [384, 179], penalties [179, 384].
+Initializing episode 160. Greed 0.00000. Batch size 4. Memory [2655, 2199]. Player wins [386, 180], penalties [180, 386].
+Initializing episode 161. Greed 0.00000. Batch size 4. Memory [2670, 2210]. Player wins [390, 180], penalties [180, 390].
+Initializing episode 162. Greed 0.00000. Batch size 4. Memory [2689, 2225]. Player wins [393, 180], penalties [180, 393].
+Initializing episode 163. Greed 0.00000. Batch size 4. Memory [2704, 2237]. Player wins [396, 181], penalties [181, 396].
+Initializing episode 164. Greed 0.00000. Batch size 4. Memory [2722, 2252]. Player wins [398, 182], penalties [182, 398].
+Initializing episode 165. Greed 0.00000. Batch size 4. Memory [2739, 2268]. Player wins [399, 185], penalties [185, 399].
+Initializing episode 166. Greed 0.00000. Batch size 4. Memory [2756, 2282]. Player wins [402, 186], penalties [186, 402].
+Initializing episode 167. Greed 0.00000. Batch size 4. Memory [2773, 2296]. Player wins [405, 187], penalties [187, 405].
+Initializing episode 168. Greed 0.00000. Batch size 4. Memory [2791, 2310]. Player wins [409, 187], penalties [187, 409].
+Initializing episode 169. Greed 0.00000. Batch size 4. Memory [2808, 2324]. Player wins [411, 188], penalties [188, 411].
+Initializing episode 170. Greed 0.00000. Batch size 4. Memory [2823, 2337]. Player wins [412, 190], penalties [190, 412].
+Initializing episode 171. Greed 0.00000. Batch size 4. Memory [2839, 2351]. Player wins [414, 192], penalties [192, 414].
+Initializing episode 172. Greed 0.00000. Batch size 4. Memory [2855, 2363]. Player wins [418, 192], penalties [192, 418].
+Initializing episode 173. Greed 0.00000. Batch size 4. Memory [2874, 2378]. Player wins [421, 192], penalties [192, 421].
+Initializing episode 174. Greed 0.00000. Batch size 4. Memory [2889, 2392]. Player wins [422, 195], penalties [195, 422].
+Initializing episode 175. Greed 0.00000. Batch size 4. Memory [2906, 2405]. Player wins [426, 195], penalties [195, 426].
+Initializing episode 176. Greed 0.00000. Batch size 4. Memory [2924, 2421]. Player wins [428, 197], penalties [197, 428].
+Initializing episode 177. Greed 0.00000. Batch size 4. Memory [2942, 2436]. Player wins [431, 198], penalties [198, 431].
+Initializing episode 178. Greed 0.00000. Batch size 4. Memory [2960, 2450]. Player wins [435, 198], penalties [198, 435].
+Initializing episode 179. Greed 0.00000. Batch size 4. Memory [2977, 2465]. Player wins [437, 200], penalties [200, 437].
+Initializing episode 180. Greed 0.00000. Batch size 4. Memory [2994, 2479]. Player wins [439, 201], penalties [201, 439].
+Initializing episode 181. Greed 0.00000. Batch size 4. Memory [3011, 2492]. Player wins [443, 201], penalties [201, 443].
+Initializing episode 182. Greed 0.00000. Batch size 4. Memory [3028, 2505]. Player wins [447, 201], penalties [201, 447].
+Initializing episode 183. Greed 0.00000. Batch size 4. Memory [3048, 2521]. Player wins [450, 201], penalties [201, 450].
+Initializing episode 184. Greed 0.00000. Batch size 4. Memory [3066, 2537]. Player wins [450, 203], penalties [203, 450].
+Initializing episode 185. Greed 0.00000. Batch size 4. Memory [3084, 2551]. Player wins [454, 203], penalties [203, 454].
+Initializing episode 186. Greed 0.00000. Batch size 4. Memory [3102, 2566]. Player wins [456, 204], penalties [204, 456].
+Initializing episode 187. Greed 0.00000. Batch size 4. Memory [3120, 2581]. Player wins [459, 205], penalties [205, 459].
+Initializing episode 188. Greed 0.00000. Batch size 4. Memory [3134, 2592]. Player wins [462, 206], penalties [206, 462].
+Initializing episode 189. Greed 0.00000. Batch size 4. Memory [3152, 2607]. Player wins [464, 207], penalties [207, 464].
+Initializing episode 190. Greed 0.00000. Batch size 4. Memory [3168, 2621]. Player wins [466, 209], penalties [209, 466].
+Initializing episode 191. Greed 0.00000. Batch size 4. Memory [3185, 2636]. Player wins [468, 211], penalties [211, 468].
+Initializing episode 192. Greed 0.00000. Batch size 4. Memory [3202, 2649]. Player wins [471, 211], penalties [211, 471].
+Initializing episode 193. Greed 0.00000. Batch size 4. Memory [3219, 2664]. Player wins [472, 213], penalties [213, 472].
+Initializing episode 194. Greed 0.00000. Batch size 4. Memory [3237, 2678]. Player wins [475, 213], penalties [213, 475].
+Initializing episode 195. Greed 0.00000. Batch size 4. Memory [3253, 2690]. Player wins [479, 213], penalties [213, 479].
+Initializing episode 196. Greed 0.00000. Batch size 4. Memory [3270, 2704]. Player wins [482, 214], penalties [214, 482].
+Initializing episode 197. Greed 0.00000. Batch size 4. Memory [3284, 2714]. Player wins [486, 214], penalties [214, 486].
+Initializing episode 198. Greed 0.00000. Batch size 4. Memory [3303, 2730]. Player wins [487, 215], penalties [215, 487].
+Initializing episode 199. Greed 0.00000. Batch size 4. Memory [3321, 2744]. Player wins [490, 215], penalties [215, 490].
+Initializing episode 200. Greed 0.00000. Batch size 4. Memory [3337, 2759]. Player wins [490, 218], penalties [218, 490].
+Initializing episode 201. Greed 0.00000. Batch size 4. Memory [3357, 2775]. Player wins [492, 218], penalties [218, 492].
+Episode 201 average loss: [0.0014183049335972303, 0.0018798891429065003]
+Initializing episode 202. Greed 0.00100. Batch size 4. Memory [3373, 2788]. Player wins [495, 219], penalties [219, 495].
+Episode 202 average loss: [0.0014364734990522266, 0.0019665427855215965]
+Initializing episode 203. Greed 0.00200. Batch size 4. Memory [3392, 2803]. Player wins [499, 219], penalties [219, 499].
+Episode 203 average loss: [0.0014660832850495354, 0.0017125005077105015]
+Initializing episode 204. Greed 0.00300. Batch size 4. Memory [3409, 2817]. Player wins [501, 220], penalties [220, 501].
+Episode 204 average loss: [0.0015957486757542938, 0.001382292836206034]
+Initializing episode 205. Greed 0.00400. Batch size 4. Memory [3427, 2832]. Player wins [504, 221], penalties [221, 504].
+Episode 205 average loss: [0.0014021355309523642, 0.0017479024652857333]
+Initializing episode 206. Greed 0.00500. Batch size 4. Memory [3444, 2846]. Player wins [506, 222], penalties [222, 506].
+Episode 206 average loss: [0.0011770100856665522, 0.001615218713413924]
+Initializing episode 207. Greed 0.00600. Batch size 4. Memory [3461, 2861]. Player wins [508, 224], penalties [224, 508].
+Episode 207 average loss: [0.0014077741652727127, 0.0014069622615352274]
+Initializing episode 208. Greed 0.00700. Batch size 4. Memory [3479, 2876]. Player wins [511, 225], penalties [225, 511].
+Episode 208 average loss: [0.0014607353834435344, 0.0018125541449990124]
+Initializing episode 209. Greed 0.00800. Batch size 4. Memory [3496, 2889]. Player wins [514, 225], penalties [225, 514].
+Episode 209 average loss: [0.0010465515499365413, 0.0016184956507964267]
+Initializing episode 210. Greed 0.00900. Batch size 4. Memory [3512, 2902]. Player wins [517, 226], penalties [226, 517].
+Episode 210 average loss: [0.001048844285024744, 0.0018640155774644679]
+Initializing episode 211. Greed 0.01000. Batch size 4. Memory [3527, 2915]. Player wins [519, 228], penalties [228, 519].
+Episode 211 average loss: [0.0015033025003504008, 0.0019032106385566295]
+Initializing episode 212. Greed 0.01100. Batch size 4. Memory [3544, 2930]. Player wins [520, 230], penalties [230, 520].
+Episode 212 average loss: [0.0010829819540958852, 0.0014049308199901133]
+Initializing episode 213. Greed 0.01200. Batch size 4. Memory [3564, 2946]. Player wins [522, 230], penalties [230, 522].
+Episode 213 average loss: [0.0008421243784885684, 0.0016019030749289827]
+Initializing episode 214. Greed 0.01300. Batch size 4. Memory [3584, 2963]. Player wins [526, 230], penalties [230, 527].
+Episode 214 average loss: [0.0013517243438400327, 0.0014803362195380033]
+Initializing episode 215. Greed 0.01400. Batch size 4. Memory [3601, 2977]. Player wins [528, 231], penalties [231, 529].
+Episode 215 average loss: [0.0015153214684687556, 0.0019174519111402333]
+Initializing episode 216. Greed 0.01500. Batch size 4. Memory [3618, 2991]. Player wins [530, 232], penalties [232, 531].
+Episode 216 average loss: [0.001482145255431533, 0.0017471426050178706]
+Initializing episode 217. Greed 0.01600. Batch size 4. Memory [3636, 3006]. Player wins [533, 233], penalties [233, 534].
+Episode 217 average loss: [0.0008515301306033507, 0.0016467231907881796]
+Initializing episode 218. Greed 0.01700. Batch size 4. Memory [3652, 3018]. Player wins [537, 233], penalties [233, 538].
+Episode 218 average loss: [0.001413748663617298, 0.0020268407999537883]
+Initializing episode 219. Greed 0.01800. Batch size 4. Memory [3669, 3032]. Player wins [540, 234], penalties [234, 541].
+Episode 219 average loss: [0.0011058347299695015, 0.0013833033735863864]
+Initializing episode 220. Greed 0.01900. Batch size 4. Memory [3688, 3049]. Player wins [542, 235], penalties [235, 544].
+Episode 220 average loss: [0.0010081339148908025, 0.0016112274412686627]
+Initializing episode 221. Greed 0.02000. Batch size 4. Memory [3703, 3063]. Player wins [543, 238], penalties [238, 545].
+Episode 221 average loss: [0.0007413290295517072, 0.001661737955873832]
+Initializing episode 222. Greed 0.02100. Batch size 4. Memory [3719, 3076]. Player wins [546, 239], penalties [239, 548].
+Episode 222 average loss: [0.0017824183509219439, 0.001308891794178635]
+Initializing episode 223. Greed 0.02200. Batch size 4. Memory [3736, 3090]. Player wins [548, 240], penalties [240, 550].
+Episode 223 average loss: [0.001257292166701518, 0.0015177889057667927]
+Initializing episode 224. Greed 0.02300. Batch size 4. Memory [3753, 3105]. Player wins [549, 242], penalties [242, 551].
+Episode 224 average loss: [0.0011755325249396265, 0.0013267529488075525]
+Initializing episode 225. Greed 0.02400. Batch size 4. Memory [3769, 3118]. Player wins [552, 243], penalties [243, 554].
+Episode 225 average loss: [0.0011614275122569366, 0.0015330465817400677]
+Initializing episode 226. Greed 0.02500. Batch size 4. Memory [3788, 3133]. Player wins [554, 244], penalties [245, 556].
+Episode 226 average loss: [0.0015166098717600107, 0.0013812782359309494]
+Initializing episode 227. Greed 0.02600. Batch size 4. Memory [3807, 3149]. Player wins [556, 245], penalties [246, 558].
+Episode 227 average loss: [0.0010778013383969665, 0.0010497170587768778]
+Initializing episode 228. Greed 0.02700. Batch size 4. Memory [3820, 3161]. Player wins [557, 248], penalties [249, 559].
+Episode 228 average loss: [0.0013737439992837607, 0.0013244012487120926]
+Initializing episode 229. Greed 0.02800. Batch size 4. Memory [3835, 3173]. Player wins [559, 249], penalties [250, 561].
+Episode 229 average loss: [0.001009117854118813, 0.0013702211843337863]
+Initializing episode 230. Greed 0.02900. Batch size 4. Memory [3852, 3188]. Player wins [560, 251], penalties [252, 562].
+Episode 230 average loss: [0.0009771756497987856, 0.001203194635713266]
+Initializing episode 231. Greed 0.03000. Batch size 4. Memory [3866, 3200]. Player wins [562, 253], penalties [254, 564].
+Episode 231 average loss: [0.0013324166260038812, 0.0015232795073340337]
+Initializing episode 232. Greed 0.03100. Batch size 4. Memory [3881, 3214]. Player wins [563, 256], penalties [257, 565].
+Episode 232 average loss: [0.0009454974322579801, 0.001553803973365575]
+Initializing episode 233. Greed 0.03200. Batch size 4. Memory [3896, 3226]. Player wins [566, 257], penalties [258, 568].
+Episode 233 average loss: [0.0012755674331194975, 0.0013920656955716286]
+Initializing episode 234. Greed 0.03300. Batch size 4. Memory [3914, 3241]. Player wins [569, 257], penalties [258, 572].
+Episode 234 average loss: [0.0011715127999195828, 0.0012733363313600422]
+Initializing episode 235. Greed 0.03400. Batch size 4. Memory [3930, 3254]. Player wins [571, 259], penalties [261, 574].
+Episode 235 average loss: [0.0012688378395978362, 0.0012834285851567983]
+Initializing episode 236. Greed 0.03500. Batch size 4. Memory [3945, 3266]. Player wins [574, 260], penalties [262, 577].
+Episode 236 average loss: [0.0010905392409767956, 0.001411829242715612]
+Initializing episode 237. Greed 0.03600. Batch size 4. Memory [3961, 3278]. Player wins [578, 260], penalties [262, 581].
+Episode 237 average loss: [0.0011171357531566174, 0.0012703168380539865]
+Initializing episode 238. Greed 0.03700. Batch size 4. Memory [3979, 3293]. Player wins [581, 261], penalties [263, 584].
+Episode 238 average loss: [0.0012186783656943589, 0.0011784244852606207]
+Initializing episode 239. Greed 0.03800. Batch size 4. Memory [3996, 3306]. Player wins [584, 261], penalties [263, 587].
+Episode 239 average loss: [0.0010070222138892858, 0.0013375972455833107]
+Initializing episode 240. Greed 0.03900. Batch size 4. Memory [4013, 3320]. Player wins [586, 262], penalties [264, 589].
+Episode 240 average loss: [0.001138599868863821, 0.0012727924564387648]
+Initializing episode 241. Greed 0.04000. Batch size 4. Memory [4031, 3335]. Player wins [589, 263], penalties [265, 592].
+Episode 241 average loss: [0.0011223149893339723, 0.001203145441832021]
+Initializing episode 242. Greed 0.04100. Batch size 4. Memory [4048, 3349]. Player wins [592, 264], penalties [266, 595].
+Episode 242 average loss: [0.0008429815992712974, 0.0014631288941018283]
+Initializing episode 243. Greed 0.04200. Batch size 4. Memory [4067, 3364]. Player wins [594, 264], penalties [266, 597].
+Episode 243 average loss: [0.0011196295857768166, 0.001202884267761626]
+Initializing episode 244. Greed 0.04300. Batch size 4. Memory [4083, 3378]. Player wins [597, 264], penalties [266, 602].
+Episode 244 average loss: [0.0008440413138097418, 0.0012494223857564585]
+Initializing episode 245. Greed 0.04400. Batch size 4. Memory [4095, 3387]. Player wins [600, 265], penalties [267, 605].
+Episode 245 average loss: [0.0009440623776754365, 0.0015603239182382822]
+Initializing episode 246. Greed 0.04500. Batch size 4. Memory [4110, 3401]. Player wins [600, 268], penalties [270, 605].
+Episode 246 average loss: [0.0012819092694876923, 0.001257772017399677]
+Initializing episode 247. Greed 0.04600. Batch size 4. Memory [4124, 3413]. Player wins [602, 270], penalties [272, 607].
+Episode 247 average loss: [0.0012767851068120864, 0.0015072338283061981]
+Initializing episode 248. Greed 0.04700. Batch size 4. Memory [4138, 3424]. Player wins [605, 271], penalties [273, 610].
+Episode 248 average loss: [0.0010426834130405703, 0.0011550558424046771]
+Initializing episode 249. Greed 0.04800. Batch size 4. Memory [4155, 3439]. Player wins [607, 272], penalties [275, 614].
+Episode 249 average loss: [0.000982260482851416, 0.001208140788367018]
+Initializing episode 250. Greed 0.04900. Batch size 4. Memory [4173, 3453]. Player wins [610, 272], penalties [275, 617].
+Episode 250 average loss: [0.001048803370213136, 0.001184379489859566]
+Initializing episode 251. Greed 0.05000. Batch size 4. Memory [4192, 3468]. Player wins [613, 272], penalties [275, 620].
+Episode 251 average loss: [0.0009559176158456302, 0.0012481067043898458]
+Initializing episode 252. Greed 0.05100. Batch size 4. Memory [4211, 3482]. Player wins [615, 272], penalties [276, 622].
+Episode 252 average loss: [0.0006939990475075319, 0.0008373502088943497]
+Initializing episode 253. Greed 0.05200. Batch size 4. Memory [4229, 3497]. Player wins [616, 274], penalties [279, 623].
+Episode 253 average loss: [0.0008747219661017879, 0.001058073464082554]
+Initializing episode 254. Greed 0.05300. Batch size 4. Memory [4245, 3510]. Player wins [618, 275], penalties [280, 625].
+Episode 254 average loss: [0.0011675389541778713, 0.0011124108859803528]
+Initializing episode 255. Greed 0.05400. Batch size 4. Memory [4261, 3522]. Player wins [622, 275], penalties [280, 629].
+Episode 255 average loss: [0.0009674433327745646, 0.001111562320147641]
+Initializing episode 256. Greed 0.05500. Batch size 4. Memory [4280, 3537]. Player wins [626, 275], penalties [280, 633].
+Episode 256 average loss: [0.0012608943128725515, 0.0010800353134982287]
+Initializing episode 257. Greed 0.05600. Batch size 4. Memory [4297, 3551]. Player wins [629, 276], penalties [281, 636].
+Episode 257 average loss: [0.0008580107853049413, 0.001038907840847969]
+Initializing episode 258. Greed 0.05700. Batch size 4. Memory [4313, 3566]. Player wins [629, 279], penalties [284, 636].
+Episode 258 average loss: [0.0009874855924863369, 0.0012664274603594095]
+Initializing episode 259. Greed 0.05800. Batch size 4. Memory [4328, 3579]. Player wins [631, 281], penalties [286, 638].
+Episode 259 average loss: [0.0008621301589300856, 0.0010550444072578101]
+Initializing episode 260. Greed 0.05900. Batch size 4. Memory [4344, 3591]. Player wins [635, 281], penalties [286, 642].
+Episode 260 average loss: [0.0005904132209252566, 0.0012494524591602385]
+Initializing episode 261. Greed 0.06000. Batch size 4. Memory [4361, 3604]. Player wins [639, 281], penalties [286, 646].
+Episode 261 average loss: [0.0008797639049589634, 0.0009742843045387417]
+Initializing episode 262. Greed 0.06100. Batch size 4. Memory [4379, 3618]. Player wins [642, 281], penalties [286, 649].
+Episode 262 average loss: [0.000739990575109712, 0.0012794034296853675]
+Initializing episode 263. Greed 0.06200. Batch size 4. Memory [4394, 3632]. Player wins [643, 284], penalties [289, 650].
+Episode 263 average loss: [0.0006518984548165463, 0.001086344226496294]
+Initializing episode 264. Greed 0.06300. Batch size 4. Memory [4411, 3645]. Player wins [646, 284], penalties [289, 653].
+Episode 264 average loss: [0.0012175134907010943, 0.0011349668784532696]
+Initializing episode 265. Greed 0.06400. Batch size 4. Memory [4426, 3657]. Player wins [649, 285], penalties [290, 656].
+Episode 265 average loss: [0.0012147853690707548, 0.001066094772382216]
+Initializing episode 266. Greed 0.06500. Batch size 4. Memory [4445, 3673]. Player wins [653, 285], penalties [290, 661].
+Episode 266 average loss: [0.0011352858098689466, 0.0008146722248056903]
+Initializing episode 267. Greed 0.06600. Batch size 4. Memory [4461, 3687]. Player wins [655, 287], penalties [292, 663].
+Episode 267 average loss: [0.0009749352728249505, 0.0010286221746355294]
+Initializing episode 268. Greed 0.06700. Batch size 4. Memory [4480, 3702]. Player wins [658, 287], penalties [292, 666].
+Episode 268 average loss: [0.0007645882336267581, 0.0011985901186967061]
+Initializing episode 269. Greed 0.06800. Batch size 4. Memory [4496, 3716]. Player wins [660, 289], penalties [294, 668].
+Episode 269 average loss: [0.0008673726726556197, 0.0011123726493678988]
+Initializing episode 270. Greed 0.06900. Batch size 4. Memory [4514, 3731]. Player wins [663, 290], penalties [295, 671].
+Episode 270 average loss: [0.0011126013652590866, 0.0012251499415883286]
+Initializing episode 271. Greed 0.07000. Batch size 4. Memory [4534, 3748]. Player wins [664, 290], penalties [295, 673].
+Episode 271 average loss: [0.0008010978199308738, 0.0011400242685340345]
+Initializing episode 272. Greed 0.07100. Batch size 4. Memory [4553, 3764]. Player wins [666, 291], penalties [296, 675].
+Episode 272 average loss: [0.0009507049901664934, 0.0009995311847887933]
+Initializing episode 273. Greed 0.07200. Batch size 4. Memory [4570, 3778]. Player wins [669, 291], penalties [296, 679].
+Episode 273 average loss: [0.0008882679278030992, 0.0010201119526755064]
+Initializing episode 274. Greed 0.07300. Batch size 4. Memory [4588, 3794]. Player wins [671, 293], penalties [298, 681].
+Episode 274 average loss: [0.0009766389169575025, 0.001013412499257053]
+Initializing episode 275. Greed 0.07400. Batch size 4. Memory [4602, 3807]. Player wins [673, 295], penalties [300, 684].
+Episode 275 average loss: [0.0007561438105767593, 0.0010870149766560645]
+Initializing episode 276. Greed 0.07500. Batch size 4. Memory [4620, 3821]. Player wins [677, 295], penalties [300, 688].
+Episode 276 average loss: [0.0010299360001226887, 0.0010381225438322872]
+Initializing episode 277. Greed 0.07600. Batch size 4. Memory [4639, 3837]. Player wins [680, 295], penalties [300, 692].
+Episode 277 average loss: [0.0010653197299689055, 0.0009942691889591516]
+Initializing episode 278. Greed 0.07700. Batch size 4. Memory [4654, 3849]. Player wins [683, 296], penalties [301, 695].
+Episode 278 average loss: [0.0007308177758074765, 0.0011329571965948812]
+Initializing episode 279. Greed 0.07800. Batch size 4. Memory [4666, 3861]. Player wins [684, 299], penalties [304, 697].
+Episode 279 average loss: [0.0007818810729077086, 0.0012283942836802454]
+Initializing episode 280. Greed 0.07900. Batch size 4. Memory [4681, 3874]. Player wins [687, 300], penalties [305, 701].
+Episode 280 average loss: [0.0008117827994283289, 0.0011638516967650502]
+Initializing episode 281. Greed 0.08000. Batch size 4. Memory [4698, 3889]. Player wins [689, 302], penalties [307, 703].
+Episode 281 average loss: [0.0009607692452846095, 0.0010274061613017693]
+Initializing episode 282. Greed 0.08100. Batch size 4. Memory [4716, 3904]. Player wins [690, 303], penalties [308, 704].
+Episode 282 average loss: [0.0008351828204467892, 0.000985360814956948]
+Initializing episode 283. Greed 0.08200. Batch size 4. Memory [4733, 3918]. Player wins [692, 305], penalties [311, 706].
+Episode 283 average loss: [0.0009779833431821316, 0.0011121124523924663]
+Initializing episode 284. Greed 0.08300. Batch size 4. Memory [4750, 3931]. Player wins [695, 305], penalties [311, 709].
+Episode 284 average loss: [0.0007325564743950963, 0.0010156016156543045]
+Initializing episode 285. Greed 0.08400. Batch size 4. Memory [4768, 3947]. Player wins [696, 307], penalties [313, 710].
+Episode 285 average loss: [0.001036292433531748, 0.0010022134908164542]
+Initializing episode 286. Greed 0.08500. Batch size 4. Memory [4783, 3961]. Player wins [697, 310], penalties [316, 711].
+Episode 286 average loss: [0.0008747609710553661, 0.0009580455895047635]
+Initializing episode 287. Greed 0.08600. Batch size 4. Memory [4800, 3974]. Player wins [700, 310], penalties [316, 714].
+Episode 287 average loss: [0.000924347534439423, 0.0010098567193684478]
+Initializing episode 288. Greed 0.08700. Batch size 4. Memory [4814, 3986]. Player wins [702, 312], penalties [318, 716].
+Episode 288 average loss: [0.0008660482635605149, 0.001240446837618947]
+Initializing episode 289. Greed 0.08800. Batch size 4. Memory [4831, 3999]. Player wins [706, 312], penalties [318, 720].
+Episode 289 average loss: [0.0008312369172926992, 0.0010149954061489553]
+Initializing episode 290. Greed 0.08900. Batch size 4. Memory [4847, 4012]. Player wins [709, 313], penalties [319, 723].
+Episode 290 average loss: [0.0011106659600045531, 0.0010108429269166663]
+Initializing episode 291. Greed 0.09000. Batch size 4. Memory [4865, 4027]. Player wins [710, 314], penalties [320, 724].
+Episode 291 average loss: [0.0011469055782072247, 0.000996994716115296]
+Initializing episode 292. Greed 0.09100. Batch size 4. Memory [4883, 4042]. Player wins [712, 315], penalties [321, 726].
+Episode 292 average loss: [0.0010537069028941914, 0.0010590556310489773]
+Initializing episode 293. Greed 0.09200. Batch size 4. Memory [4899, 4056]. Player wins [713, 317], penalties [323, 727].
+Episode 293 average loss: [0.0008322589914314449, 0.0011063669517170638]
+Initializing episode 294. Greed 0.09300. Batch size 4. Memory [4915, 4070]. Player wins [715, 319], penalties [325, 729].
+Episode 294 average loss: [0.0008257139212219045, 0.0008703703875653446]
+Initializing episode 295. Greed 0.09400. Batch size 4. Memory [4934, 4083]. Player wins [717, 320], penalties [329, 731].
+Episode 295 average loss: [0.0008921045201449571, 0.0009700498564846137]
+Initializing episode 296. Greed 0.09500. Batch size 4. Memory [4952, 4098]. Player wins [719, 322], penalties [332, 733].
+Episode 296 average loss: [0.000817561021540314, 0.0008297058142488822]
+Initializing episode 297. Greed 0.09600. Batch size 4. Memory [4968, 4111]. Player wins [722, 323], penalties [333, 736].
+Episode 297 average loss: [0.0007651271638072407, 0.0011479042780896027]
+Initializing episode 298. Greed 0.09700. Batch size 4. Memory [4982, 4124]. Player wins [723, 326], penalties [336, 737].
+Episode 298 average loss: [0.0010311015146064826, 0.0008977402043952184]
+Initializing episode 299. Greed 0.09800. Batch size 4. Memory [5001, 4140]. Player wins [726, 326], penalties [336, 741].
+Episode 299 average loss: [0.0008614831865997985, 0.000892626668792218]
+Initializing episode 300. Greed 0.09900. Batch size 4. Memory [5016, 4153]. Player wins [727, 328], penalties [338, 742].
+Episode 300 average loss: [0.0006815645772601581, 0.0007872084647210108]
+Initializing episode 301. Greed 0.10000. Batch size 4. Memory [5032, 4167]. Player wins [729, 330], penalties [340, 744].
+Episode 301 average loss: [0.0006857427768409252, 0.0010505283687962219]
+Initializing episode 302. Greed 0.10100. Batch size 4. Memory [5049, 4181]. Player wins [733, 330], penalties [340, 749].
+Episode 302 average loss: [0.000823305148514919, 0.0010832750762347133]
+Initializing episode 303. Greed 0.10200. Batch size 4. Memory [5067, 4195]. Player wins [736, 330], penalties [340, 752].
+Episode 303 average loss: [0.0008761830802541226, 0.0008480052871163935]
+Initializing episode 304. Greed 0.10300. Batch size 4. Memory [5085, 4210]. Player wins [738, 332], penalties [343, 754].
+Episode 304 average loss: [0.000958448086748831, 0.001103683712426573]
+Initializing episode 305. Greed 0.10400. Batch size 4. Memory [5102, 4224]. Player wins [741, 333], penalties [344, 757].
+Episode 305 average loss: [0.000980801811965648, 0.0010332754813134671]
+Initializing episode 306. Greed 0.10500. Batch size 4. Memory [5120, 4240]. Player wins [741, 335], penalties [346, 757].
+Episode 306 average loss: [0.0009619790391298011, 0.0008946888498030603]
+Initializing episode 307. Greed 0.10600. Batch size 4. Memory [5137, 4252]. Player wins [744, 336], penalties [349, 760].
+Episode 307 average loss: [0.0010526104941329156, 0.0011884142348373478]
+Initializing episode 308. Greed 0.10700. Batch size 4. Memory [5157, 4267]. Player wins [744, 338], penalties [354, 760].
+Episode 308 average loss: [0.0007103100635706343, 0.0008797375161925124]
+Initializing episode 309. Greed 0.10800. Batch size 4. Memory [5173, 4281]. Player wins [746, 340], penalties [356, 762].
+Episode 309 average loss: [0.0008232262519992549, 0.0009863407467491925]
+Initializing episode 310. Greed 0.10900. Batch size 4. Memory [5192, 4297]. Player wins [750, 340], penalties [356, 767].
+Episode 310 average loss: [0.0009631036017607483, 0.0011342802641188933]
+Initializing episode 311. Greed 0.11000. Batch size 4. Memory [5208, 4313]. Player wins [750, 344], penalties [360, 767].
+Episode 311 average loss: [0.0007327379746129737, 0.0010167145635932684]
+Initializing episode 312. Greed 0.11100. Batch size 4. Memory [5225, 4328]. Player wins [753, 345], penalties [361, 771].
+Episode 312 average loss: [0.0007454326744967451, 0.0008964671797002666]
+Initializing episode 313. Greed 0.11200. Batch size 4. Memory [5244, 4346]. Player wins [753, 347], penalties [364, 773].
+Episode 313 average loss: [0.0009145059186266736, 0.0007457465137122199]
+Initializing episode 314. Greed 0.11300. Batch size 4. Memory [5263, 4362]. Player wins [754, 349], penalties [367, 774].
+Episode 314 average loss: [0.0009198702726280316, 0.0009487985575105995]
+Initializing episode 315. Greed 0.11400. Batch size 4. Memory [5278, 4374]. Player wins [756, 351], penalties [370, 776].
+Episode 315 average loss: [0.0009274930489482358, 0.0008865310112014413]
+Initializing episode 316. Greed 0.11500. Batch size 4. Memory [5295, 4387]. Player wins [760, 351], penalties [370, 780].
+Episode 316 average loss: [0.0008099983795545995, 0.0010871937149204314]
+Initializing episode 317. Greed 0.11600. Batch size 4. Memory [5314, 4403]. Player wins [761, 352], penalties [371, 781].
+Episode 317 average loss: [0.0008479389362037182, 0.0009298234786414964]
+Initializing episode 318. Greed 0.11700. Batch size 4. Memory [5333, 4418]. Player wins [763, 353], penalties [373, 783].
+Episode 318 average loss: [0.0005563842190895229, 0.0009571341623086482]
+Initializing episode 319. Greed 0.11800. Batch size 4. Memory [5352, 4433]. Player wins [765, 354], penalties [375, 785].
+Episode 319 average loss: [0.001095278646310114, 0.0008422859087163074]
+Initializing episode 320. Greed 0.11900. Batch size 4. Memory [5371, 4448]. Player wins [766, 356], penalties [379, 786].
+Episode 320 average loss: [0.0007159677799791098, 0.0007562596583738923]
+Initializing episode 321. Greed 0.12000. Batch size 4. Memory [5386, 4459]. Player wins [769, 357], penalties [381, 789].
+Episode 321 average loss: [0.0009117802896071225, 0.0009750689670909197]
+Initializing episode 322. Greed 0.12100. Batch size 4. Memory [5402, 4472]. Player wins [771, 359], penalties [384, 791].
+Episode 322 average loss: [0.000686753305754709, 0.0008295997130599889]
+Initializing episode 323. Greed 0.12200. Batch size 4. Memory [5417, 4487]. Player wins [773, 361], penalties [386, 795].
+Episode 323 average loss: [0.0009151111767601429, 0.000879768126954635]
+Initializing episode 324. Greed 0.12300. Batch size 4. Memory [5431, 4498]. Player wins [776, 362], penalties [387, 798].
+Episode 324 average loss: [0.00099906810792163, 0.0010104421264259145]
+Initializing episode 325. Greed 0.12400. Batch size 4. Memory [5447, 4511]. Player wins [777, 364], penalties [390, 799].
+Episode 325 average loss: [0.0009436406253371388, 0.0008897897311147641]
+Initializing episode 326. Greed 0.12500. Batch size 4. Memory [5467, 4528]. Player wins [779, 364], penalties [390, 802].
+Episode 326 average loss: [0.0008021826535696164, 0.0010443065752042458]
+Initializing episode 327. Greed 0.12600. Batch size 4. Memory [5482, 4540]. Player wins [781, 365], penalties [391, 804].
+Episode 327 average loss: [0.0007910381304100156, 0.0008824760152492672]
+Initializing episode 328. Greed 0.12700. Batch size 4. Memory [5502, 4555]. Player wins [783, 366], penalties [394, 806].
+Episode 328 average loss: [0.0008657229278469458, 0.0009940042800735682]
+Initializing episode 329. Greed 0.12800. Batch size 4. Memory [5518, 4568]. Player wins [785, 367], penalties [395, 808].
+Episode 329 average loss: [0.0008700821723323316, 0.0009855199285084381]
+Initializing episode 330. Greed 0.12900. Batch size 4. Memory [5534, 4581]. Player wins [788, 368], penalties [396, 811].
+Episode 330 average loss: [0.00105659064623372, 0.0009864104843776051]
+Initializing episode 331. Greed 0.13000. Batch size 4. Memory [5554, 4599]. Player wins [790, 368], penalties [396, 815].
+Episode 331 average loss: [0.0008452430367469788, 0.0009152127662673592]
+Initializing episode 332. Greed 0.13100. Batch size 4. Memory [5571, 4611]. Player wins [793, 368], penalties [397, 818].
+Episode 332 average loss: [0.0009413234220119193, 0.0008293906284961849]
+Initializing episode 333. Greed 0.13200. Batch size 4. Memory [5589, 4625]. Player wins [796, 368], penalties [397, 821].
+Episode 333 average loss: [0.0006852579972473904, 0.0009645850768720265]
+Initializing episode 334. Greed 0.13300. Batch size 4. Memory [5602, 4636]. Player wins [798, 370], penalties [399, 823].
+Episode 334 average loss: [0.0007830998016288504, 0.001047153485706076]
+Initializing episode 335. Greed 0.13400. Batch size 4. Memory [5618, 4650]. Player wins [800, 372], penalties [401, 825].
+Episode 335 average loss: [0.0009684143614404919, 0.0010141224272295156]
+Initializing episode 336. Greed 0.13500. Batch size 4. Memory [5633, 4665]. Player wins [802, 373], penalties [402, 830].
+Episode 336 average loss: [0.0008929916162742302, 0.001009343407349661]
+Initializing episode 337. Greed 0.13600. Batch size 4. Memory [5648, 4678]. Player wins [805, 374], penalties [403, 834].
+Episode 337 average loss: [0.0007645496331282299, 0.0012360071202486076]
+Initializing episode 338. Greed 0.13700. Batch size 4. Memory [5667, 4694]. Player wins [809, 374], penalties [403, 839].
+Episode 338 average loss: [0.000936264883917333, 0.000899041058305143]
+Initializing episode 339. Greed 0.13800. Batch size 4. Memory [5685, 4709]. Player wins [811, 376], penalties [406, 841].
+Episode 339 average loss: [0.0008128989080432803, 0.0009506843984127044]
+Initializing episode 340. Greed 0.13900. Batch size 4. Memory [5699, 4720]. Player wins [814, 377], penalties [407, 844].
+Episode 340 average loss: [0.0010071982396766543, 0.0009151446574833244]
+Initializing episode 341. Greed 0.14000. Batch size 4. Memory [5714, 4731]. Player wins [817, 378], penalties [409, 847].
+Episode 341 average loss: [0.0008455872681224719, 0.0008067680959356949]
+Initializing episode 342. Greed 0.14100. Batch size 4. Memory [5728, 4744]. Player wins [817, 381], penalties [412, 847].
+Episode 342 average loss: [0.0007435243169311434, 0.0009411279577761888]
+Initializing episode 343. Greed 0.14200. Batch size 4. Memory [5745, 4759]. Player wins [819, 383], penalties [414, 849].
+Episode 343 average loss: [0.0005754116702721351, 0.0008717698640086585]
+Initializing episode 344. Greed 0.14300. Batch size 4. Memory [5758, 4770]. Player wins [821, 385], penalties [416, 851].
+Episode 344 average loss: [0.0007461539702489972, 0.0008835353888571263]
+Initializing episode 345. Greed 0.14400. Batch size 4. Memory [5772, 4783]. Player wins [823, 387], penalties [418, 854].
+Episode 345 average loss: [0.0008420903730439022, 0.0010002909548347816]
+Initializing episode 346. Greed 0.14500. Batch size 4. Memory [5789, 4798]. Player wins [825, 389], penalties [420, 856].
+Episode 346 average loss: [0.0007167678748373873, 0.0007691174745559692]
+Initializing episode 347. Greed 0.14600. Batch size 4. Memory [5806, 4812]. Player wins [826, 390], penalties [421, 857].
+Episode 347 average loss: [0.0010147571253279846, 0.0009685572925567006]
+Initializing episode 348. Greed 0.14700. Batch size 4. Memory [5823, 4828]. Player wins [829, 390], penalties [421, 863].
+Episode 348 average loss: [0.0008079377003014088, 0.0009641811549146143]
+Initializing episode 349. Greed 0.14800. Batch size 4. Memory [5837, 4840]. Player wins [831, 392], penalties [423, 865].
+Episode 349 average loss: [0.0008538491992195221, 0.0010215802467428148]
+Initializing episode 350. Greed 0.14900. Batch size 4. Memory [5855, 4855]. Player wins [834, 393], penalties [425, 869].
+Episode 350 average loss: [0.0007728795753791928, 0.0010171315923798829]
+Initializing episode 351. Greed 0.15000. Batch size 4. Memory [5870, 4869]. Player wins [836, 395], penalties [427, 872].
+Episode 351 average loss: [0.0009148260403890162, 0.001007479993859306]
+Initializing episode 352. Greed 0.15100. Batch size 4. Memory [5887, 4882]. Player wins [839, 395], penalties [427, 875].
+Episode 352 average loss: [0.0009144839714281261, 0.001065035501960665]
+Initializing episode 353. Greed 0.15200. Batch size 4. Memory [5905, 4898]. Player wins [841, 396], penalties [428, 878].
+Episode 353 average loss: [0.0008953331723912723, 0.0008057161240786728]
+Initializing episode 354. Greed 0.15300. Batch size 4. Memory [5918, 4910]. Player wins [842, 399], penalties [431, 879].
+Episode 354 average loss: [0.0005784815002698451, 0.0007316479417828045]
+Initializing episode 355. Greed 0.15400. Batch size 4. Memory [5931, 4919]. Player wins [845, 400], penalties [433, 882].
+Episode 355 average loss: [0.0007906612842237915, 0.0009116276156749915]
+Initializing episode 356. Greed 0.15500. Batch size 4. Memory [5949, 4934]. Player wins [847, 402], penalties [436, 884].
+Episode 356 average loss: [0.0007936963799390165, 0.0008232725789033187]
+Initializing episode 357. Greed 0.15600. Batch size 4. Memory [5968, 4949]. Player wins [849, 402], penalties [437, 887].
+Episode 357 average loss: [0.0006917831778991967, 0.0007894009264418856]
+Initializing episode 358. Greed 0.15700. Batch size 4. Memory [5985, 4962]. Player wins [850, 405], penalties [443, 888].
+Episode 358 average loss: [0.0008592720680300974, 0.0009987864177674055]
+Initializing episode 359. Greed 0.15800. Batch size 4. Memory [6001, 4978]. Player wins [850, 409], penalties [447, 888].
+Episode 359 average loss: [0.0006329815369099379, 0.0008936082498015215]
+Initializing episode 360. Greed 0.15900. Batch size 4. Memory [6021, 4994]. Player wins [852, 410], penalties [451, 892].
+Episode 360 average loss: [0.0008709816950916623, 0.0008838094290695153]
+Initializing episode 361. Greed 0.16000. Batch size 4. Memory [6041, 5010]. Player wins [854, 411], penalties [454, 895].
+Episode 361 average loss: [0.0006860510488464074, 0.0008355026524937289]
+Initializing episode 362. Greed 0.16100. Batch size 4. Memory [6057, 5021]. Player wins [857, 412], penalties [457, 898].
+Episode 362 average loss: [0.001036771262685458, 0.001025397815586378]
+Initializing episode 363. Greed 0.16200. Batch size 4. Memory [6072, 5034]. Player wins [858, 415], penalties [461, 899].
+Episode 363 average loss: [0.0009125116012000944, 0.0008676896298614641]
+Initializing episode 364. Greed 0.16300. Batch size 4. Memory [6090, 5049]. Player wins [860, 417], penalties [465, 902].
+Episode 364 average loss: [0.0008192387443462698, 0.00104251107404707]
+Initializing episode 365. Greed 0.16400. Batch size 4. Memory [6110, 5063]. Player wins [864, 417], penalties [467, 906].
+Episode 365 average loss: [0.0006637170365799896, 0.0008671319268284027]
+Initializing episode 366. Greed 0.16500. Batch size 4. Memory [6128, 5080]. Player wins [866, 419], penalties [471, 911].
+Episode 366 average loss: [0.0009436833555810153, 0.0009529469127301127]
+Initializing episode 367. Greed 0.16600. Batch size 4. Memory [6145, 5094]. Player wins [868, 421], penalties [474, 913].
+Episode 367 average loss: [0.0009461124815667669, 0.000996508564437843]
+Initializing episode 368. Greed 0.16700. Batch size 4. Memory [6159, 5107]. Player wins [870, 423], penalties [476, 916].
+Episode 368 average loss: [0.0010545829631155358, 0.0007873542897868901]
+Initializing episode 369. Greed 0.16800. Batch size 4. Memory [6174, 5119]. Player wins [873, 424], penalties [477, 919].
+Episode 369 average loss: [0.0007637094713572878, 0.0007759921936667524]
+Initializing episode 370. Greed 0.16900. Batch size 4. Memory [6189, 5130]. Player wins [877, 424], penalties [477, 923].
+Episode 370 average loss: [0.0007585410942108586, 0.0009827886555845349]
+Initializing episode 371. Greed 0.17000. Batch size 4. Memory [6208, 5144]. Player wins [877, 427], penalties [484, 923].
+Episode 371 average loss: [0.0007952677377033978, 0.0009411328210262582]
+Initializing episode 372. Greed 0.17100. Batch size 4. Memory [6224, 5156]. Player wins [880, 427], penalties [484, 926].
+Episode 372 average loss: [0.0010613667138386518, 0.0009125471638981253]
+Initializing episode 373. Greed 0.17200. Batch size 4. Memory [6241, 5167]. Player wins [883, 427], penalties [486, 929].
+Episode 373 average loss: [0.0007686339443105019, 0.0008543360798450357]
+Initializing episode 374. Greed 0.17300. Batch size 4. Memory [6259, 5184]. Player wins [885, 428], penalties [487, 933].
+Episode 374 average loss: [0.0007171781855339015, 0.0008284069613595916]
+Initializing episode 375. Greed 0.17400. Batch size 4. Memory [6275, 5196]. Player wins [887, 429], penalties [489, 935].
+Episode 375 average loss: [0.0006807367449668659, 0.0009889565117191523]
+Initializing episode 376. Greed 0.17500. Batch size 4. Memory [6292, 5210]. Player wins [889, 430], penalties [491, 938].
+Episode 376 average loss: [0.0006974416107616642, 0.0009561002000489018]
+Initializing episode 377. Greed 0.17600. Batch size 4. Memory [6309, 5224]. Player wins [891, 431], penalties [493, 941].
+Episode 377 average loss: [0.0007477586375898681, 0.0007348244078457355]
+Initializing episode 378. Greed 0.17700. Batch size 4. Memory [6326, 5237]. Player wins [895, 431], penalties [494, 946].
+Episode 378 average loss: [0.0008244063974416349, 0.000981443765340373]
+Initializing episode 379. Greed 0.17800. Batch size 4. Memory [6341, 5249]. Player wins [898, 432], penalties [495, 949].
+Episode 379 average loss: [0.0009343666984932497, 0.001106543021160178]
+Initializing episode 380. Greed 0.17900. Batch size 4. Memory [6361, 5265]. Player wins [900, 432], penalties [496, 952].
+Episode 380 average loss: [0.001078434707596898, 0.0006471585191320627]
+Initializing episode 381. Greed 0.18000. Batch size 4. Memory [6381, 5279]. Player wins [903, 432], penalties [498, 955].
+Episode 381 average loss: [0.0008988125191535801, 0.0010545797898278881]
+Initializing episode 382. Greed 0.18100. Batch size 4. Memory [6395, 5289]. Player wins [906, 433], penalties [500, 958].
+Episode 382 average loss: [0.0006515870495191352, 0.0008700426789635623]
+Initializing episode 383. Greed 0.18200. Batch size 4. Memory [6412, 5301]. Player wins [909, 433], penalties [501, 961].
+Episode 383 average loss: [0.0008248675135705112, 0.0007197989960497415]
+Initializing episode 384. Greed 0.18300. Batch size 4. Memory [6431, 5314]. Player wins [912, 434], penalties [505, 964].
+Episode 384 average loss: [0.000876280656666495, 0.0007700829359237104]
+Initializing episode 385. Greed 0.18400. Batch size 4. Memory [6447, 5327]. Player wins [913, 436], penalties [508, 965].
+Episode 385 average loss: [0.0006154579066787846, 0.0007360128220170736]
+Initializing episode 386. Greed 0.18500. Batch size 4. Memory [6462, 5340]. Player wins [915, 437], penalties [509, 968].
+Episode 386 average loss: [0.0012007206314592622, 0.000804116963990964]
+Initializing episode 387. Greed 0.18600. Batch size 4. Memory [6476, 5351]. Player wins [917, 439], penalties [512, 970].
+Episode 387 average loss: [0.0005776263424195349, 0.0008341065245490013]
+Initializing episode 388. Greed 0.18700. Batch size 4. Memory [6494, 5364]. Player wins [920, 439], penalties [513, 973].
+Episode 388 average loss: [0.0006975942378630862, 0.000938778548152186]
+Initializing episode 389. Greed 0.18800. Batch size 4. Memory [6512, 5378]. Player wins [922, 440], penalties [515, 975].
+Episode 389 average loss: [0.0006477541147350249, 0.0009458593611436135]
+Initializing episode 390. Greed 0.18900. Batch size 4. Memory [6529, 5395]. Player wins [924, 442], penalties [517, 979].
+Episode 390 average loss: [0.0008103718981146812, 0.0010362994740717112]
+Initializing episode 391. Greed 0.19000. Batch size 4. Memory [6547, 5407]. Player wins [928, 442], penalties [519, 983].
+Episode 391 average loss: [0.0007033259113086388, 0.0009648881037719548]
+Initializing episode 392. Greed 0.19100. Batch size 4. Memory [6566, 5423]. Player wins [929, 443], penalties [520, 984].
+Episode 392 average loss: [0.000944356337034454, 0.0007734264056327649]
+Initializing episode 393. Greed 0.19200. Batch size 4. Memory [6580, 5436]. Player wins [930, 446], penalties [523, 985].
+Episode 393 average loss: [0.0010665047797374428, 0.0008673522796016186]
+Initializing episode 394. Greed 0.19300. Batch size 4. Memory [6595, 5446]. Player wins [933, 446], penalties [524, 988].
+Episode 394 average loss: [0.0008601678889065695, 0.0008711907766365374]
+Initializing episode 395. Greed 0.19400. Batch size 4. Memory [6616, 5461]. Player wins [935, 448], penalties [530, 990].
+Episode 395 average loss: [0.0008063073619268835, 0.0007858690732973628]
+Initializing episode 396. Greed 0.19500. Batch size 4. Memory [6636, 5478]. Player wins [937, 449], penalties [533, 994].
+Episode 396 average loss: [0.0008633704710518941, 0.0008008850563783199]
+Initializing episode 397. Greed 0.19600. Batch size 4. Memory [6654, 5492]. Player wins [938, 450], penalties [535, 995].
+Episode 397 average loss: [0.0009914498392997, 0.000903582462342456]
+Initializing episode 398. Greed 0.19700. Batch size 4. Memory [6675, 5507]. Player wins [940, 451], penalties [539, 997].
+Episode 398 average loss: [0.0008064297408881513, 0.0009920699892311611]
+Initializing episode 399. Greed 0.19800. Batch size 4. Memory [6691, 5520]. Player wins [944, 451], penalties [539, 1002].
+Episode 399 average loss: [0.0009267453977372497, 0.0007924775476567447]
+Initializing episode 400. Greed 0.19900. Batch size 4. Memory [6710, 5535]. Player wins [947, 452], penalties [542, 1006].
+Episode 400 average loss: [0.0008087877678917721, 0.0008604477960034273]
+Initializing episode 401. Greed 0.20000. Batch size 4. Memory [6725, 5546]. Player wins [951, 452], penalties [542, 1010].
+Episode 401 average loss: [0.0006475679983850569, 0.0009422067058039829]
+Initializing episode 402. Greed 0.20100. Batch size 4. Memory [6740, 5560]. Player wins [952, 455], penalties [545, 1011].
+Episode 402 average loss: [0.0008943640365032479, 0.000721409116522409]
+Initializing episode 403. Greed 0.20200. Batch size 4. Memory [6755, 5574]. Player wins [954, 457], penalties [547, 1014].
+Episode 403 average loss: [0.0008801555716975903, 0.0007437365469134724]
+Initializing episode 404. Greed 0.20300. Batch size 4. Memory [6776, 5589]. Player wins [957, 458], penalties [551, 1017].
+Episode 404 average loss: [0.0007092345069395379, 0.0010419490048661829]
+Initializing episode 405. Greed 0.20400. Batch size 4. Memory [6793, 5604]. Player wins [959, 460], penalties [553, 1019].
+Episode 405 average loss: [0.000896737357834354, 0.0007750872146888552]
+Initializing episode 406. Greed 0.20500. Batch size 4. Memory [6810, 5618]. Player wins [961, 461], penalties [555, 1022].
+Episode 406 average loss: [0.0009337776835309341, 0.0010989508242346346]
+Initializing episode 407. Greed 0.20600. Batch size 4. Memory [6825, 5630]. Player wins [963, 462], penalties [556, 1024].
+Episode 407 average loss: [0.0006469151679387627, 0.0009837413672357798]
+Initializing episode 408. Greed 0.20700. Batch size 4. Memory [6840, 5642]. Player wins [964, 465], penalties [561, 1025].
+Episode 408 average loss: [0.0007222666405141354, 0.0009000853227917105]
+Initializing episode 409. Greed 0.20800. Batch size 4. Memory [6857, 5655]. Player wins [966, 466], penalties [563, 1027].
+Episode 409 average loss: [0.0006252668099477887, 0.0008309409974820235]
+Initializing episode 410. Greed 0.20900. Batch size 4. Memory [6877, 5672]. Player wins [969, 467], penalties [565, 1031].
+Episode 410 average loss: [0.0006280667915813286, 0.0008252689757765355]
+Initializing episode 411. Greed 0.21000. Batch size 4. Memory [6896, 5686]. Player wins [970, 468], penalties [568, 1032].
+Episode 411 average loss: [0.0008907965061047839, 0.0008662093670055685]
+Initializing episode 412. Greed 0.21100. Batch size 4. Memory [6909, 5698]. Player wins [971, 471], penalties [571, 1033].
+Episode 412 average loss: [0.0009070650822567669, 0.0008685182335532525]
+Initializing episode 413. Greed 0.21200. Batch size 4. Memory [6929, 5713]. Player wins [973, 471], penalties [572, 1035].
+Episode 413 average loss: [0.0007996263535460457, 0.0008769701176788658]
+Initializing episode 414. Greed 0.21300. Batch size 4. Memory [6944, 5726]. Player wins [974, 474], penalties [576, 1036].
+Episode 414 average loss: [0.0007808427974602885, 0.0009196316558783027]
+Initializing episode 415. Greed 0.21400. Batch size 4. Memory [6960, 5739]. Player wins [976, 476], penalties [579, 1038].
+Episode 415 average loss: [0.0007964529003301221, 0.0008888306135001282]
+Initializing episode 416. Greed 0.21500. Batch size 4. Memory [6974, 5751]. Player wins [978, 478], penalties [581, 1040].
+Episode 416 average loss: [0.0007799404621538189, 0.0007308515034512513]
+Initializing episode 417. Greed 0.21600. Batch size 4. Memory [6990, 5763]. Player wins [981, 479], penalties [583, 1043].
+Episode 417 average loss: [0.000663334195533852, 0.0007518055922859771]
+Initializing episode 418. Greed 0.21700. Batch size 4. Memory [7007, 5773]. Player wins [985, 479], penalties [586, 1047].
+Episode 418 average loss: [0.0008357598950775961, 0.000770590918061013]
+Initializing episode 419. Greed 0.21800. Batch size 4. Memory [7021, 5787]. Player wins [985, 483], penalties [590, 1047].
+Episode 419 average loss: [0.0007287547377927694, 0.0010518961353227496]
+Initializing episode 420. Greed 0.21900. Batch size 4. Memory [7034, 5797]. Player wins [988, 484], penalties [591, 1050].
+Episode 420 average loss: [0.0008182765363017097, 0.0009330065950052813]
+Initializing episode 421. Greed 0.22000. Batch size 4. Memory [7050, 5809]. Player wins [991, 484], penalties [591, 1053].
+Episode 421 average loss: [0.0010767964267870411, 0.000800602714298293]
+Initializing episode 422. Greed 0.22100. Batch size 4. Memory [7067, 5824]. Player wins [994, 484], penalties [591, 1058].
+Episode 422 average loss: [0.0007955579843837768, 0.0008108690031804145]
+Initializing episode 423. Greed 0.22200. Batch size 4. Memory [7084, 5838]. Player wins [996, 486], penalties [594, 1060].
+Episode 423 average loss: [0.0008778133107205996, 0.0009041018761658611]
+Initializing episode 424. Greed 0.22300. Batch size 4. Memory [7100, 5853]. Player wins [999, 486], penalties [594, 1066].
+Episode 424 average loss: [0.0009256524669278102, 0.0009246872432413511]
+Initializing episode 425. Greed 0.22400. Batch size 4. Memory [7118, 5866]. Player wins [1001, 487], penalties [597, 1068].
+Episode 425 average loss: [0.0011039609991712496, 0.0008512175554642454]
+Initializing episode 426. Greed 0.22500. Batch size 4. Memory [7134, 5879]. Player wins [1004, 487], penalties [597, 1072].
+Episode 426 average loss: [0.0009670369803312827, 0.0007630737408445301]
+Initializing episode 427. Greed 0.22600. Batch size 4. Memory [7154, 5892]. Player wins [1007, 487], penalties [600, 1075].
+Episode 427 average loss: [0.0007733493823454612, 0.0007588353667718669]
+Initializing episode 428. Greed 0.22700. Batch size 4. Memory [7168, 5904]. Player wins [1009, 489], penalties [602, 1077].
+Episode 428 average loss: [0.0008080267230980098, 0.0009608935739379376]
+Initializing episode 429. Greed 0.22800. Batch size 4. Memory [7183, 5917]. Player wins [1012, 490], penalties [603, 1081].
+Episode 429 average loss: [0.0007187380135292188, 0.0007646735321031883]
+Initializing episode 430. Greed 0.22900. Batch size 4. Memory [7200, 5932]. Player wins [1016, 490], penalties [603, 1087].
+Episode 430 average loss: [0.0006717420976862988, 0.0009180739183317531]
+Initializing episode 431. Greed 0.23000. Batch size 4. Memory [7217, 5946]. Player wins [1020, 490], penalties [604, 1093].
+Episode 431 average loss: [0.0006220315990503877, 0.0010406486431343688]
+Initializing episode 432. Greed 0.23100. Batch size 4. Memory [7232, 5957]. Player wins [1023, 491], penalties [606, 1096].
+Episode 432 average loss: [0.0008279277215478941, 0.001047768656280823]
+Initializing episode 433. Greed 0.23200. Batch size 4. Memory [7248, 5969]. Player wins [1026, 491], penalties [606, 1099].
+Episode 433 average loss: [0.0007333586460542089, 0.0006695533544795277]
+Initializing episode 434. Greed 0.23300. Batch size 4. Memory [7264, 5982]. Player wins [1028, 492], penalties [608, 1102].
+Episode 434 average loss: [0.0008634374797111377, 0.0008592583966674283]
+Initializing episode 435. Greed 0.23400. Batch size 4. Memory [7281, 5995]. Player wins [1032, 492], penalties [608, 1106].
+Episode 435 average loss: [0.0007140793662983924, 0.000952093891100958]
+Initializing episode 436. Greed 0.23500. Batch size 4. Memory [7298, 6009]. Player wins [1035, 493], penalties [609, 1109].
+Episode 436 average loss: [0.0007891718202947893, 0.0009118865921416066]
+Initializing episode 437. Greed 0.23600. Batch size 4. Memory [7317, 6025]. Player wins [1035, 494], penalties [611, 1110].
+Episode 437 average loss: [0.0010133790730668063, 0.0008098872018639337]
+Initializing episode 438. Greed 0.23700. Batch size 4. Memory [7334, 6037]. Player wins [1038, 494], penalties [612, 1113].
+Episode 438 average loss: [0.0008688836853252724, 0.0009348727529868483]
+Initializing episode 439. Greed 0.23800. Batch size 4. Memory [7351, 6050]. Player wins [1040, 494], penalties [612, 1115].
+Episode 439 average loss: [0.0007625545761336318, 0.0008821082539560103]
+Initializing episode 440. Greed 0.23900. Batch size 4. Memory [7370, 6065]. Player wins [1041, 495], penalties [614, 1116].
+Episode 440 average loss: [0.0008418629819061607, 0.0007786030706483871]
+Initializing episode 441. Greed 0.24000. Batch size 4. Memory [7387, 6077]. Player wins [1044, 495], penalties [615, 1119].
+Episode 441 average loss: [0.0006930396688403561, 0.0009015825169626623]
+Initializing episode 442. Greed 0.24100. Batch size 4. Memory [7404, 6091]. Player wins [1046, 496], penalties [616, 1121].
+Episode 442 average loss: [0.0008440321964573943, 0.0007468376974833922]
+Initializing episode 443. Greed 0.24200. Batch size 4. Memory [7418, 6104]. Player wins [1047, 499], penalties [619, 1122].
+Episode 443 average loss: [0.0008053448691498488, 0.0007249385477431739]
+Initializing episode 444. Greed 0.24300. Batch size 4. Memory [7436, 6118]. Player wins [1048, 501], penalties [623, 1123].
+Episode 444 average loss: [0.0008201339369406924, 0.0008247004559962078]
+Initializing episode 445. Greed 0.24400. Batch size 4. Memory [7452, 6133]. Player wins [1050, 503], penalties [625, 1126].
+Episode 445 average loss: [0.0009301648882683366, 0.000990629242733121]
+Initializing episode 446. Greed 0.24500. Batch size 4. Memory [7470, 6145]. Player wins [1053, 504], penalties [629, 1129].
+Episode 446 average loss: [0.001010724717231754, 0.0006860222559995376]
+Initializing episode 447. Greed 0.24600. Batch size 4. Memory [7489, 6164]. Player wins [1056, 504], penalties [630, 1137].
+Episode 447 average loss: [0.001000859137010676, 0.0007461377139076252]
+Initializing episode 448. Greed 0.24700. Batch size 4. Memory [7506, 6179]. Player wins [1058, 505], penalties [631, 1140].
+Episode 448 average loss: [0.0009321346762590111, 0.0009121781215071679]
+Initializing episode 449. Greed 0.24800. Batch size 4. Memory [7522, 6192]. Player wins [1061, 506], penalties [632, 1143].
+Episode 449 average loss: [0.0006090677211018788, 0.0010118738520594145]
+Initializing episode 450. Greed 0.24900. Batch size 4. Memory [7538, 6207]. Player wins [1065, 506], penalties [632, 1150].
+Episode 450 average loss: [0.0007850541547999125, 0.0008451140072958714]
+Initializing episode 451. Greed 0.25000. Batch size 4. Memory [7559, 6222]. Player wins [1067, 506], penalties [634, 1152].
+Episode 451 average loss: [0.0008440299963694998, 0.0009421690745512023]
+Initializing episode 452. Greed 0.25100. Batch size 4. Memory [7575, 6236]. Player wins [1069, 508], penalties [636, 1154].
+Episode 452 average loss: [0.000569463866458346, 0.000778243388944807]
+Initializing episode 453. Greed 0.25200. Batch size 4. Memory [7593, 6248]. Player wins [1072, 509], penalties [640, 1157].
+Episode 453 average loss: [0.000950303568970412, 0.0010524842972782526]
+Initializing episode 454. Greed 0.25300. Batch size 4. Memory [7612, 6262]. Player wins [1074, 509], penalties [641, 1159].
+Episode 454 average loss: [0.0005909314363221215, 0.000772526061733846]
+Initializing episode 455. Greed 0.25400. Batch size 4. Memory [7633, 6278]. Player wins [1076, 510], penalties [644, 1161].
+Episode 455 average loss: [0.0006946734603843652, 0.0009515831683529541]
+Initializing episode 456. Greed 0.25500. Batch size 4. Memory [7648, 6291]. Player wins [1078, 512], penalties [646, 1163].
+Episode 456 average loss: [0.0008485274209471589, 0.0008649068397723815]
+Initializing episode 457. Greed 0.25600. Batch size 4. Memory [7666, 6307]. Player wins [1080, 514], penalties [649, 1166].
+Episode 457 average loss: [0.0007806796810737895, 0.0006989446383985606]
+Initializing episode 458. Greed 0.25700. Batch size 4. Memory [7685, 6321]. Player wins [1083, 515], penalties [652, 1169].
+Episode 458 average loss: [0.0009583416976965964, 0.0009768106586610277]
+Initializing episode 459. Greed 0.25800. Batch size 4. Memory [7699, 6333]. Player wins [1085, 517], penalties [654, 1171].
+Episode 459 average loss: [0.0007673195214010775, 0.0007926285695496269]
+Initializing episode 460. Greed 0.25900. Batch size 4. Memory [7716, 6349]. Player wins [1086, 519], penalties [656, 1173].
+Episode 460 average loss: [0.0008609877055278048, 0.0008975445874966681]
+Initializing episode 461. Greed 0.26000. Batch size 4. Memory [7733, 6364]. Player wins [1089, 520], penalties [657, 1177].
+Episode 461 average loss: [0.0006159507829579525, 0.0007161175405296186]
+Initializing episode 462. Greed 0.26100. Batch size 4. Memory [7751, 6378]. Player wins [1092, 521], penalties [661, 1182].
+Episode 462 average loss: [0.0008853387103458358, 0.0009827640711922538]
+Initializing episode 463. Greed 0.26200. Batch size 4. Memory [7767, 6392]. Player wins [1094, 522], penalties [662, 1185].
+Episode 463 average loss: [0.0005947276691181792, 0.0009262700316159882]
+Initializing episode 464. Greed 0.26300. Batch size 4. Memory [7780, 6404]. Player wins [1095, 525], penalties [665, 1186].
+Episode 464 average loss: [0.0006020781715051271, 0.0007188595511252061]
+Initializing episode 465. Greed 0.26400. Batch size 4. Memory [7798, 6420]. Player wins [1098, 526], penalties [666, 1190].
+Episode 465 average loss: [0.0008427799993013549, 0.0009734195902840131]
+Initializing episode 466. Greed 0.26500. Batch size 4. Memory [7813, 6435]. Player wins [1100, 528], penalties [668, 1194].
+Episode 466 average loss: [0.000829553377116099, 0.0008762383076827973]
+Initializing episode 467. Greed 0.26600. Batch size 4. Memory [7828, 6447]. Player wins [1103, 529], penalties [669, 1197].
+Episode 467 average loss: [0.0009203977795550599, 0.0008821435301797464]
+Initializing episode 468. Greed 0.26700. Batch size 4. Memory [7844, 6460]. Player wins [1106, 530], penalties [670, 1200].
+Episode 468 average loss: [0.0011702060371383347, 0.0008148563687096943]
+Initializing episode 469. Greed 0.26800. Batch size 4. Memory [7861, 6476]. Player wins [1107, 532], penalties [672, 1202].
+Episode 469 average loss: [0.0009888365428196266, 0.0009575345611665398]
+Initializing episode 470. Greed 0.26900. Batch size 4. Memory [7878, 6491]. Player wins [1109, 534], penalties [675, 1205].
+Episode 470 average loss: [0.0006016302698602279, 0.0009534219538586007]
+Initializing episode 471. Greed 0.27000. Batch size 4. Memory [7894, 6504]. Player wins [1112, 535], penalties [676, 1208].
+Episode 471 average loss: [0.0009890033135889098, 0.0010463845159392805]
+Initializing episode 472. Greed 0.27100. Batch size 4. Memory [7908, 6516]. Player wins [1116, 535], penalties [676, 1214].
+Episode 472 average loss: [0.0005322907178197056, 0.0008905513153877109]
+Initializing episode 473. Greed 0.27200. Batch size 4. Memory [7922, 6528]. Player wins [1118, 537], penalties [678, 1216].
+Episode 473 average loss: [0.0007239954720716923, 0.0008014110838606333]
+Initializing episode 474. Greed 0.27300. Batch size 4. Memory [7940, 6547]. Player wins [1120, 539], penalties [681, 1222].
+Episode 474 average loss: [0.0006917933074873872, 0.0008311616606079042]
+Initializing episode 475. Greed 0.27400. Batch size 4. Memory [7959, 6562]. Player wins [1122, 540], penalties [683, 1224].
+Episode 475 average loss: [0.0007728508657733487, 0.0009240579886615953]
+Initializing episode 476. Greed 0.27500. Batch size 4. Memory [7978, 6576]. Player wins [1125, 540], penalties [684, 1227].
+Episode 476 average loss: [0.0006995520325290272, 0.000787351506005507]
+Initializing episode 477. Greed 0.27600. Batch size 4. Memory [7992, 6587]. Player wins [1128, 541], penalties [685, 1230].
+Episode 477 average loss: [0.0009161191759631037, 0.0009193998528644442]
+Initializing episode 478. Greed 0.27700. Batch size 4. Memory [8008, 6600]. Player wins [1129, 542], penalties [686, 1231].
+Episode 478 average loss: [0.0008715745273300192, 0.0009390501654706895]
+Initializing episode 479. Greed 0.27800. Batch size 4. Memory [8024, 6614]. Player wins [1133, 542], penalties [686, 1237].
+Episode 479 average loss: [0.0006305136365964162, 0.0009975156175311315]
+Initializing episode 480. Greed 0.27900. Batch size 4. Memory [8043, 6628]. Player wins [1135, 542], penalties [687, 1239].
+Episode 480 average loss: [0.0009458515348590233, 0.00088058006208898]
+Initializing episode 481. Greed 0.28000. Batch size 4. Memory [8061, 6642]. Player wins [1137, 543], penalties [689, 1241].
+Episode 481 average loss: [0.0007736867224924605, 0.0006652371733004904]
+Initializing episode 482. Greed 0.28100. Batch size 4. Memory [8081, 6658]. Player wins [1138, 544], penalties [692, 1243].
+Episode 482 average loss: [0.0008481545170070604, 0.000717639978392981]
+Initializing episode 483. Greed 0.28200. Batch size 4. Memory [8098, 6671]. Player wins [1141, 545], penalties [694, 1246].
+Episode 483 average loss: [0.0009888152781059034, 0.000745219743597166]
+Initializing episode 484. Greed 0.28300. Batch size 4. Memory [8114, 6686]. Player wins [1144, 546], penalties [695, 1251].
+Episode 484 average loss: [0.0007165292510762811, 0.0008417045406531543]
+Initializing episode 485. Greed 0.28400. Batch size 4. Memory [8130, 6700]. Player wins [1145, 548], penalties [697, 1252].
+Episode 485 average loss: [0.0007519456383306533, 0.0008016583364224061]
+Initializing episode 486. Greed 0.28500. Batch size 4. Memory [8146, 6715]. Player wins [1147, 550], penalties [699, 1255].
+Episode 486 average loss: [0.0008089136948304562, 0.001085372986077952]
+Initializing episode 487. Greed 0.28600. Batch size 4. Memory [8163, 6729]. Player wins [1147, 553], penalties [704, 1255].
+Episode 487 average loss: [0.0010076355538330972, 0.0008012508023966802]
+Initializing episode 488. Greed 0.28700. Batch size 4. Memory [8176, 6740]. Player wins [1149, 555], penalties [706, 1257].
+Episode 488 average loss: [0.0008526678393536713, 0.0008725716397748329]
+Initializing episode 489. Greed 0.28800. Batch size 4. Memory [8189, 6749]. Player wins [1153, 555], penalties [706, 1261].
+Episode 489 average loss: [0.0007507847622036934, 0.0008670210663694888]
+Initializing episode 490. Greed 0.28900. Batch size 4. Memory [8206, 6763]. Player wins [1155, 556], penalties [707, 1263].
+Episode 490 average loss: [0.0009395900007802993, 0.0007065670943120494]
+Initializing episode 491. Greed 0.29000. Batch size 4. Memory [8223, 6777]. Player wins [1157, 557], penalties [709, 1266].
+Episode 491 average loss: [0.0008653719806506371, 0.0008704703068360686]
+Initializing episode 492. Greed 0.29100. Batch size 4. Memory [8241, 6796]. Player wins [1160, 558], penalties [711, 1274].
+Episode 492 average loss: [0.0007119831016098033, 0.0008638093149784254]
+Initializing episode 493. Greed 0.29200. Batch size 4. Memory [8261, 6816]. Player wins [1161, 559], penalties [715, 1281].
+Episode 493 average loss: [0.0005467185750603676, 0.0008196061884518713]
+Initializing episode 494. Greed 0.29300. Batch size 4. Memory [8276, 6828]. Player wins [1164, 560], penalties [716, 1284].
+Episode 494 average loss: [0.0009290149377193302, 0.0007353701599640772]
+Initializing episode 495. Greed 0.29400. Batch size 4. Memory [8292, 6842]. Player wins [1165, 563], penalties [720, 1285].
+Episode 495 average loss: [0.0008184272446669638, 0.0010964981629513204]
+Initializing episode 496. Greed 0.29500. Batch size 4. Memory [8308, 6857]. Player wins [1166, 565], penalties [722, 1287].
+Episode 496 average loss: [0.0008096522476989775, 0.001082211930770427]
+Initializing episode 497. Greed 0.29600. Batch size 4. Memory [8325, 6870]. Player wins [1169, 565], penalties [722, 1290].
+Episode 497 average loss: [0.0007487357972422615, 0.000757764867739752]
+Initializing episode 498. Greed 0.29700. Batch size 4. Memory [8341, 6883]. Player wins [1172, 566], penalties [723, 1293].
+Episode 498 average loss: [0.0008331810327945277, 0.0008877767861122266]
+Initializing episode 499. Greed 0.29800. Batch size 4. Memory [8355, 6895]. Player wins [1174, 568], penalties [725, 1295].
+Episode 499 average loss: [0.001011384415323846, 0.0007594290334964171]
+Initializing episode 500. Greed 0.29900. Batch size 4. Memory [8371, 6907]. Player wins [1177, 568], penalties [725, 1298].
+Episode 500 average loss: [0.000811227184551006, 0.0009226318163035268]
+Initializing episode 501. Greed 0.30000. Batch size 4. Memory [8386, 6922]. Player wins [1179, 570], penalties [727, 1302].
+Episode 501 average loss: [0.0006425461004255339, 0.0009660284675192087]
+Initializing episode 502. Greed 0.30100. Batch size 4. Memory [8402, 6935]. Player wins [1183, 570], penalties [727, 1307].
+Episode 502 average loss: [0.0008152568545483519, 0.0007461451081326231]
+Initializing episode 503. Greed 0.30200. Batch size 4. Memory [8418, 6949]. Player wins [1184, 572], penalties [729, 1308].
+Episode 503 average loss: [0.0008586463882238604, 0.0010761899611679837]
+Initializing episode 504. Greed 0.30300. Batch size 4. Memory [8438, 6964]. Player wins [1187, 572], penalties [731, 1312].
+Episode 504 average loss: [0.0007804512628354132, 0.0008416106284130365]
+Initializing episode 505. Greed 0.30400. Batch size 4. Memory [8454, 6978]. Player wins [1189, 574], penalties [733, 1314].
+Episode 505 average loss: [0.0008127527416945668, 0.000731399512005737]
+Initializing episode 506. Greed 0.30500. Batch size 4. Memory [8467, 6989]. Player wins [1190, 577], penalties [737, 1315].
+Episode 506 average loss: [0.0008215222068511965, 0.000815175804415379]
+Initializing episode 507. Greed 0.30600. Batch size 4. Memory [8485, 7006]. Player wins [1193, 577], penalties [737, 1321].
+Episode 507 average loss: [0.0009824835393704814, 0.0010675775437531147]
+Initializing episode 508. Greed 0.30700. Batch size 4. Memory [8502, 7020]. Player wins [1194, 579], penalties [740, 1322].
+Episode 508 average loss: [0.0005115240492159501, 0.0008352108532562851]
+Initializing episode 509. Greed 0.30800. Batch size 4. Memory [8519, 7034]. Player wins [1196, 580], penalties [741, 1324].
+Episode 509 average loss: [0.0008609192067524418, 0.000860448379535228]
+Initializing episode 510. Greed 0.30900. Batch size 4. Memory [8536, 7047]. Player wins [1199, 581], penalties [743, 1327].
+Episode 510 average loss: [0.0008691065275343135, 0.000888430536724627]
+Initializing episode 511. Greed 0.31000. Batch size 4. Memory [8552, 7061]. Player wins [1202, 581], penalties [743, 1332].
+Episode 511 average loss: [0.0008675227739634769, 0.0008871722360102771]
+Initializing episode 512. Greed 0.31100. Batch size 4. Memory [8570, 7073]. Player wins [1206, 581], penalties [745, 1336].
+Episode 512 average loss: [0.000871313171228394, 0.0010048736119642853]
+Initializing episode 513. Greed 0.31200. Batch size 4. Memory [8586, 7087]. Player wins [1208, 583], penalties [747, 1338].
+Episode 513 average loss: [0.00042808065336430445, 0.0008730935005587526]
+Initializing episode 514. Greed 0.31300. Batch size 4. Memory [8600, 7098]. Player wins [1211, 584], penalties [748, 1341].
+Episode 514 average loss: [0.0009372904532938264, 0.0008550901620765217]
+Initializing episode 515. Greed 0.31400. Batch size 4. Memory [8617, 7113]. Player wins [1214, 584], penalties [748, 1346].
+Episode 515 average loss: [0.000649135074733446, 0.0007543005631305277]
+Initializing episode 516. Greed 0.31500. Batch size 4. Memory [8632, 7127]. Player wins [1216, 586], penalties [750, 1349].
+Episode 516 average loss: [0.0007578288990771398, 0.0010380239342339336]
+Initializing episode 517. Greed 0.31600. Batch size 4. Memory [8648, 7139]. Player wins [1218, 587], penalties [752, 1351].
+Episode 517 average loss: [0.0008222468644486402, 0.0007224322233179754]
+Initializing episode 518. Greed 0.31700. Batch size 4. Memory [8663, 7151]. Player wins [1219, 589], penalties [755, 1352].
+Episode 518 average loss: [0.0006768568871646292, 0.0008919905780607627]
+Initializing episode 519. Greed 0.31800. Batch size 4. Memory [8677, 7163]. Player wins [1222, 590], penalties [756, 1356].
+Episode 519 average loss: [0.0009114537441002375, 0.0007924145532094619]
+Initializing episode 520. Greed 0.31900. Batch size 4. Memory [8692, 7178]. Player wins [1225, 591], penalties [757, 1362].
+Episode 520 average loss: [0.0007571183043182828, 0.0008370720257516951]
+Initializing episode 521. Greed 0.32000. Batch size 4. Memory [8706, 7191]. Player wins [1227, 593], penalties [759, 1365].
+Episode 521 average loss: [0.0009888883269013604, 0.000840974818856921]
+Initializing episode 522. Greed 0.32100. Batch size 4. Memory [8725, 7212]. Player wins [1230, 593], penalties [760, 1375].
+Episode 522 average loss: [0.0006976276636123657, 0.0006545891995880414]
+Initializing episode 523. Greed 0.32200. Batch size 4. Memory [8743, 7228]. Player wins [1233, 594], penalties [761, 1379].
+Episode 523 average loss: [0.0005913791505412923, 0.0010211899223375237]
+Initializing episode 524. Greed 0.32300. Batch size 4. Memory [8757, 7239]. Player wins [1236, 595], penalties [762, 1382].
+Episode 524 average loss: [0.0006313803347034587, 0.0007662285352125764]
+Initializing episode 525. Greed 0.32400. Batch size 4. Memory [8771, 7251]. Player wins [1238, 597], penalties [764, 1384].
+Episode 525 average loss: [0.0010416435850654831, 0.0008845214259862485]
+Initializing episode 526. Greed 0.32500. Batch size 4. Memory [8785, 7265]. Player wins [1238, 601], penalties [768, 1384].
+Episode 526 average loss: [0.0006665851154442256, 0.0008282698836410418]
+Initializing episode 527. Greed 0.32600. Batch size 4. Memory [8802, 7281]. Player wins [1240, 602], penalties [769, 1388].
+Episode 527 average loss: [0.0007473958976333961, 0.0008532900363206863]
+Initializing episode 528. Greed 0.32700. Batch size 4. Memory [8818, 7296]. Player wins [1241, 605], penalties [773, 1390].
+Episode 528 average loss: [0.0007447212966243652, 0.0008903837905646386]
+Initializing episode 529. Greed 0.32800. Batch size 4. Memory [8833, 7309]. Player wins [1244, 606], penalties [774, 1394].
+Episode 529 average loss: [0.0007490606338251382, 0.0009071880485862494]
+Initializing episode 530. Greed 0.32900. Batch size 4. Memory [8848, 7321]. Player wins [1246, 607], penalties [775, 1396].
+Episode 530 average loss: [0.0006917035231405558, 0.0008211692135470609]
+Initializing episode 531. Greed 0.33000. Batch size 4. Memory [8863, 7337]. Player wins [1249, 608], penalties [776, 1403].
+Episode 531 average loss: [0.0006761359487427399, 0.0010243863944197074]
+Initializing episode 532. Greed 0.33100. Batch size 4. Memory [8880, 7353]. Player wins [1250, 611], penalties [779, 1404].
+Episode 532 average loss: [0.0008820089824439492, 0.0009179994485748466]
+Initializing episode 533. Greed 0.33200. Batch size 4. Memory [8898, 7369]. Player wins [1252, 611], penalties [781, 1410].
+Episode 533 average loss: [0.0007123069242677755, 0.0008236083441362199]
+Initializing episode 534. Greed 0.33300. Batch size 4. Memory [8914, 7384]. Player wins [1254, 613], penalties [783, 1413].
+Episode 534 average loss: [0.0008793368659098632, 0.0010711826907936484]
+Initializing episode 535. Greed 0.33400. Batch size 4. Memory [8929, 7397]. Player wins [1256, 614], penalties [784, 1416].
+Episode 535 average loss: [0.0007486346803489141, 0.0010947765088834178]
+Initializing episode 536. Greed 0.33500. Batch size 4. Memory [8949, 7410]. Player wins [1259, 615], penalties [789, 1419].
+Episode 536 average loss: [0.0011138727746179535, 0.0008637117862235755]
+Initializing episode 537. Greed 0.33600. Batch size 4. Memory [8964, 7423]. Player wins [1261, 617], penalties [791, 1421].
+Episode 537 average loss: [0.0010530923251420832, 0.0008818777188515434]
+Initializing episode 538. Greed 0.33700. Batch size 4. Memory [8979, 7437]. Player wins [1265, 617], penalties [791, 1428].
+Episode 538 average loss: [0.0009277247627323959, 0.0007331593624257948]
+Initializing episode 539. Greed 0.33800. Batch size 4. Memory [8992, 7446]. Player wins [1269, 617], penalties [791, 1432].
+Episode 539 average loss: [0.0008195988401504499, 0.0007793397256006886]
+Initializing episode 540. Greed 0.33900. Batch size 4. Memory [9007, 7461]. Player wins [1270, 619], penalties [794, 1436].
+Episode 540 average loss: [0.0009601929438455651, 0.0006873813739124065]
+Initializing episode 541. Greed 0.34000. Batch size 4. Memory [9025, 7475]. Player wins [1272, 620], penalties [797, 1439].
+Episode 541 average loss: [0.0007392612198600546, 0.000763078426825814]
+Initializing episode 542. Greed 0.34100. Batch size 4. Memory [9042, 7489]. Player wins [1275, 621], penalties [798, 1442].
+Episode 542 average loss: [0.0007288783284214636, 0.000850674114190042]
+Initializing episode 543. Greed 0.34200. Batch size 4. Memory [9062, 7504]. Player wins [1277, 622], penalties [801, 1444].
+Episode 543 average loss: [0.0008599731809226796, 0.0010602294642012566]
+Initializing episode 544. Greed 0.34300. Batch size 4. Memory [9076, 7515]. Player wins [1280, 623], penalties [802, 1447].
+Episode 544 average loss: [0.0007452329504303634, 0.0009280673621105962]
+Initializing episode 545. Greed 0.34400. Batch size 4. Memory [9092, 7529]. Player wins [1281, 625], penalties [804, 1448].
+Episode 545 average loss: [0.0008805093265519562, 0.00104524014221335]
+Initializing episode 546. Greed 0.34500. Batch size 4. Memory [9107, 7543]. Player wins [1283, 627], penalties [806, 1451].
+Episode 546 average loss: [0.0010453444374434184, 0.0008253231426351704]
+Initializing episode 547. Greed 0.34600. Batch size 4. Memory [9121, 7554]. Player wins [1286, 628], penalties [807, 1454].
+Episode 547 average loss: [0.0007668525882763788, 0.0010224602330708877]
+Initializing episode 548. Greed 0.34700. Batch size 4. Memory [9138, 7567]. Player wins [1289, 628], penalties [807, 1457].
+Episode 548 average loss: [0.0008276025153463706, 0.0009804744768189266]
+Initializing episode 549. Greed 0.34800. Batch size 4. Memory [9152, 7578]. Player wins [1291, 629], penalties [808, 1459].
+Episode 549 average loss: [0.0008003017719602212, 0.0008140166697558016]
+Initializing episode 550. Greed 0.34900. Batch size 4. Memory [9168, 7591]. Player wins [1294, 630], penalties [809, 1462].
+Episode 550 average loss: [0.0007518787620938383, 0.0009084820048883557]
+Initializing episode 551. Greed 0.35000. Batch size 4. Memory [9184, 7603]. Player wins [1297, 630], penalties [809, 1465].
+Episode 551 average loss: [0.000812206311490048, 0.0008971405781763183]
+Initializing episode 552. Greed 0.35100. Batch size 4. Memory [9201, 7620]. Player wins [1300, 631], penalties [810, 1471].
+Episode 552 average loss: [0.0009026408725832072, 0.0010756338532600137]
+Initializing episode 553. Greed 0.35200. Batch size 4. Memory [9215, 7634]. Player wins [1303, 632], penalties [811, 1477].
+Episode 553 average loss: [0.0006544633906742092, 0.0009603130383766256]
+Initializing episode 554. Greed 0.35300. Batch size 4. Memory [9229, 7645]. Player wins [1306, 633], penalties [812, 1480].
+Episode 554 average loss: [0.0007097948575392366, 0.0007966893375851214]
+Initializing episode 555. Greed 0.35400. Batch size 4. Memory [9248, 7661]. Player wins [1309, 634], penalties [813, 1483].
+Episode 555 average loss: [0.0007781601399818265, 0.0008265999547967857]
+Initializing episode 556. Greed 0.35500. Batch size 4. Memory [9266, 7675]. Player wins [1310, 636], penalties [817, 1484].
+Episode 556 average loss: [0.000696860695659945, 0.0006807686877436936]
+Initializing episode 557. Greed 0.35600. Batch size 4. Memory [9283, 7689]. Player wins [1312, 637], penalties [819, 1487].
+Episode 557 average loss: [0.0006722966209053993, 0.0009056290304711597]
+Initializing episode 558. Greed 0.35700. Batch size 4. Memory [9298, 7702]. Player wins [1315, 638], penalties [820, 1491].
+Episode 558 average loss: [0.000472010945668444, 0.0010291775193763896]
+Initializing episode 559. Greed 0.35800. Batch size 4. Memory [9313, 7714]. Player wins [1318, 639], penalties [821, 1494].
+Episode 559 average loss: [0.0006865027353342157, 0.0011960107658524066]
+Initializing episode 560. Greed 0.35900. Batch size 4. Memory [9329, 7725]. Player wins [1321, 640], penalties [824, 1497].
+Episode 560 average loss: [0.0007107061489174763, 0.0008991583745228127]
+Initializing episode 561. Greed 0.36000. Batch size 4. Memory [9349, 7739]. Player wins [1323, 640], penalties [826, 1499].
+Episode 561 average loss: [0.0006717829706354274, 0.0008568347742160162]
+Initializing episode 562. Greed 0.36100. Batch size 4. Memory [9365, 7752]. Player wins [1326, 641], penalties [827, 1502].
+Episode 562 average loss: [0.0009010858513647691, 0.0008939916413510218]
+Initializing episode 563. Greed 0.36200. Batch size 4. Memory [9381, 7766]. Player wins [1328, 643], penalties [829, 1504].
+Episode 563 average loss: [0.000677709011749054, 0.0008833015478254916]
+Initializing episode 564. Greed 0.36300. Batch size 4. Memory [9401, 7778]. Player wins [1330, 644], penalties [835, 1506].
+Episode 564 average loss: [0.000597308799115126, 0.0006915484518685844]
+Initializing episode 565. Greed 0.36400. Batch size 4. Memory [9415, 7790]. Player wins [1332, 646], penalties [837, 1508].
+Episode 565 average loss: [0.0007931784348329529, 0.0006870461831567809]
+Initializing episode 566. Greed 0.36500. Batch size 4. Memory [9431, 7803]. Player wins [1334, 647], penalties [838, 1510].
+Episode 566 average loss: [0.0007377242000075057, 0.0008185093598016961]
+Initializing episode 567. Greed 0.36600. Batch size 4. Memory [9446, 7816]. Player wins [1336, 648], penalties [839, 1513].
+Episode 567 average loss: [0.0008232535013424543, 0.0006871774094179273]
+Initializing episode 568. Greed 0.36700. Batch size 4. Memory [9464, 7833]. Player wins [1338, 649], penalties [840, 1517].
+Episode 568 average loss: [0.0007264500573827801, 0.0009091261731968684]
+Initializing episode 569. Greed 0.36800. Batch size 4. Memory [9481, 7845]. Player wins [1341, 649], penalties [841, 1520].
+Episode 569 average loss: [0.0007059246894310821, 0.0007480469093107703]
+Initializing episode 570. Greed 0.36900. Batch size 4. Memory [9498, 7860]. Player wins [1343, 650], penalties [842, 1523].
+Episode 570 average loss: [0.0006972512658519138, 0.0008949431648943573]
+Initializing episode 571. Greed 0.37000. Batch size 4. Memory [9514, 7877]. Player wins [1346, 651], penalties [843, 1530].
+Episode 571 average loss: [0.0011727802164386957, 0.000954524939879775]
+Initializing episode 572. Greed 0.37100. Batch size 4. Memory [9529, 7889]. Player wins [1349, 652], penalties [844, 1533].
+Episode 572 average loss: [0.0006177135186994241, 0.0009946148363976842]
+Initializing episode 573. Greed 0.37200. Batch size 4. Memory [9543, 7902]. Player wins [1350, 655], penalties [847, 1534].
+Episode 573 average loss: [0.0008371391391847283, 0.0011408215737901627]
+Initializing episode 574. Greed 0.37300. Batch size 4. Memory [9559, 7917]. Player wins [1352, 656], penalties [848, 1538].
+Episode 574 average loss: [0.001047366633429192, 0.0008668786758789793]
+Initializing episode 575. Greed 0.37400. Batch size 4. Memory [9573, 7929]. Player wins [1354, 658], penalties [850, 1540].
+Episode 575 average loss: [0.0011040780445910059, 0.0009101935793296434]
+Initializing episode 576. Greed 0.37500. Batch size 4. Memory [9586, 7940]. Player wins [1356, 660], penalties [852, 1542].
+Episode 576 average loss: [0.0006134099514585816, 0.0006993612041696906]
+Initializing episode 577. Greed 0.37600. Batch size 4. Memory [9600, 7953]. Player wins [1358, 662], penalties [854, 1545].
+Episode 577 average loss: [0.0007273280485109849, 0.0009303273188627579]
+Initializing episode 578. Greed 0.37700. Batch size 4. Memory [9617, 7966]. Player wins [1361, 663], penalties [856, 1548].
+Episode 578 average loss: [0.0008983053303381894, 0.0007673524936156658]
+Initializing episode 579. Greed 0.37800. Batch size 4. Memory [9635, 7982]. Player wins [1363, 665], penalties [859, 1551].
+Episode 579 average loss: [0.0005372193250381811, 0.001047986212969673]
+Initializing episode 580. Greed 0.37900. Batch size 4. Memory [9651, 7995]. Player wins [1364, 667], penalties [862, 1552].
+Episode 580 average loss: [0.0006751167798379007, 0.0008156710268499759]
+Initializing episode 581. Greed 0.38000. Batch size 4. Memory [9667, 8007]. Player wins [1366, 668], penalties [865, 1555].
+Episode 581 average loss: [0.0007202330796810037, 0.0010193027397194369]
+Initializing episode 582. Greed 0.38100. Batch size 4. Memory [9684, 8022]. Player wins [1367, 669], penalties [866, 1557].
+Episode 582 average loss: [0.000797688246530015, 0.0008713581366464496]
+Initializing episode 583. Greed 0.38200. Batch size 4. Memory [9699, 8035]. Player wins [1368, 671], penalties [868, 1558].
+Episode 583 average loss: [0.0008149856426329775, 0.0009408753460527143]
+Initializing episode 584. Greed 0.38300. Batch size 4. Memory [9715, 8048]. Player wins [1371, 671], penalties [868, 1562].
+Episode 584 average loss: [0.000686451844457123, 0.0009048684441950172]
+Initializing episode 585. Greed 0.38400. Batch size 4. Memory [9731, 8062]. Player wins [1373, 673], penalties [870, 1564].
+Episode 585 average loss: [0.0006470024549344089, 0.0010199829761404545]
+Initializing episode 586. Greed 0.38500. Batch size 4. Memory [9747, 8077]. Player wins [1373, 676], penalties [873, 1564].
+Episode 586 average loss: [0.0009206838964018971, 0.0009390230465214699]
+Initializing episode 587. Greed 0.38600. Batch size 4. Memory [9763, 8092]. Player wins [1374, 678], penalties [875, 1566].
+Episode 587 average loss: [0.0008572836943332934, 0.0009201402426697314]
+Initializing episode 588. Greed 0.38700. Batch size 4. Memory [9777, 8105]. Player wins [1375, 681], penalties [878, 1567].
+Episode 588 average loss: [0.0009034585818881169, 0.001083324103092309]
+Initializing episode 589. Greed 0.38800. Batch size 4. Memory [9790, 8115]. Player wins [1378, 682], penalties [879, 1570].
+Episode 589 average loss: [0.0008328982383116252, 0.0010206202859990299]
+Initializing episode 590. Greed 0.38900. Batch size 4. Memory [9804, 8126]. Player wins [1382, 682], penalties [879, 1575].
+Episode 590 average loss: [0.0008216560236178339, 0.0007558185979077178]
+Initializing episode 591. Greed 0.39000. Batch size 4. Memory [9817, 8136]. Player wins [1386, 682], penalties [879, 1580].
+Episode 591 average loss: [0.0008497728222909456, 0.0008897032508125099]
+Initializing episode 592. Greed 0.39100. Batch size 4. Memory [9832, 8150]. Player wins [1390, 682], penalties [879, 1587].
+Episode 592 average loss: [0.0007060670322971418, 0.0008649332885397598]
+Initializing episode 593. Greed 0.39200. Batch size 4. Memory [9847, 8165]. Player wins [1394, 682], penalties [879, 1595].
+Episode 593 average loss: [0.0006475567879533628, 0.0009950815874617547]
+Initializing episode 594. Greed 0.39300. Batch size 4. Memory [9861, 8176]. Player wins [1397, 683], penalties [880, 1598].
+Episode 594 average loss: [0.0006133023351948294, 0.0007812468748953608]
+Initializing episode 595. Greed 0.39400. Batch size 4. Memory [9875, 8187]. Player wins [1398, 686], penalties [885, 1599].
+Episode 595 average loss: [0.0007371867090114392, 0.000934779760427773]
+Initializing episode 596. Greed 0.39500. Batch size 4. Memory [9891, 8202]. Player wins [1399, 689], penalties [888, 1600].
+Episode 596 average loss: [0.0008070232142927125, 0.0008135701646097004]
+Initializing episode 597. Greed 0.39600. Batch size 4. Memory [9906, 8215]. Player wins [1401, 691], penalties [890, 1602].
+Episode 597 average loss: [0.0008120638861631354, 0.0008459976525045931]
+Initializing episode 598. Greed 0.39700. Batch size 4. Memory [9919, 8228]. Player wins [1401, 695], penalties [894, 1602].
+Episode 598 average loss: [0.0008586810224435546, 0.0009714374900795519]
+Initializing episode 599. Greed 0.39800. Batch size 4. Memory [9936, 8245]. Player wins [1404, 696], penalties [896, 1609].
+Episode 599 average loss: [0.0007128071479706301, 0.0009593056359638771]
+Initializing episode 600. Greed 0.39900. Batch size 4. Memory [9952, 8259]. Player wins [1408, 696], penalties [896, 1615].
+Episode 600 average loss: [0.0009506327359386804, 0.0009458966907748783]
+Initializing episode 601. Greed 0.40000. Batch size 4. Memory [9967, 8275]. Player wins [1410, 698], penalties [898, 1620].
+Episode 601 average loss: [0.0007628737560783824, 0.0010394762955709463]
+Initializing episode 602. Greed 0.40100. Batch size 4. Memory [9981, 8286]. Player wins [1414, 698], penalties [898, 1625].
+Episode 602 average loss: [0.0006895990227349102, 0.000677842029189277]
+Initializing episode 603. Greed 0.40200. Batch size 4. Memory [9996, 8298]. Player wins [1417, 699], penalties [899, 1628].
+Episode 603 average loss: [0.0008492246164347638, 0.0008419784743719819]
+Initializing episode 604. Greed 0.40300. Batch size 4. Memory [10014, 8312]. Player wins [1419, 700], penalties [901, 1630].
+Episode 604 average loss: [0.0005181054960606465, 0.0009246425373324504]
+Initializing episode 605. Greed 0.40400. Batch size 4. Memory [10032, 8326]. Player wins [1421, 702], penalties [906, 1633].
+Episode 605 average loss: [0.0008009895047342235, 0.000729897887636484]
+Initializing episode 606. Greed 0.40500. Batch size 4. Memory [10048, 8340]. Player wins [1423, 703], penalties [907, 1636].
+Episode 606 average loss: [0.0008479662250134755, 0.0009402486268134618]
+Initializing episode 607. Greed 0.40600. Batch size 4. Memory [10065, 8353]. Player wins [1425, 704], penalties [909, 1638].
+Episode 607 average loss: [0.0010259724149364047, 0.0009184015240559044]
+Initializing episode 608. Greed 0.40700. Batch size 4. Memory [10080, 8367]. Player wins [1428, 705], penalties [910, 1643].
+Episode 608 average loss: [0.0007498724044125993, 0.0007715479805483483]
+Initializing episode 609. Greed 0.40800. Batch size 4. Memory [10092, 8378]. Player wins [1431, 706], penalties [911, 1648].
+Episode 609 average loss: [0.0008435272495262325, 0.0008663223590701819]
+Initializing episode 610. Greed 0.40900. Batch size 4. Memory [10106, 8390]. Player wins [1432, 708], penalties [913, 1649].
+Episode 610 average loss: [0.0007056582253426313, 0.0009235647121386137]
+Initializing episode 611. Greed 0.41000. Batch size 4. Memory [10119, 8400]. Player wins [1435, 709], penalties [914, 1652].
+Episode 611 average loss: [0.0008267459750641137, 0.0010002132912632078]
+Initializing episode 612. Greed 0.41100. Batch size 4. Memory [10137, 8412]. Player wins [1439, 709], penalties [916, 1656].
+Episode 612 average loss: [0.0008313068817817391, 0.0008641440228809818]
+Initializing episode 613. Greed 0.41200. Batch size 4. Memory [10153, 8424]. Player wins [1442, 710], penalties [919, 1660].
+Episode 613 average loss: [0.0009278401008082761, 0.0008777988712406821]
+Initializing episode 614. Greed 0.41300. Batch size 4. Memory [10167, 8437]. Player wins [1443, 713], penalties [922, 1661].
+Episode 614 average loss: [0.0008243038289947435, 0.0006699571618810296]
+Initializing episode 615. Greed 0.41400. Batch size 4. Memory [10184, 8451]. Player wins [1446, 713], penalties [922, 1665].
+Episode 615 average loss: [0.0008709207322681323, 0.0009422093547376184]
+Initializing episode 616. Greed 0.41500. Batch size 4. Memory [10198, 8468]. Player wins [1447, 716], penalties [925, 1670].
+Episode 616 average loss: [0.0008172181802695956, 0.0011349386715499515]
+Initializing episode 617. Greed 0.41600. Batch size 4. Memory [10213, 8482]. Player wins [1448, 719], penalties [929, 1672].
+Episode 617 average loss: [0.0008547377743525431, 0.0008481865676003508]
+Initializing episode 618. Greed 0.41700. Batch size 4. Memory [10229, 8495]. Player wins [1451, 720], penalties [930, 1675].
+Episode 618 average loss: [0.001005054483054361, 0.001086534374432328]
+Initializing episode 619. Greed 0.41800. Batch size 4. Memory [10246, 8512]. Player wins [1454, 721], penalties [931, 1681].
+Episode 619 average loss: [0.0008018497086595744, 0.0008821302442811429]
+Initializing episode 620. Greed 0.41900. Batch size 4. Memory [10262, 8526]. Player wins [1456, 723], penalties [933, 1683].
+Episode 620 average loss: [0.0007662732071670083, 0.0009072255197679624]
+Initializing episode 621. Greed 0.42000. Batch size 4. Memory [10278, 8544]. Player wins [1458, 725], penalties [935, 1689].
+Episode 621 average loss: [0.0009600426506949589, 0.0010236766887828709]
+Initializing episode 622. Greed 0.42100. Batch size 4. Memory [10292, 8555]. Player wins [1461, 726], penalties [936, 1692].
+Episode 622 average loss: [0.0007237565845975445, 0.0009654248715378344]
+Initializing episode 623. Greed 0.42200. Batch size 4. Memory [10306, 8567]. Player wins [1463, 728], penalties [938, 1694].
+Episode 623 average loss: [0.0010285463591571896, 0.0009115203749388457]
+Initializing episode 624. Greed 0.42300. Batch size 4. Memory [10322, 8581]. Player wins [1464, 730], penalties [940, 1695].
+Episode 624 average loss: [0.0007210951735032722, 0.000921407705754973]
+Initializing episode 625. Greed 0.42400. Batch size 4. Memory [10338, 8596]. Player wins [1467, 731], penalties [941, 1700].
+Episode 625 average loss: [0.000598880575530024, 0.0009450323705095798]
+Initializing episode 626. Greed 0.42500. Batch size 4. Memory [10353, 8609]. Player wins [1469, 733], penalties [943, 1702].
+Episode 626 average loss: [0.0008042169890056053, 0.0009547910885885358]
+Initializing episode 627. Greed 0.42600. Batch size 4. Memory [10369, 8625]. Player wins [1471, 735], penalties [945, 1706].
+Episode 627 average loss: [0.0006764387138761007, 0.0008626922924752132]
+Initializing episode 628. Greed 0.42700. Batch size 4. Memory [10386, 8636]. Player wins [1473, 736], penalties [949, 1708].
+Episode 628 average loss: [0.000628548661056398, 0.0009693053540435027]
+Initializing episode 629. Greed 0.42800. Batch size 4. Memory [10402, 8651]. Player wins [1475, 738], penalties [951, 1711].
+Episode 629 average loss: [0.0007517703650389902, 0.0007464635257040047]
+Initializing episode 630. Greed 0.42900. Batch size 4. Memory [10417, 8663]. Player wins [1477, 740], penalties [954, 1713].
+Episode 630 average loss: [0.0008362859468131015, 0.0008686635475088325]
+Initializing episode 631. Greed 0.43000. Batch size 4. Memory [10431, 8674]. Player wins [1480, 741], penalties [955, 1716].
+Episode 631 average loss: [0.0007067334336170461, 0.001210111404361669]
+Initializing episode 632. Greed 0.43100. Batch size 4. Memory [10445, 8686]. Player wins [1482, 743], penalties [957, 1718].
+Episode 632 average loss: [0.0007413730313095988, 0.0009597349627357391]
+Initializing episode 633. Greed 0.43200. Batch size 4. Memory [10459, 8697]. Player wins [1485, 744], penalties [958, 1721].
+Episode 633 average loss: [0.0009118174202740192, 0.0009709000805742107]
+Initializing episode 634. Greed 0.43300. Batch size 4. Memory [10473, 8709]. Player wins [1487, 746], penalties [960, 1723].
+Episode 634 average loss: [0.000521450734231621, 0.0008226494363043457]
+Initializing episode 635. Greed 0.43400. Batch size 4. Memory [10489, 8722]. Player wins [1489, 747], penalties [961, 1725].
+Episode 635 average loss: [0.000800691532883017, 0.0009040995719260536]
+Initializing episode 636. Greed 0.43500. Batch size 4. Memory [10507, 8737]. Player wins [1490, 748], penalties [963, 1727].
+Episode 636 average loss: [0.0007415112522721756, 0.000935599600779824]
+Initializing episode 637. Greed 0.43600. Batch size 4. Memory [10521, 8748]. Player wins [1493, 749], penalties [964, 1730].
+Episode 637 average loss: [0.0006387164146872237, 0.0010814013512572274]
+Initializing episode 638. Greed 0.43700. Batch size 4. Memory [10538, 8762]. Player wins [1496, 750], penalties [965, 1733].
+Episode 638 average loss: [0.0007236113160615787, 0.0007626290303464471]
+Initializing episode 639. Greed 0.43800. Batch size 4. Memory [10554, 8775]. Player wins [1500, 750], penalties [965, 1738].
+Episode 639 average loss: [0.0005687663247550114, 0.0007840444579617017]
+Initializing episode 640. Greed 0.43900. Batch size 4. Memory [10567, 8786]. Player wins [1502, 752], penalties [967, 1740].
+Episode 640 average loss: [0.0009127920387651433, 0.0006897300058467822]
+Initializing episode 641. Greed 0.44000. Batch size 4. Memory [10582, 8799]. Player wins [1505, 753], penalties [968, 1744].
+Episode 641 average loss: [0.0006336277211731714, 0.0008116401861318283]
+Initializing episode 642. Greed 0.44100. Batch size 4. Memory [10595, 8812]. Player wins [1505, 757], penalties [972, 1744].
+Episode 642 average loss: [0.0008497854742017807, 0.001003663524898002]
+Initializing episode 643. Greed 0.44200. Batch size 4. Memory [10619, 8828]. Player wins [1505, 759], penalties [980, 1744].
+Episode 643 average loss: [0.0008519907108469246, 0.0009261556794323648]
+Initializing episode 644. Greed 0.44300. Batch size 4. Memory [10636, 8839]. Player wins [1508, 759], penalties [982, 1747].
+Episode 644 average loss: [0.0010213987279712455, 0.00103466740984004]
+Initializing episode 645. Greed 0.44400. Batch size 4. Memory [10649, 8849]. Player wins [1511, 760], penalties [983, 1750].
+Episode 645 average loss: [0.0006112571427365765, 0.0009305383457103745]
+Initializing episode 646. Greed 0.44500. Batch size 4. Memory [10664, 8862]. Player wins [1514, 761], penalties [984, 1754].
+Episode 646 average loss: [0.0008693012803430773, 0.0008882047162236025]
+Initializing episode 647. Greed 0.44600. Batch size 4. Memory [10678, 8873]. Player wins [1517, 762], penalties [986, 1758].
+Episode 647 average loss: [0.0007997262825180466, 0.0007830608883523382]
+Initializing episode 648. Greed 0.44700. Batch size 4. Memory [10695, 8886]. Player wins [1519, 764], penalties [991, 1761].
+Episode 648 average loss: [0.0008054073608946055, 0.0009188882831949741]
+Initializing episode 649. Greed 0.44800. Batch size 4. Memory [10711, 8900]. Player wins [1521, 766], penalties [993, 1763].
+Episode 649 average loss: [0.0007055498223053292, 0.0009248300630133599]
+Initializing episode 650. Greed 0.44900. Batch size 4. Memory [10728, 8913]. Player wins [1522, 769], penalties [999, 1764].
+Episode 650 average loss: [0.0008086270078950163, 0.0008570429947992254]
+Initializing episode 651. Greed 0.45000. Batch size 4. Memory [10750, 8926]. Player wins [1524, 770], penalties [1006, 1766].
+Episode 651 average loss: [0.0008770812506554648, 0.0009156158310361206]
+Initializing episode 652. Greed 0.45100. Batch size 4. Memory [10766, 8938]. Player wins [1528, 770], penalties [1006, 1770].
+Episode 652 average loss: [0.0006593288380827289, 0.000809814315289259]
+Initializing episode 653. Greed 0.45200. Batch size 4. Memory [10779, 8947]. Player wins [1532, 770], penalties [1006, 1774].
+Episode 653 average loss: [0.0008117485235238241, 0.0007991643279739139]
+Initializing episode 654. Greed 0.45300. Batch size 4. Memory [10793, 8959]. Player wins [1534, 772], penalties [1008, 1776].
+Episode 654 average loss: [0.000900418426941282, 0.0011041819733301444]
+Initializing episode 655. Greed 0.45400. Batch size 4. Memory [10805, 8969]. Player wins [1536, 774], penalties [1010, 1778].
+Episode 655 average loss: [0.000760485274700581, 0.0008191588546781402]
+Initializing episode 656. Greed 0.45500. Batch size 4. Memory [10822, 8985]. Player wins [1537, 775], penalties [1012, 1782].
+Episode 656 average loss: [0.0007068580380291678, 0.0009352791312267072]
+Initializing episode 657. Greed 0.45600. Batch size 4. Memory [10835, 8995]. Player wins [1540, 776], penalties [1013, 1785].
+Episode 657 average loss: [0.0007741507179161999, 0.000989263962158778]
+Initializing episode 658. Greed 0.45700. Batch size 4. Memory [10855, 9010]. Player wins [1541, 777], penalties [1016, 1786].
+Episode 658 average loss: [0.0008108826190106232, 0.001109009444586594]
+Initializing episode 659. Greed 0.45800. Batch size 4. Memory [10874, 9028]. Player wins [1544, 778], penalties [1017, 1791].
+Episode 659 average loss: [0.0007948033977299929, 0.0010089143353980035]
+Initializing episode 660. Greed 0.45900. Batch size 4. Memory [10888, 9038]. Player wins [1547, 778], penalties [1017, 1794].
+Episode 660 average loss: [0.0009127021592576056, 0.0009390385937876999]
+Initializing episode 661. Greed 0.46000. Batch size 4. Memory [10904, 9051]. Player wins [1550, 779], penalties [1018, 1797].
+Episode 661 average loss: [0.0006444062484661118, 0.0011672141205053776]
+Initializing episode 662. Greed 0.46100. Batch size 4. Memory [10922, 9066]. Player wins [1551, 780], penalties [1019, 1798].
+Episode 662 average loss: [0.0006077614205423742, 0.0007938776630908251]
+Initializing episode 663. Greed 0.46200. Batch size 4. Memory [10939, 9081]. Player wins [1553, 782], penalties [1021, 1800].
+Episode 663 average loss: [0.0009090562072944724, 0.0009572129735412697]
+Initializing episode 664. Greed 0.46300. Batch size 4. Memory [10954, 9094]. Player wins [1555, 784], penalties [1023, 1802].
+Episode 664 average loss: [0.0007970465248945402, 0.0009730407382448902]
+Initializing episode 665. Greed 0.46400. Batch size 4. Memory [10977, 9108]. Player wins [1556, 785], penalties [1030, 1803].
+Episode 665 average loss: [0.0007474689548623494, 0.0009928456380624664]
+Initializing episode 666. Greed 0.46500. Batch size 4. Memory [10996, 9122]. Player wins [1557, 788], penalties [1037, 1804].
+Episode 666 average loss: [0.0009489444389199728, 0.0009203711079488345]
+Initializing episode 667. Greed 0.46600. Batch size 4. Memory [11020, 9140]. Player wins [1559, 788], penalties [1044, 1811].
+Episode 667 average loss: [0.0009794101083221345, 0.0009697545610833913]
+Initializing episode 668. Greed 0.46700. Batch size 4. Memory [11036, 9153]. Player wins [1560, 790], penalties [1048, 1813].
+Episode 668 average loss: [0.000623276608530432, 0.0007603059406392276]
+Initializing episode 669. Greed 0.46800. Batch size 4. Memory [11051, 9167]. Player wins [1563, 791], penalties [1049, 1818].
+Episode 669 average loss: [0.0008252516272477806, 0.0007816909164830577]
+Initializing episode 670. Greed 0.46900. Batch size 4. Memory [11065, 9179]. Player wins [1565, 793], penalties [1051, 1820].
+Episode 670 average loss: [0.0008598317799624056, 0.0010045101444120519]
+Initializing episode 671. Greed 0.47000. Batch size 4. Memory [11078, 9190]. Player wins [1567, 795], penalties [1053, 1822].
+Episode 671 average loss: [0.0008158829325111583, 0.0009316210489487275]
+Initializing episode 672. Greed 0.47100. Batch size 4. Memory [11090, 9203]. Player wins [1570, 796], penalties [1054, 1829].
+Episode 672 average loss: [0.0009750718573658643, 0.0009182524544567885]
+Initializing episode 673. Greed 0.47200. Batch size 4. Memory [11105, 9218]. Player wins [1572, 798], penalties [1056, 1833].
+Episode 673 average loss: [0.0006694662770314608, 0.0008461422912660055]
+Initializing episode 674. Greed 0.47300. Batch size 4. Memory [11118, 9228]. Player wins [1575, 799], penalties [1057, 1836].
+Episode 674 average loss: [0.0007883562595287168, 0.0006716752223755149]
+Initializing episode 675. Greed 0.47400. Batch size 4. Memory [11132, 9241]. Player wins [1579, 799], penalties [1057, 1843].
+Episode 675 average loss: [0.0008730803687781604, 0.0007197714744093405]
+Initializing episode 676. Greed 0.47500. Batch size 4. Memory [11150, 9257]. Player wins [1581, 800], penalties [1058, 1846].
+Episode 676 average loss: [0.0006453369511291385, 0.0008257981680799276]
+Initializing episode 677. Greed 0.47600. Batch size 4. Memory [11166, 9271]. Player wins [1582, 802], penalties [1060, 1847].
+Episode 677 average loss: [0.0008446924366580788, 0.0009827599169511814]
+Initializing episode 678. Greed 0.47700. Batch size 4. Memory [11180, 9283]. Player wins [1584, 804], penalties [1062, 1849].
+Episode 678 average loss: [0.0007211210443832291, 0.001006125445807508]
+Initializing episode 679. Greed 0.47800. Batch size 4. Memory [11195, 9301]. Player wins [1585, 806], penalties [1064, 1855].
+Episode 679 average loss: [0.0012374924384251547, 0.000892058359265017]
+Initializing episode 680. Greed 0.47900. Batch size 4. Memory [11212, 9315]. Player wins [1588, 806], penalties [1066, 1861].
+Episode 680 average loss: [0.0009398578300273844, 0.0007961858230243836]
+Initializing episode 681. Greed 0.48000. Batch size 4. Memory [11224, 9324]. Player wins [1591, 807], penalties [1067, 1864].
+Episode 681 average loss: [0.0005362033436540515, 0.0009459759865421801]
+Initializing episode 682. Greed 0.48100. Batch size 4. Memory [11239, 9336]. Player wins [1594, 808], penalties [1068, 1867].
+Episode 682 average loss: [0.0008151040391466166, 0.0007664377464809351]
+Initializing episode 683. Greed 0.48200. Batch size 4. Memory [11254, 9361]. Player wins [1597, 809], penalties [1069, 1883].
+Episode 683 average loss: [0.0010397011123131961, 0.0006681900529656559]
+Initializing episode 684. Greed 0.48300. Batch size 4. Memory [11269, 9375]. Player wins [1598, 812], penalties [1072, 1884].
+Episode 684 average loss: [0.0009349912637844682, 0.0008120359445456416]
+Initializing episode 685. Greed 0.48400. Batch size 4. Memory [11286, 9389]. Player wins [1599, 813], penalties [1073, 1885].
+Episode 685 average loss: [0.0007460244766358907, 0.001058763494559874]
+Initializing episode 686. Greed 0.48500. Batch size 4. Memory [11298, 9397]. Player wins [1603, 813], penalties [1073, 1889].
+Episode 686 average loss: [0.0007082870045754438, 0.0008692461051396094]
+Initializing episode 687. Greed 0.48600. Batch size 4. Memory [11313, 9409]. Player wins [1605, 814], penalties [1075, 1892].
+Episode 687 average loss: [0.0009392448377588557, 0.0010953015945334402]
+Initializing episode 688. Greed 0.48700. Batch size 4. Memory [11329, 9423]. Player wins [1607, 816], penalties [1077, 1894].
+Episode 688 average loss: [0.0006308294687187299, 0.0011395724723115563]
+Initializing episode 689. Greed 0.48800. Batch size 4. Memory [11343, 9434]. Player wins [1610, 817], penalties [1078, 1897].
+Episode 689 average loss: [0.0007946027253638022, 0.0008743780134763154]
+Initializing episode 690. Greed 0.48900. Batch size 4. Memory [11357, 9445]. Player wins [1613, 818], penalties [1079, 1900].
+Episode 690 average loss: [0.0008808529892121442, 0.0009224766581610311]
+Initializing episode 691. Greed 0.49000. Batch size 4. Memory [11370, 9457]. Player wins [1614, 821], penalties [1082, 1901].
+Episode 691 average loss: [0.0007964833115693182, 0.0008789615792920813]
+Initializing episode 692. Greed 0.49100. Batch size 4. Memory [11386, 9469]. Player wins [1618, 821], penalties [1082, 1905].
+Episode 692 average loss: [0.001192217860079836, 0.0008647113863844424]
+Initializing episode 693. Greed 0.49200. Batch size 4. Memory [11399, 9479]. Player wins [1621, 822], penalties [1083, 1908].
+Episode 693 average loss: [0.0007121617440134287, 0.0008073626609984786]
+Initializing episode 694. Greed 0.49300. Batch size 4. Memory [11415, 9494]. Player wins [1623, 823], penalties [1084, 1912].
+Episode 694 average loss: [0.0009818445214477833, 0.0007902007491793483]
+Initializing episode 695. Greed 0.49400. Batch size 4. Memory [11428, 9505]. Player wins [1625, 825], penalties [1086, 1914].
+Episode 695 average loss: [0.0009424807396594827, 0.0010376198379641497]
+Initializing episode 696. Greed 0.49500. Batch size 4. Memory [11456, 9519]. Player wins [1626, 826], penalties [1098, 1915].
+Episode 696 average loss: [0.0007958534479257651, 0.00080773849185789]
+Initializing episode 697. Greed 0.49600. Batch size 4. Memory [11470, 9530]. Player wins [1629, 827], penalties [1099, 1918].
+Episode 697 average loss: [0.0007410978374537081, 0.0009778319799806923]
+Initializing episode 698. Greed 0.49700. Batch size 4. Memory [11486, 9544]. Player wins [1632, 827], penalties [1099, 1923].
+Episode 698 average loss: [0.0006282203706047897, 0.001020304351446352]
+Initializing episode 699. Greed 0.49800. Batch size 4. Memory [11498, 9554]. Player wins [1634, 829], penalties [1101, 1925].
+Episode 699 average loss: [0.0009482091882091481, 0.0011954425826843362]
+Initializing episode 700. Greed 0.49900. Batch size 4. Memory [11512, 9565]. Player wins [1638, 829], penalties [1101, 1930].
+Episode 700 average loss: [0.0008749186429971209, 0.0007555542720688714]
+Saved accuracy/loss plot to bots/tempname-20240317223126.dttt.pt.log.png
+Saved logs to bots/tempname-20240317223126.dttt.pt.log

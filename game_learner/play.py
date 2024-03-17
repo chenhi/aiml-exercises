@@ -7,9 +7,9 @@ from deepqlearn import *
 import os, datetime, re, sys, torch
 
 open_str = '\nCommand-line options: python play.py <game> <play/train/simulate>\n\
-    If play (default), only play against one model.\n\
+    If play (default), play against a model.\n\
     If train, continue to play after training.\n\
-    If simulate, allow choosing different models.\n\n'
+    If simulate, watch two bots in a model play each other.\n\n'
 
 
 if len(sys.argv) == 1:
@@ -50,7 +50,11 @@ try:
     shortname = shortnames[game_index]
     type = types[game_index]
 except:
-    print("Don't know what you mean.  Exiting.")
+    games_str = ""
+    for i in range(len(names)):
+        games_str += names[i] + ' (' + shortnames[i] + '), '
+    games_str = games_str[:-2]
+    print(f"Didn't recognize that game.  The games are {games_str}.  Exiting.")
     exit()
 
 
@@ -129,17 +133,16 @@ if train_new:
         game.save_q(fname)
 
     elif type == "dqn":
-        game.set_greed(0.5)
-        logtext = game.deep_learn(learn_rate=0.00025, episodes=10000, episode_length=20, batch_size=4, train_batch_size=32, copy_frequency=5, verbose=True)
         res = "tempname"
-
         fname_end = re.sub(r'\W+', '', res)[0:64] + f"-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}{file_ext}"
         fname = 'bots/' + fname_end
-        game.save_q(fname)
         logpath = fname + ".log"
-        with open(logpath, "w") as f:
-            logtext += log(f"Saved logs to {logpath}")
-            f.write(logtext)
+        
+        #game.deep_learn(learn_rate=0.0001, greed_start = 1, greed_end = 0.3, episodes=5000, episode_length=20, batch_size=4, episodes_before_train=500, train_batch_size=32, copy_frequency=250, savelog=logpath, verbose=True)
+        game.deep_learn(learn_rate=0.0005, greed_start = 1, greed_end = 0.3, episodes=2000, episode_length=20, batch_size=4, episodes_before_train=200, train_batch_size=32, copy_frequency=250, savelog=logpath, verbose=True)
+        
+        #game.deep_learn(learn_rate=0.0001, greed_start = 1, greed_end = 0.3, episodes=500, episode_length=20, batch_size=4, episodes_before_train=50, train_batch_size=32, copy_frequency=25, savelog=logpath, verbose=True)
+        game.save_q(fname)
 
 
 
@@ -167,79 +170,19 @@ else:
         print("No bot loaded.")
 
 
-#TODO zeroing out doesn't help
 # Load the AI; special case is index = 0 which is random AI
 if load_index == 0:
     game.null_q()
-    random = True           # This isn't needed just patch
 elif load_index != -1:
     game.load_q('bots/' + saves[load_index])
-
-
-
-# if simulate:
-#     # Get the subset of bots we want to play against.
-#     while True:
-#         if len(saves) == len(load_indices):
-#             print("All bots already loaded.\n")
-#             break
-#         savestr = ""
-#         loadstr = ""
-#         for i in range(len(saves)):
-#             if i not in load_indices:
-#                 savestr += f"[{i}] {saves[i]}\n"
-#             else:
-#                 loadstr += f"{saves[i]}, "
-#         res = input(f"Already loaded: {loadstr[0:-2]}\n\nThere are some saved bots:\n{savestr}\n\nIf you want to load them, enter the number.  Otherwise, enter anything else.\n")
-#         try:
-#             i = int(res)
-#             if i < 0 or i >= len(saves):
-#                 break
-#             if i in load_indices:
-#                 print("Was already loaded.")
-#                 continue
-#             load_indices.append(int(res))
-#             print(f"Loaded {saves[int(res)]}\n")
-#         except:
-#             break
-
-# # If only one bot loaded, we don't need to ask which turn it plays.
-# if len(load_indices) == 1:
-#     # Load the AI; special case is index = 0 which is random AI
-#     if load_indices[0] > 0:
-#         game.load_q('bots/' + saves[load_indices[0]])
-
-
-# TODO individual loading
 
 
 
 
 #==================== PLAY THE GAME ====================#
 
-# Simulation:
 if simulate:
-    # if len(sys.argv) >= 4:
-    #     res = sys.argv[3]
-    # else:
-    #     res = input(f"How many simulations?  Enter -1 for step-through mode. ")
-    # try:
-    #     num_sim = int(res)
-    #     if num_sim < 0:
-    #         raise Exception()
-    # except:
-    #     print("Couldn't interpret the passed argument for number of simulations.  Defaulting to step-through simulations.")
-    #     num_sim = -1
-
-    # if num_sim > 0:
-    #     game.simulate_game(num_sim, 1000)
-    #     exit()
-    # elif num_sim < 0:
-    #while True:
     game.stepthru_game()
-    #res = input("\nAnother round? (y/n) ")
-    #    if res == 'n':
-    input("Any input to exit. ") 
     exit()
 
 
@@ -248,8 +191,6 @@ bot_list = [False for i in range(mdp.num_players)]
 
 # Play the AI
 # Assumptions: all AI play from a single model, and only one human player.
-# TODO: more flexible play formats via command
-
 def item(obj, mdp: MDP, is_list=False):
     if mdp.batched:
         if is_list:
@@ -259,12 +200,6 @@ def item(obj, mdp: MDP, is_list=False):
         else:
             return obj[0].tolist()
     return obj
-
-def states_equal(s1, s2, mdp: MDP) -> bool:
-    if mdp.batched:
-        return torch.prod(s1 == s2).item == 1
-    else:
-        return s1 == s2
 
 while True:
     if load_index >= 0:
@@ -296,12 +231,13 @@ while True:
             print(item(game.qs[p].get(s, None), mdp))
             a = game.qs[p].policy(s)
             print(f"Chosen action: \n{item(a, mdp)}.\n")
-            t, r = game.mdp.transition(s, a)
-            while states_equal(s, t, mdp):
+            if mdp.is_valid_action(s, a):
+                s, r = game.mdp.transition(s, a)
+            else:
                 print("Bot tried to make an illegal move.  Playing randomly.")
                 a = game.mdp.get_random_action(s)
-                t, r = game.mdp.transition(s, a)
-            s = t
+                print(f"Randomly chosen action: \n{item(a, mdp)}.\n")
+                s, r = game.mdp.transition(s, a)
     if item(r, mdp)[p] == 1.:
         winnerstr = f"Player {p + 1} ({game.mdp.symb[p]}), {'a person' if p == player_index else 'a bot'}, won."
     elif item(r, mdp)[p] == 0.:

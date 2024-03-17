@@ -275,6 +275,22 @@ class QLearn():
             for i in indices:
                 self.qs[i] = QFunction(self.mdp)
     
+    def stepthru_game(self):
+        s = self.mdp.get_initial_state()
+        print(f"Initial state:\n{self.mdp.board_str(s)}")
+        turn = 0
+        while self.mdp.is_terminal(s) == False:
+            turn += 1
+            p = self.mdp.get_player(s)
+            print(f"Turn {turn}, player {p+1} ({self.mdp.symb[p]})")
+            a = self.qs[p].policy(s)
+            print(f"Chosen action: {self.mdp.action_str(a)}")
+            s, r = self.mdp.transition(s, a)
+            print(f"Next state:\n{self.mdp.board_str(s)}")
+            print(f"Rewards for players: {r}")
+            input("Enter to continue.\n")
+        input("Terminal state reached.  Enter to end. ")
+
     # Non-batched method
     def current_player(self, s) -> int:
         if s == None:

@@ -1,5 +1,4 @@
 __pycache__
-bots/*.c4.*
 bots/*.exp
 bots/temp*
 temp*

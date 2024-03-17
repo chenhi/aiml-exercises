@@ -8,7 +8,7 @@ options = sys.argv[1:]
 class TTTTensorMDP(MDP):
     def __init__(self):
         super().__init__(None, None, discount=1, num_players=2, state_shape=(2,3,3), action_shape=(3,3), batched=True, \
-                         symb = {0: "X", 1: "O", None: "-"}, input_str = "Input position to play, e.g. '1, 3' for the 1st row and 3rd column: ")
+                         symb = {0: "X", 1: "O", None: "-"}, input_str = "Input position to play, e.g. '1, 3' for the 1st row and 3rd column: ", penalty=-1)
 
     def str_to_action(self, input: str) -> torch.Tensor:
         coords = input.split(',')
@@ -51,11 +51,15 @@ class TTTTensorMDP(MDP):
     def valid_action_filter(self, state: torch.Tensor):
         return state.sum((1)) == 0
     
-    def get_random_action(self, state):
+    def get_random_action(self, state, max_tries=100):
         filter = self.valid_action_filter(state)
-        while torch.prod(filter.sum((1,2)) <= 1).item() != 1:                              # Almost always terminates after one step
+        tries = 0
+        while (filter.count_nonzero(dim=(1,2)) <= 1).prod().item() != 1:                             # Almost always terminates after one step
             temp = torch.rand(state.size(0), 3, 3) * filter
             filter = temp == temp.max()
+            tries += 1
+            if tries >= max_tries:
+                break
         return filter.int()
     
 
@@ -76,7 +80,8 @@ class TTTTensorMDP(MDP):
     def action_str(self, action: torch.Tensor) -> list[str]:
         outs = []
         for b in range(action.shape[0]):
-            print("TODO")
+            flat_pos = action[b].flatten().max(0).indices.item()
+            outs.append(f"position {flat_pos//3+1, flat_pos % 3+1}")
         return outs
 
 
@@ -133,18 +138,24 @@ class TTTNN(nn.Module):
         super().__init__()
         self.stack = nn.Sequential(
             nn.Conv2d(2, 32, (3,3), padding='same'),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             #nn.Dropout(p=0.2),             # Dropout introduces randomness into the Q function.  Not sure if this is desirable.
             #nn.BatchNorm2d(32),
             nn.Conv2d(32, 64, (3,3), padding='same'),
-            nn.ReLU(),
+            nn.LeakyReLU(),
+            nn.Conv2d(64, 128, (3,3), padding='same'),
+            nn.LeakyReLU(),
             #nn.BatchNorm2d(64),
-            nn.Flatten(),
-            nn.Linear(64*3*3, 64*3*3),
-            nn.ReLU(),
+            #nn.Flatten(),
+            #nn.Linear(128*3*3, 64*3*3),
+            nn.Conv2d(128, 256, (3,3), padding='same'),
+            nn.LeakyReLU(),
+            #nn.Linear(64*3*3, 64),
+            #nn.ReLU(),
             #nn.BatchNorm1d(64*7*6),
-            nn.Linear(64*3*3, 9), 
-            nn.Unflatten(1, (3, 3))
+            #nn.Linear(64, 9), 
+            nn.Conv2d(256, 1, (3,3), padding='same'),
+            #nn.Unflatten(1, (3, 3))
         )
     
     def forward(self, x):
@@ -162,16 +173,15 @@ if "test" in options:
     s = mdp.get_initial_state()
     print(mdp.board_str(s)[0])
 
-    for i in range(10):
+    for i in range(12):
         print("play")
         a = mdp.get_random_action(s)
-        #print(a.tolist())
+        print(a.tolist())
         t, r = mdp.transition(s, a)
         print(mdp.board_str(t)[0])
         print(r.tolist())
         s = t
 
     dqn = DQN(mdp, TTTNN, torch.nn.HuberLoss(), torch.optim.SGD, 100000)
-    dqn.set_greed(0.5)
-    dqn.deep_learn(0.1, 50, 10, 16, 16, 4, True)
+    dqn.deep_learn(0.1, 0.5, 0.5, 50, 10, 16, 16, 16, 4, True)
 

@@ -49,6 +49,10 @@ class TTTMDP(MDP):
             out += "\n"
         return out
 
+
+    def action_str(self, action) -> list[str]:
+        return f"position {action[0]+1, action[1]+1}"
+    
     # Reward is 1 for winning the game, -1 for losing, and 0 for a tie; awarded upon entering terminal state
     def transition(self, state, a):
         # Copy it

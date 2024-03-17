@@ -28,6 +28,9 @@ class C4MDP(MDP):
         out += "|1234567|"
         return out
     
+    def action_str(self, action) -> str:
+        return f"column {action+1}"
+    
     
     def str_to_action(self, input: str) -> torch.Tensor:
         try:

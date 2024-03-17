@@ -7,8 +7,10 @@ import torch
 # Testing options
 # 'test' to test
 # 'verbose' to print more messages
-# 'slow' to do a slow simulation of Q-updates
+# 'convergence' to do a simulation of Q-updates for testing convergence
+# 'dqn' to run the DQN
 # 'saveload' to test saving and loading
+
 
 options = sys.argv[1:]
 
@@ -20,7 +22,6 @@ class C4TensorMDP(MDP):
     def __init__(self):
         super().__init__(None, None, discount=1, num_players=2, state_shape=(2,6,7), action_shape=(7,), batched=True, \
                          symb = {0: "O", 1: "X", None: "-"}, input_str = "Input column to play (1-7). ")
-
 
     # Logic: if player 0 has more pieces than player 1, then it's player 1's turn.  Otherwise, it's player 0's turn.
     # Return shape (batch, 1, 1, 1)
@@ -49,29 +50,32 @@ class C4TensorMDP(MDP):
             return None
         return self.int_to_action(i)
     
-    # Not for batch use
-    def states_equal(self, state1: torch.Tensor, state2: torch.Tensor) -> bool:
-        torch.sum(t).item() == torch.sum(s).item()
-    
     # Return shape (batch, 7), boolean type
     def valid_action_filter(self, state: torch.Tensor):
         return state.sum((1,2)) < 6
 
-    # Gets a random valid action; if there are none, then it plays in the 0th column. #TODO make it return 0 instead
-    def get_random_action(self, state):
+    # Gets a random valid action; if there are none, then it plays in the 0th column.
+    def get_random_action(self, state, max_tries=100):
         #indices = (torch.rand(state.size(0)) * 7).int()
-        indices = (torch.rand((state.size(0), 7)) * self.valid_action_filter(state).int()).max(1).indices
-        return torch.eye(7, dtype=int)[None].expand(state.size(0), -1, -1)[torch.arange(state.size(0)), indices]
+        #indices = (torch.rand((state.size(0), 7)) * self.valid_action_filter(state).int()).max(1).indices
+        #return torch.eye(7, dtype=int)[None].expand(state.size(0), -1, -1)[torch.arange(state.size(0)), indices]
+        filter = self.valid_action_filter(state)
+        tries = 0
+        while (filter.count_nonzero(dim=1) <= 1).prod().item() != 1:                            # Almost always terminates after one step
+            temp = torch.rand(state.size(0), 7) * filter
+            filter = temp == temp.max()
+            tries += 1
+            if tries >= max_tries:
+                break
+        return filter.int()
 
     # Return shape (batch, 2, 1, 1)
     def swap_player(self, player_vector: torch.Tensor) -> torch.Tensor:
         return torch.tensordot(player_vector, torch.tensor([[0,1],[1,0]], dtype=int), dims=([1], [0])).swapaxes(1, -1)
 
-    # Player 0 is always the first player.
     # Return shape (batch_size, 2, 6, 7)
     def get_initial_state(self, batch_size=1) -> torch.Tensor:
-        return torch.zeros((batch_size, 2, 6, 7), dtype=int)
-#        return torch.tensordot(torch.ones((batch_size, ), dtype=int), torch.zeros((2,6,7), dtype=int), 0)    
+        return torch.zeros((batch_size, 2, 6, 7), dtype=int)   
 
     def action_str(self, action: torch.Tensor) -> list[str]:
         outs = []
@@ -585,22 +589,23 @@ if "test" in options:
         print("FAIL!!! No update, very unlikely.")
 
     q = NNQFunction(mdp, C4NN, torch.nn.MSELoss(), torch.optim.Adam)
-    if "slow" in options:
-        print("\nCurrent values:")
-        print(q.val(t))
+    if "convergence" in options:
+        #print("Should converge to:")
+        #print(d.r + q.val(d.t.float()))
+        lr = float(input("learn rate? rec. 0.00025 or 0.0005 or 0.001: "))
         print("\nRunning update 100 times and checking for convergence.")
         for i in range(0, 500):
-            q.update(d, learn_rate=0.00025)
+            q.update(d, learn_rate=lr)
             print(q.get(s,a))
         print("Did it converge to:")
         print(d.r + q.val(d.t.float()))
 
 
-    print("\nTesting if deep Q-learning algorithm throws errors.")
-    dqn = DQN(mdp, C4NN, torch.nn.HuberLoss(), torch.optim.SGD, 1000)
-    dqn.set_greed(0.5)
-    dqn.deep_learn(0.5, 10, 100, 1, 4, 10, verbose=verbose)
-    print("PASS.  Things ran to completion, at least.")
+    if "dqn" in options:
+        print("\nTesting if deep Q-learning algorithm throws errors.")
+        dqn = DQN(mdp, C4NN, torch.nn.HuberLoss(), torch.optim.SGD, 1000)
+        dqn.deep_learn(0.5, 0.5, 0.5, 10, 100, 1, 4, 5, 10, verbose=verbose)
+        print("PASS.  Things ran to completion, at least.")
 
     if "saveload" in options:
         print("\nTesting saving and loading.")
