@@ -54,6 +54,7 @@ class ExperienceReplay():
 
 
 # A Q-function where the inputs and outputs are all tensors
+# q_model = None means play randomly and all values 0.
 class NNQFunction(QFunction):
     def __init__(self, mdp: MDP, q_model, loss_fn, optimizer_class: torch.optim.Optimizer):
         if mdp.state_shape == None or mdp.action_shape == None:
@@ -64,22 +65,32 @@ class NNQFunction(QFunction):
         self.loss_fn = loss_fn
         self.optimizer = optimizer_class
 
-    # Input has shape (batches, ) + state_shape and (batches, ) + action_shape
+    # Output shape (batch, ) if action is not None, otherwise (batch, + action_shape
     def get(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
-        # The neural network produces a tensor of shape (batches, ) + action_shape
-        pred = self.q(state.float())
-        # A little inefficient because we only take the diagonals, 
-        return torch.tensordot(pred.flatten(start_dim=1), action.flatten(start_dim=1).float(), dims=([1],[1])).diagonal()
+        if self.q == None:
+            pred = self.mdp.get_random_action(state)    
+        else:
+            pred = self.q(state.float())
+        if action == None:
+            return pred
+        else:
+            # A little inefficient because we only take the diagonals, 
+            return torch.tensordot(pred.flatten(start_dim=1), action.flatten(start_dim=1).float(), dims=([1],[1])).diagonal()
 
     # Input is a tensor of shape (batches, ) + state.shape
     # Output is a tensor of shape (batches, )
     def val(self, state) -> torch.Tensor:
+        if self.q == None:
+            return torch.zeros(state.size(0))
         terminal = torch.flatten(self.mdp.is_terminal(state.float()))
         return torch.flatten(self.q(state.float()), 1, -1).max(1).values * ~terminal
     
     # Input is a batch of state vectors
     # Returns the value of an optimal policy at a given state, shape (batches, ) + action_shape
     def policy(self, state) -> torch.Tensor:
+        if self.q == None:
+            return self.mdp.get_random_action(state)
+        
         flattened_indices = torch.flatten(self.q(state.float()), 1, -1).max(1).indices
         linear_dim = 1
         for d in self.mdp.action_shape:
@@ -94,13 +105,13 @@ class NNQFunction(QFunction):
         if not isinstance(self.q, nn.Module):
             Exception("NNQFunction needs to have a class extending nn.Module.")
 
-        self.q.train()
+        if self.q == None:
+            return
 
+        self.q.train()
         opt = self.optimizer(self.q.parameters(), lr=learn_rate)
-        
         pred = self.get(data.s.float(), data.a)
         y = data.r + self.val(data.t.float())
-        
         loss = self.loss_fn(pred, y)
 
         # Optimize
@@ -135,10 +146,6 @@ class DQN():
         self.qs = [NNQFunction(mdp, q_model, loss_fn, optimizer) for i in range(mdp.num_players)]
         self.memories = [ExperienceReplay(memory_capacity) for i in range(mdp.num_players)]
 
-    def zero_out(self):
-        for qf in self.qs:
-            qf.q.zero_out()
-
     # Note that greedy involves values, so it should refer to the target network
     def set_greed(self, eps):
         if type(eps) == list:
@@ -157,10 +164,10 @@ class DQN():
 
             
 
-    def load_q(self, fname, index=None):
+    def load_q(self, fname, indices=None):
         zf = zipfile.ZipFile(fname, mode="r")
         for i in range(self.mdp.num_players):
-            if index == None or index == i:
+            if indices == None or i in indices:
                 zf.extract(f"{fname}.{i}")
                 self.qs[i].q = torch.jit.load(f"{fname}.{i}")
                 os.remove(f"{fname}.{i}")
@@ -168,6 +175,11 @@ class DQN():
             self.qs[i].q.eval()					# Set to evaluation mode
         zf.close()
 
+
+    def null_q(self, indices = None):
+        for i in range(self.mdp.num_players):
+            if indices == None or i in indices:
+                self.qs[i].q = None
 
     # Copy the weights of one NN to another
     def copy_policy_to_target(self):

@@ -259,13 +259,21 @@ class QLearn():
         with open(fname, 'wb') as f:
             pickle.dump(self.qs, f)
         
-    def load_q(self, fname, index=None):
+    def load_q(self, fname, indices=None):
         with open(fname, 'rb') as f:
             temp_qs = pickle.load(f)
-        if index == None:
+        if indices == None:
             self.qs = temp_qs
         else:
-            self.qs[index] = temp_qs[index]
+            for i in indices:
+                self.qs[i] = temp_qs[i]
+
+    def null_q(self, indices = None):
+        if indices == None:
+            self.qs = [QFunction(self.mdp) for i in range(self.mdp.num_players)]
+        else:
+            for i in indices:
+                self.qs[i] = QFunction(self.mdp)
     
     # Non-batched method
     def current_player(self, s) -> int:

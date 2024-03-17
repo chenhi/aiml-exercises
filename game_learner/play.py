@@ -25,7 +25,7 @@ dtttmdp = dttt.TTTTensorMDP()
 names = ["Tic-Tac-Toe", "Connect Four", "Deep Tic-Tac-Toe", "Deep Connect Four"]
 shortnames = ["ttt", "c4", "dttt", "dc4"]
 mdps = [tttmdp, c4mdp, dtttmdp, c4tmdp]
-games = [QLearn(tttmdp), QLearn(c4mdp), DQN(dtttmdp, dttt.TTTNN, torch.nn.HuberLoss(), torch.optim.SGD, 100000), DQN(c4tmdp, c4t.C4NN, torch.nn.HuberLoss(), torch.optim.SGD, 100000)]
+games = [QLearn(tttmdp), QLearn(c4mdp), DQN(dtttmdp, dttt.TTTNN, torch.nn.HuberLoss(), torch.optim.Adam, 1000000), DQN(c4tmdp, c4t.C4NN, torch.nn.HuberLoss(), torch.optim.Adam, 1000000)]
 file_exts = ['.ttt.pkl', '.c4.pkl', '.dttt.pt', '.dc4.pt']
 types = ["qlearn", "qlearn", "dqn", "dqn"]
 
@@ -130,7 +130,7 @@ if train_new:
 
     elif type == "dqn":
         game.set_greed(0.5)
-        logtext = game.deep_learn(learn_rate=0.01, episodes=10000, episode_length=20, batch_size=16, train_batch_size=64, copy_frequency=5, verbose=True)
+        logtext = game.deep_learn(learn_rate=0.00025, episodes=10000, episode_length=20, batch_size=4, train_batch_size=32, copy_frequency=5, verbose=True)
         res = "tempname"
 
         fname_end = re.sub(r'\W+', '', res)[0:64] + f"-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}{file_ext}"
@@ -170,8 +170,8 @@ else:
 #TODO zeroing out doesn't help
 # Load the AI; special case is index = 0 which is random AI
 if load_index == 0:
-    #game.zero_out()
-    pass
+    game.null_q()
+    random = True           # This isn't needed just patch
 elif load_index != -1:
     game.load_q('bots/' + saves[load_index])
 
@@ -249,26 +249,42 @@ bot_list = [False for i in range(mdp.num_players)]
 # Play the AI
 # Assumptions: all AI play from a single model, and only one human player.
 # TODO: more flexible play formats via command
+
+def item(obj, mdp: MDP, is_list=False):
+    if mdp.batched:
+        if is_list:
+            return obj[0]
+        elif torch.numel(obj) == 1:
+            return obj[0].item()
+        else:
+            return obj[0].tolist()
+    return obj
+
+def states_equal(s1, s2, mdp: MDP) -> bool:
+    if mdp.batched:
+        return torch.prod(s1 == s2).item == 1
+    else:
+        return s1 == s2
+
 while True:
-    break
     if load_index >= 0:
         res = input(f"Which player to play as?  An integer from 1 to {mdp.num_players}, or 'q' to quit. ")
         if res == 'q':
             exit()
-        if res != '1' and res != '2':
+        try:
+            player_index = int(res) - 1
+            if player_index < 0 or player_index >= mdp.num_players:
+                raise Exception()
+        except:
+            print("Unrecognized response.")
             continue
-        if res == '1':
-            comp = 1
-        else:
-            comp = 0
-    else:
-        comp = -1
+        
 
     s = game.mdp.get_initial_state()
-    while game.mdp.is_terminal(s).item() == False:
-        p = game.mdp.get_player(s).item()
-        print(game.mdp.board_str(s)[0])
-        if p != comp:
+    while item(game.mdp.is_terminal(s), mdp) == False:
+        p = item(game.mdp.get_player(s), mdp)
+        print(f"\n{item(game.mdp.board_str(s), mdp, is_list=True)}")
+        if p == player_index:
             res = input(mdp.input_str)
             a = mdp.str_to_action(res)
             if a == None:
@@ -277,163 +293,20 @@ while True:
             s, r = game.mdp.transition(s,a)
         else:
             print("Action values:")
-            print(game.qs[comp].q(s.float())[0].tolist())
-            a = game.qs[comp].policy(s.float())
-            print(f"Chosen action: {a}.\n")
+            print(item(game.qs[p].get(s, None), mdp))
+            a = game.qs[p].policy(s)
+            print(f"Chosen action: \n{item(a, mdp)}.\n")
             t, r = game.mdp.transition(s, a)
-            while torch.sum(t).item() == torch.sum(s).item():
+            while states_equal(s, t, mdp):
                 print("Bot tried to make an illegal move.  Playing randomly.")
                 a = game.mdp.get_random_action(s)
                 t, r = game.mdp.transition(s, a)
             s = t
-        if r[0,p].item() == 1.:
-            print(game.mdp.board_str(s)[0])
-            print(f"\nThe winner is player {p} ({game.mdp.symb[p]}).\n")
-            
-
-
-while True:
-    # for i in range(mdp.num_players):
-    #     res = input(f"Enter 'b' to make bot player {i+1} ({mdp.symb[i]}) and 'p' for player. ")
-    #     if res == 'b':
-    #         bot_list[i] = True
-
-    if shortname == "ttt":
-        while True:
-            s = game.mdp.get_initial_state()
-            while game.mdp.is_terminal(s) == False:
-                p = s[0]
-                print('\n' + game.mdp.board_str(s))
-                if not bot_list[p]:
-                    re = input(f"Input position to play e.g. '1,3' for row 1, column 3. ")
-                    try:
-                        res = re.split(",")
-                        x, y = int(res[0].strip()), int(res[1].strip())
-                        if (x-1,y-1) in game.mdp.get_actions(s):
-                            s, _ = game.mdp.transition(s, (x-1,y-1))
-                        else:
-                            raise Exception()
-                    except:
-                        print("ERROR: Invalid action, try again.")
-                else:
-                    for a in game.mdp.get_actions(s):
-                        print(f"Value of action {a} is {game.qs[p].get(s, a)}.")
-                    a = game.qs[p].policy(s)
-                    print(f"Chosen action: {a}.\n")
-                    s, _ = game.mdp.transition(s, a)
-
-            winner = game.mdp.winner(s)
-            if winner == -1:
-                winnerstr = 'The game is a tie.'
-            else:
-                winnerstr = f"Player {winner + 1} ({game.mdp.symb[winner]}), {'a computer' if bot_list[winner] else 'a person'}, won."
-            print(f"{game.mdp.board_str(s)}\n{winnerstr}\n\n")
-    elif shortname == "c4":
-        while True:
-            if len(load_indices) > 0:
-                res = input("Play as first or second player?  Enter '1' or '2' or 'q' to quit: ")
-                if res == 'q':
-                    exit()
-                if res != '1' and res != '2':
-                    continue
-                if res == '1':
-                    comp = 1
-                else:
-                    comp = 0
-            else:
-                comp = -1
-
-            s = game.mdp.get_initial_state()
-            while game.mdp.is_terminal(s) == False:
-                p = s[0]
-                print(game.mdp.board_str(s))
-                if p != comp:
-                    re = input(f"Input column to play (1-7). ")
-                    s, _ = game.mdp.transition(s, int(re) - 1)
-                else:
-                    for a in game.mdp.get_actions(s):
-                        print(f"Value of action {a} is {game.qs[comp].get(s, a)}.")
-                    a = game.qs[comp].policy(s)
-                    print(f"Chosen action: {a}.\n")
-                    s, _ = game.mdp.transition(s, a)
-                
-
-            print(f"{game.mdp.board_str(s)}The winner is {game.mdp.symb[str(s[2])]}.\n\n")
-    elif shortname == "dc4":
-        while True:
-            if load_index >= 0:
-                res = input("Play as first or second player?  Enter '1' or '2' or 'q' to quit: ")
-                if res == 'q':
-                    exit()
-                if res != '1' and res != '2':
-                    continue
-                if res == '1':
-                    comp = 1
-                else:
-                    comp = 0
-            else:
-                comp = -1
-
-            s = game.mdp.get_initial_state()
-            while game.mdp.is_terminal(s).item() == False:
-                p = game.mdp.get_player(s).item()
-                print(game.mdp.board_str(s)[0])
-                if p != comp:
-                    res = input(f"Input column to play (1-7). ")
-                    s, r = game.mdp.transition(s, game.mdp.action_index_to_tensor(int(res) - 1))
-                else:
-                    print("Action values:")
-                    print(game.qs[comp].q(s.float()).tolist())
-                    a = game.qs[comp].policy(s.float())
-                    print(f"Chosen action: {a}.\n")
-                    t, r = game.mdp.transition(s, a)
-                    while torch.sum(t).item() == torch.sum(s).item():
-                        print("Bot tried to make an illegal move.  Playing randomly.")
-                        a = game.mdp.get_random_action(s)
-                        t, r = game.mdp.transition(s, a)
-                    s = t
-                if r[0,p].item() == 1.:
-                    print(game.mdp.board_str(s)[0])
-                    print(f"\nThe winner is player {p} ({game.mdp.symb[p]}).\n")
-    elif shortname == "dttt":
-        while True:
-            if load_index >= 0:
-                res = input("Play as first or second player?  Enter '1' or '2' or 'q' to quit: ")
-                if res == 'q':
-                    exit()
-                if res != '1' and res != '2':
-                    continue
-                if res == '1':
-                    comp = 1
-                else:
-                    comp = 0
-            else:
-                comp = -1
-
-            s = game.mdp.get_initial_state()
-            while game.mdp.is_terminal(s).item() == False:
-                p = game.mdp.get_player(s).item()
-                print(game.mdp.board_str(s)[0])
-                if p != comp:
-                    res = input(mdp.input_str)
-                    a = mdp.str_to_action(res)
-                    if a == None:
-                        print("Did not understand input.")
-                        continue
-                    s, r = game.mdp.transition(s,a)
-                else:
-                    print("Action values:")
-                    print(game.qs[comp].q(s.float())[0].tolist())
-                    a = game.qs[comp].policy(s.float())
-                    print(f"Chosen action: {a}.\n")
-                    t, r = game.mdp.transition(s, a)
-                    while torch.sum(t).item() == torch.sum(s).item():
-                        print("Bot tried to make an illegal move.  Playing randomly.")
-                        a = game.mdp.get_random_action(s)
-                        t, r = game.mdp.transition(s, a)
-                    s = t
-                if r[0,p].item() == 1.:
-                    print(game.mdp.board_str(s)[0])
-                    print(f"\nThe winner is player {p} ({game.mdp.symb[p]}).\n")
-
-
+    if item(r, mdp)[p] == 1.:
+        winnerstr = f"Player {p + 1} ({game.mdp.symb[p]}), {'a person' if p == player_index else 'a bot'}, won."
+    elif item(r, mdp)[p] == 0.:
+        winnerstr = 'The game is a tie.'
+    else:
+        winnerstr = "Somehow I'm not sure who won."
+    
+    print(f"\n{item(game.mdp.board_str(s), mdp, is_list=True)}\n\n{winnerstr}\n\n")

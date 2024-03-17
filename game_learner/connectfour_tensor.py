@@ -42,12 +42,16 @@ class C4TensorMDP(MDP):
     
     def str_to_action(self, input: str) -> torch.Tensor:
         try:
-            i = int(input)
+            i = int(input) - 1
             if i < 0 or i > 7:
                 raise Exception()
         except:
             return None
         return self.int_to_action(i)
+    
+    # Not for batch use
+    def states_equal(self, state1: torch.Tensor, state2: torch.Tensor) -> bool:
+        torch.sum(t).item() == torch.sum(s).item()
     
     # Return shape (batch, 7), boolean type
     def valid_action_filter(self, state: torch.Tensor):
@@ -250,6 +254,7 @@ class C4TensorMDP(MDP):
     # Sum the channels, and board factors.  The result should be 1 * 1 * 6 * 7 = 42.  If it is greater, something went wrong and we won't account for it.
     def is_full(self, state: torch.Tensor) -> torch.Tensor:
         return (abs(state.sum((1,2,3))) == 42 * torch.ones(state.shape[0], dtype=int))[:, None, None, None]
+    
     
 
 
@@ -579,16 +584,16 @@ if "test" in options:
     else:
         print("FAIL!!! No update, very unlikely.")
 
-    q = NNQFunction(mdp, C4NN, torch.nn.MSELoss(), torch.optim.SGD)
+    q = NNQFunction(mdp, C4NN, torch.nn.MSELoss(), torch.optim.Adam)
     if "slow" in options:
         print("\nCurrent values:")
         print(q.val(t))
         print("\nRunning update 100 times and checking for convergence.")
         for i in range(0, 500):
-            q.update(d, learn_rate=0.01)
+            q.update(d, learn_rate=0.00025)
             print(q.get(s,a))
-
-
+        print("Did it converge to:")
+        print(d.r + q.val(d.t.float()))
 
 
     print("\nTesting if deep Q-learning algorithm throws errors.")

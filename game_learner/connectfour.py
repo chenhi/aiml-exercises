@@ -1,6 +1,6 @@
 from qlearn import *
 import numpy as np
-import random, sys, torch
+import random, sys, torch, warnings
 
 options = sys.argv[1:]
 
@@ -13,20 +13,30 @@ options = sys.argv[1:]
 class C4MDP(MDP):
     def __init__(self):
         super().__init__(None, range(0, 7), discount=1, num_players=2, state_shape=(2,7,6), action_shape=(7,), \
-                         symb={'0': "O", '1': "X", '': "-"}, input_str="Input column to play (1-7). ")
+                         symb={0: "O", 1: "X", None: "-"}, input_str="Input column to play (1-7). ")
 
     def board_str(self, s):
         rows = ["|" for i in range(6)]
         p, cols, _ = s
         out = ""
-        out += f"Current player: {self.symb[str(p)]}\n"
+        out += f"Current player: {self.symb[p]}\n"
         for col in cols:
             for c in range(6):
-                rows[5 - c] += self.symb[''] if c >= len(col) else self.symb[col[c]]
+                rows[5 - c] += self.symb[None] if c >= len(col) else self.symb[int(col[c])]
         for row in rows:
             out += f"{row}|\n"
         out += "|1234567|"
         return out
+    
+    
+    def str_to_action(self, input: str) -> torch.Tensor:
+        try:
+            i = int(input) - 1
+            if i < 0 or i > 7:
+                raise Exception()
+        except:
+            return None
+        return i
 
     def get_actions(self, state):
         notfull = []
