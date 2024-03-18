@@ -12,7 +12,7 @@ options = sys.argv[1:]
 # Set of actions: integers [0, 6]
 class C4MDP(MDP):
     def __init__(self):
-        super().__init__(None, range(0, 7), discount=1, num_players=2, state_shape=(2,7,6), action_shape=(7,), \
+        super().__init__(None, range(0, 7), discount=1, num_players=2, \
                          symb={0: "O", 1: "X", None: "-"}, input_str="Input column to play (1-7). ")
 
     def board_str(self, s):
@@ -59,9 +59,6 @@ class C4MDP(MDP):
                 tensor[int(state[1][i][j])][i][j] = 1.
         return tensor
     
-    # Input shape (2, 7, 6), i.e. no batch.  Any non-zero value in a channel is interpreted as 1.
-    def tensor_to_state(self, state_tensor: torch.Tensor):
-        pass
 
     # Input shape (batch_size, 7) or (7, )
     # Returns torch.Tensor in first case, scalar in second case

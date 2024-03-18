@@ -20,7 +20,8 @@ The Q-values generally got lower.  Somtimes they became more differentiated, and
 * I bumped the learning rate up from 0.0001 to 0.001 and ran it again.  It improved on one case, but still not optimal, and still sometimes tries to make illegal moves (one of which results in a loss).  I called this model "almostoptimal2".
 * I noticed that the loss would dive down but then slowly start to climb.  I trained another model, this time stopping where the loss minimized.  The resulting AI was quite bad.  Possible reason: the loss decreases as the policy network learns to play against its own weights, but climbs as it starts to learn against itself.  When the learning rate was 0.0001, the loss didn't rise and kept going down.
 * Tried 0.0005, the loss seemed to converge but it failed the corner test unfortunately.
-* Tried 0.001 and upped the penalty to -2.  This decreased the number of penalties but still the AI isn't playing optimally.  I retrained it once barely changing the parameters and it became optimal.
+* Tried 0.001 and upped the penalty to -2.  This decreased the number of penalties but still the AI isn't playing optimally.  I retrained it once barely changing the parameters and it became optimal.  I trained it again, the exact same parameters, and it sometimes didn't take winning strategies as player 2 (going for ties).  [Side observation: the deep AI tends to play center as player 2, while the classical AI tends to play side.]  Looking at the loss graphs, player 2 for the non-optimal AI had a higher loss and didn't seem to be converging as quickly.
+
 
 
 Connect Four:

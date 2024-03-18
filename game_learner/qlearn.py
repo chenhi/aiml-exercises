@@ -3,7 +3,7 @@ import random, pickle
 
 # WARNING: states and actions must be hashable if using with QFunction.
 class MDP():
-    def __init__(self, states, actions, discount=1, num_players=1, state_shape = None, action_shape = None, penalty = -1000, symb = {}, input_str = "", batched=False):
+    def __init__(self, states, actions, discount=1, num_players=1, penalty = -1000, symb = {}, input_str = "", batched=False):
         self.actions = actions
         self.discount = discount
         self.num_players = num_players
@@ -14,15 +14,8 @@ class MDP():
 
         # The states do not literally have to be tensors for the state_shape to be defined.  This just specifies, when they are turned into tensors, what shape they should be have, ignoring batch dimension
         self.states = states
-        self.state_shape = state_shape
-        self.actions = actions
-        self.action_shape = action_shape
 
-        # Useful for getting things in the right shape
-        if self.state_shape != None:
-            self.state_projshape = tuple([1 for i in self.state_shape])
-        if self.action_shape != None:
-            self.action_projshape = tuple([1 for i in self.action_shape])
+        self.actions = actions
         
     def str_to_action(self, input: str):
         raise NotImplementedError

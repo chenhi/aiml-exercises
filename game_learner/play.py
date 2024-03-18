@@ -91,17 +91,40 @@ if train_new:
         except:
             print(f"Not a valid value.  Setting greed to {default}.")
             expl = default
-
-        default=0.1
-        res = input(f"Learning rate? A number in [0, 1] (default {default}): ")
+    if type == "dqn":
+        default = 1.0
+        res = input(f"Start (un-)greed?  A number in [0, 1] (default {default}): ")
         try:
-            lr = float(res)
-            if lr < 0 or lr > 1:
+            expl_start = 1. - float(res)
+            if expl_start < 0 or expl_start > 1:
                 raise Exception
         except:
-            print(f"Not a valid value.  Setting learning rate to {default}.")
-            lr = default
+            print(f"Not a valid value.  Setting greed to {default}.")
+            expl_start = default
+        default = 0.1
+        res = input(f"End (un-)greed?  A number in [0, 1] (default {default}): ")
+        try:
+            expl_end = 1. - float(res)
+            if expl_end < 0 or expl_end > 1:
+                raise Exception
+        except:
+            print(f"Not a valid value.  Setting greed to {default}.")
+            expl_end = default
+        
+    if type == "qlearn":
+        default=0.1
+    elif type == "dqn":
+        default = 0.00025
+    res = input(f"Learning rate? A number in [0, 1] (default {default}): ")
+    try:
+        lr = float(res)
+        if lr < 0 or lr > 1:
+            raise Exception
+    except:
+        print(f"Not a valid value.  Setting learning rate to {default}.")
+        lr = default
 
+    if type == "qlearn":
         default = 64
         res = input(f"How many game runs between AI updates (default {default}): ")
         try:
@@ -122,26 +145,37 @@ if train_new:
             print(f"Not a valid value.  Setting iterations to {default}.")
             its = default
         
-        res = input("Name of file (alphanumeric only, max length 64, w/o extension): ")
-        fname_end = re.sub(r'\W+', '', res)[0:64] + f"-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}{file_ext}"
-        fname = 'bots/' + fname_end
+
+
+    res = input("Name of file (alphanumeric only, max length 64, w/o extension): ")
+    fname_end = re.sub(r'\W+', '', res)[0:64] + f"-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}{file_ext}"
+    fname = 'bots/' + fname_end
+    logpath = fname + ".log"
         
+    if type == "qlearn":
         game.set_greed(expl)
         game.batch_learn(lr, its, eps, 1000, verbose=True, savefile=fname + ".exp")
 
         # Save the AI
         game.save_q(fname)
 
-    elif type == "dqn":
-        res = "tempname"
-        fname_end = re.sub(r'\W+', '', res)[0:64] + f"-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}{file_ext}"
-        fname = 'bots/' + fname_end
-        logpath = fname + ".log"
+    if type == "dqn":
+        
         
         #game.deep_learn(learn_rate=0.0001, greed_start = 1, greed_end = 0.3, episodes=5000, episode_length=20, batch_size=4, episodes_before_train=500, train_batch_size=32, copy_frequency=250, savelog=logpath, verbose=True)
-        game.deep_learn(learn_rate=0.0001, greed_start = 1, greed_end = 0.1, episodes=2000, episode_length=20, batch_size=4, episodes_before_train=200, train_batch_size=32, copy_frequency=250, savelog=logpath, verbose=True)
         
+        # This one gave good results for tic tac toe
+        #game.deep_learn(learn_rate=0.0001, greed_start =1.0, greed_end = 0.1, episodes=2000, episode_length=20, batch_size=4, episodes_before_train=200, train_batch_size=32, copy_frequency=250, savelog=logpath, verbose=True)
+        
+        # Trying C4
+        #game.deep_learn(learn_rate=0.0001, greed_start = 1, greed_end = 0.1, episodes=2000, episode_length=50, batch_size=4, episodes_before_train=500, train_batch_size=32, copy_frequency=250, savelog=logpath, verbose=True)
+        
+        
+
         #game.deep_learn(learn_rate=0.0001, greed_start = 1, greed_end = 0.3, episodes=500, episode_length=20, batch_size=4, episodes_before_train=50, train_batch_size=32, copy_frequency=25, savelog=logpath, verbose=True)
+        
+        game.deep_learn(learn_rate=lr, greed_start=expl_start, greed_end=expl_end, episodes=2000, episode_length=50, batch_size=4, episodes_before_train=500, train_batch_size=32, copy_frequency=250, savelog=logpath, verbose=True)
+        
         game.save_q(fname)
 
 
@@ -186,6 +220,7 @@ if simulate:
     exit()
 
 
+# TODO Load two computers vs two humans?
 
 bot_list = [False for i in range(mdp.num_players)]
 
@@ -214,7 +249,7 @@ while True:
             print("Unrecognized response.")
             continue
         
-
+    
     s = game.mdp.get_initial_state()
     while item(game.mdp.is_terminal(s), mdp) == False:
         p = item(game.mdp.get_player(s), mdp)

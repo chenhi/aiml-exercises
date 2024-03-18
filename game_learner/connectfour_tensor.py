@@ -14,26 +14,98 @@ import torch
 
 options = sys.argv[1:]
 
+# A shift function with truncation, like torch.roll except without the "rolling over"
+def shift(x: torch.Tensor, shift: int, axis: int) -> torch.Tensor:
+    if shift == 0:
+        return x
+    if abs(shift) >= x.shape[axis]:
+        return torch.zeros(x.shape, dtype=int)
+    
+    zero_shape = list(x.shape)
+    if shift > 0:
+        zero_shape[axis] = shift
+        return torch.cat((torch.zeros(zero_shape, dtype=int), torch.index_select(x, axis, torch.arange(0, x.shape[axis] - shift))), axis)
+    else:
+        zero_shape[axis] = -shift
+        return torch.cat((torch.index_select(x, axis, torch.arange(-shift, x.shape[axis])), torch.zeros(zero_shape, dtype=int)), axis)
+
+
+
 
 # State tensor shape (batches, player_channel = 2, row = 6, column = 7)
 # Action tensor (batches, column = 7)
 # Reward tensor (batches, )
-class C4TensorMDP(MDP):
+class C4TensorMDP(TensorMDP):
+
     def __init__(self):
-        super().__init__(None, None, discount=1, num_players=2, state_shape=(2,6,7), action_shape=(7,), batched=True, \
+        super().__init__(state_shape=(2,6,7), action_shape=(7,), discount=1, num_players=2, batched=True, \
                          symb = {0: "O", 1: "X", None: "-"}, input_str = "Input column to play (1-7). ", penalty=-2)
+        
+        # Generate kernels for detecting winner
+        # Shape: (6*7, 16, 6, 7)
+        # The first dimension corresponds to the flattened index of the center (i, j) <--> 7i + j
+        stacks = []
+        for i in range(6):
+            for j in range(7):
+                filters = []
+                center = torch.zeros((6, 7), dtype=int)
+                center[i, j] = 1
+                # Make the vertical filters
+                u1 = shift(center, 1, 0)
+                u2 = shift(center, 2, 0)
+                u3 = shift(center, 3, 0)
+                d1 = shift(center, -1, 0)
+                d2 = shift(center, -2, 0)
+                d3 = shift(center, -3, 0)
+                filters.append(center + u1 + u2 + u3)
+                filters.append(d1 + center + u1 + u2)
+                filters.append(d2 + d1 + center + u1)
+                filters.append(d3 + d2 + d1 + center)
 
-    # Logic: if player 0 has more pieces than player 1, then it's player 1's turn.  Otherwise, it's player 0's turn.
-    # Return shape (batch, 1, 1, 1)
-    def get_player(self, state: torch.Tensor) -> torch.Tensor:
-        summed = abs(state.sum((2,3)))
-        return (1 * (summed[:,0] > summed[:,1])).to(dtype=int)[:, None, None, None]
+                # Make the horizontal filters
+                r1 = shift(center, 1, 1)
+                r2 = shift(center, 2, 1)
+                r3 = shift(center, 3, 1)
+                l1 = shift(center, -1, 1)
+                l2 = shift(center, -2, 1)
+                l3 = shift(center, -3, 1)
+                filters.append(center + r1 + r2 + r3)
+                filters.append(l1 + center + r1 + r2)
+                filters.append(l2 + l1 + center + r1)
+                filters.append(l3 + l2 + l1 + center)
+                
+                # Make the diagonal filters
+                ur1 = shift(shift(center, 1, 0), 1, 1)
+                ur2 = shift(shift(center, 2, 0), 2, 1)
+                ur3 = shift(shift(center, 3, 0), 3, 1)
+                dl1 = shift(shift(center, -1, 0), -1, 1)
+                dl2 = shift(shift(center, -2, 0), -2, 1)
+                dl3 = shift(shift(center, -3, 0), -3, 1)
+                filters.append(center + ur1 + ur2 + ur3)
+                filters.append(dl1 + center + ur1 + ur2)
+                filters.append(dl2 + dl1 + center + ur1)
+                filters.append(dl3 + dl2 + dl1 + center)
 
-    # Return shape (batch, 2, 1, 1)
-    def get_player_vector(self, state: torch.Tensor) -> torch.Tensor:
-        return torch.eye(2, dtype=int)[self.get_player(state)[:, 0, 0, 0]][:,:,None, None] # TODO maybe improve this
+                # Make the diagonal filters
+                ul1 = shift(shift(center, 1, 0), -1, 1)
+                ul2 = shift(shift(center, 2, 0), -2, 1)
+                ul3 = shift(shift(center, 3, 0), -3, 1)
+                dr1 = shift(shift(center, -1, 0), 1, 1)
+                dr2 = shift(shift(center, -2, 0), 2, 1)
+                dr3 = shift(shift(center, -3, 0), 3, 1)
+                filters.append(center + ul1 + ul2 + ul3)
+                filters.append(dr1 + center + ul1 + ul2)
+                filters.append(dr2 + dr1 + center + ul1)
+                filters.append(dr3 + dr2 + dr1 + center)
 
-    # Non-batch and not used in internal code, but might be useful
+                # Shape (16, 6, 7)
+                stacks.append(torch.stack(filters))
+        # Shape (42, 16, 6, 7)
+        self.filter_stack = torch.stack(stacks)
+
+    ##### UI RELATED METHODS #####
+    # Non-batch and not used in internal code, efficiency not as important
+        
     # Return shape (1, 7)
     def int_to_action(self, index: int):
         if index < 0 or index > 7:
@@ -50,40 +122,12 @@ class C4TensorMDP(MDP):
             return None
         return self.int_to_action(i)
     
-    # Return shape (batch, 7), boolean type
-    def valid_action_filter(self, state: torch.Tensor):
-        return state.sum((1,2)) < 6
-
-    # Gets a random valid action; if there are none, then it plays in the 0th column.
-    def get_random_action(self, state, max_tries=100):
-        #indices = (torch.rand(state.size(0)) * 7).int()
-        #indices = (torch.rand((state.size(0), 7)) * self.valid_action_filter(state).int()).max(1).indices
-        #return torch.eye(7, dtype=int)[None].expand(state.size(0), -1, -1)[torch.arange(state.size(0)), indices]
-        filter = self.valid_action_filter(state)
-        tries = 0
-        while (filter.count_nonzero(dim=1) <= 1).prod().item() != 1:                            # Almost always terminates after one step
-            temp = torch.rand(state.size(0), 7) * filter
-            filter = temp == temp.max()
-            tries += 1
-            if tries >= max_tries:
-                break
-        return filter.int()
-
-    # Return shape (batch, 2, 1, 1)
-    def swap_player(self, player_vector: torch.Tensor) -> torch.Tensor:
-        return torch.tensordot(player_vector, torch.tensor([[0,1],[1,0]], dtype=int), dims=([1], [0])).swapaxes(1, -1)
-
-    # Return shape (batch_size, 2, 6, 7)
-    def get_initial_state(self, batch_size=1) -> torch.Tensor:
-        return torch.zeros((batch_size, 2, 6, 7), dtype=int)   
-
     def action_str(self, action: torch.Tensor) -> list[str]:
         outs = []
         for i in range(action.shape[0]):
             a = action[i, :].max(0).indices.item()
             outs.append(f"column {a+1}")
         return outs
-
 
     # Returns a pretty looking board in a string.
     def board_str(self, state: torch.Tensor) -> list[str]:
@@ -117,21 +161,87 @@ class C4TensorMDP(MDP):
             outs.append(out)
         return outs
 
+    ##### INTERNAL LOGIC #####
+
+
+    ### PLAYERS ### 
+
+    # Return shape (batch, 1, 1, 1)
+    def get_player(self, state: torch.Tensor) -> torch.Tensor:
+        return (state.sum((1,2,3)) % 2)[:,None,None,None]
+
+    # Return shape (batch, 2, 1, 1)
+    def get_player_vector(self, state: torch.Tensor) -> torch.Tensor:
+        return torch.eye(2, dtype=int)[None].expand(state.size(0),-1,-1)[torch.arange(state.size(0)),self.get_player(state)[:, 0, 0, 0]][:,:,None, None]
+    
+    # Return shape (batch, 2, 1, 1)
+    def swap_player(self, player_vector: torch.Tensor) -> torch.Tensor:
+        return torch.tensordot(player_vector, torch.tensor([[0,1],[1,0]], dtype=int), dims=([1], [0])).swapaxes(1, -1)
+
+
+
+    ### ACTIONS ###
+
+    # Return shape (batch, 7), boolean type
+    def valid_action_filter(self, state: torch.Tensor):
+        return state.sum((1,2)) < 6
+
+    # Gets a random valid action; if none, returns zero
+    def get_random_action(self, state, max_tries=100):
+        filter = self.valid_action_filter(state)
+        while (filter.count_nonzero(dim=1) <= 1).prod().item() != 1:                            # Almost always terminates after one step
+            filter = torch.rand(filter.shape) * filter
+            filter = (filter == filter.max(1).values[:,None])
+            max_tries -= 1
+            if max_tries == 0:
+                break
+        return filter.int()
+
     # Sum the channels and columns, add the action, should be <= 6.  Then, do an "and" along the rows.
-    # Input shape (batch, 2, 6, 7) and (batch, 7)
-    # Return shape (batch, 1)
+    # Input shape (batch, 2, 6, 7) and (batch, 7), return shape (batch, 1)
     def is_valid_action(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
-        if state.shape[0] != action.shape[0]:
-            raise Exception("Batch sizes must agree.")
         return torch.prod(state.sum((1,2)) + action <= 6, 1)
+
+
+    ### STATES ###
+
+    # Return shape (batch_size, 2, 6, 7)
+    def get_initial_state(self, batch_size=1) -> torch.Tensor:
+        return torch.zeros((batch_size, 2, 6, 7), dtype=int)   
+    
+    # Checks for a winner centered at a given position
+    # Inputs: state has stape (batch, 2, 6, 7), player has shape (batch, ), and center has shape (batch, 6, 7)
+    # Returns a shape (batch, 1, 1, 1) boolean saying whether the indicated player is a winner.
+    def is_winner(self, state: torch.Tensor, player: torch.Tensor, center: torch.Tensor) -> torch.Tensor:
+        return ((torch.tensordot((state[torch.arange(state.shape[0]), player[:,0,0,0]][:,None,None,:,:] * center[:,:,:,None,None]).flatten(1, 2), self.filter_stack, ([1,2,3], [0,2,3])) == 4).sum(1) > 0)[:,None, None, None]
+        # Unwound version
+        # Get the channel for the indicated player, shape (batch, 6, 7)
+        #player_board = state[torch.arange(state.shape[0]), player[:,0,0,0]]
+        # Put in the position of the last move and flatten it, shape (batch, 42, 6, 7)
+        #player_board_center = (player_board[:,None,None,:,:] * center[:,:,:,None,None]).flatten(1, 2)
+        # Put in the stack of filters, shape (batch, 16), i.e. contract along the size 42 dimension, then take the dot product between the board and filters, i.e. contract again
+        #dotted = torch.tensordot(player_board_center, self.filter_stack, ([1,2,3], [0,2,3]))
+        # If any 4's appear, then this is a winner
+        #return ((dotted == 4).sum(1) > 0)[:,None, None, None]
+
+    # The game is short enough that maybe we don't care about intermediate states
+    def get_random_state(self) -> torch.Tensor:
+        return self.get_initial_state()
+
+    # Indicate a terminal state by negating everything.  So, if the maximum value of the negation is positive, then it is a terminal state.
+    def is_terminal(self, state: torch.Tensor) -> torch.Tensor:
+        return ((state * -1).flatten(1,3).max(1).values > 0)[:, None, None, None]
+    
+    # Sum the channels, and board factors.  The result should be 1 * 1 * 6 * 7 = 42.  If it is greater, something went wrong and we won't account for it.
+    def is_full(self, state: torch.Tensor) -> torch.Tensor:
+        return (abs(state.sum((1,2,3))) == 42 * torch.ones(state.shape[0], dtype=int))[:, None, None, None]
+
+
+    ### TRANSITION ###
 
     # Reward is 1 for winning the game, -1 for losing, and 0 for a tie; awarded upon entering terminal state
     # Return tuple of tensors with shape (batch, ) + state_shape for the next state and (batch, 2) for the reward
     def transition(self, state: torch.Tensor, action: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        # If the batches don't match, this can cause weird behavior.
-        if state.shape[0] != action.shape[0]:
-            raise Exception("Batch sizes must agree.")
-        
         # If the state is terminal, don't do anything.  Zero out the corresponding actions.
         action = (self.is_terminal(state) == False)[:, :, 0, 0] * action
         p = self.get_player(state)
@@ -140,15 +250,18 @@ class C4TensorMDP(MDP):
         # Make the move!  Note this operation is safe: if the move is invalid, no move will be made.
         # First, get the position we want to add by summing the channels and columns: state.sum((1,2))
         # This has shape (batch, 7); we extend it by ones to shape (batch, 6, 7): torch.tensordot(state.sum((1,2)), torch.ones(6, dtype=int), 0)
-        coltotals = state.sum((1,2))[:,None,:].expand(-1,6,-1)
+        #coltotals = state.sum((1,2))[:,None,:].expand(-1,6,-1)
         # Then, we compare it to tensor of shape (7, 6) to get a tensor of shape (batch, 6, 7).  The result is a board with True along the correct row
-        rowcounter = torch.arange(6, dtype=int)[:,None].expand(-1,7)
+        #rowcounter = torch.arange(6, dtype=int)[:,None].expand(-1,7)
         # Then, we multiply it with action to isolate the right column, shape (batch, 6, 7)
-        newpos = action[:,None,:].expand(-1,6,-1)  * (coltotals == rowcounter)
+        #newpos = action[:,None,:].expand(-1,6,-1)  * (coltotals == rowcounter)
+        newpos = action[:,None,:].expand(-1,6,-1)  * (state.sum((1,2))[:,None,:].expand(-1,6,-1) == torch.arange(6, dtype=int)[:,None].expand(-1,7))
+        
         # Then, we put the player channel back in to get a shape (batch, 2, 7, 6)
-        newpiece = p_tensor * newpos[:,None,:,:].expand(-1,2,-1,-1)
+        #newpiece = p_tensor * newpos[:,None,:,:].expand(-1,2,-1,-1)
         # Then, we add it to the state
-        newstate = state + newpiece
+        #newstate = state + newpiece
+        newstate = state + p_tensor * newpos[:,None,:,:].expand(-1,2,-1,-1)
 
         # Check whether the current player is a winner after playing at position newpos
         winner = self.is_winner(newstate, p, newpos)
@@ -167,132 +280,33 @@ class C4TensorMDP(MDP):
         
         return newstate, reward
 
-    # A shift function with truncation, like torch.roll except without the "rolling over"
-    def shift(self, x: torch.Tensor, shift: int, axis: int) -> torch.Tensor:
-        if shift == 0:
-            return x
-        if abs(shift) >= x.shape[axis]:
-            return torch.zeros(x.shape, dtype=int)
-        
-        zero_shape = list(x.shape)
-        if shift > 0:
-            zero_shape[axis] = shift
-            return torch.cat((torch.zeros(zero_shape, dtype=int), torch.index_select(x, axis, torch.arange(0, x.shape[axis] - shift))), axis)
-        else:
-            zero_shape[axis] = -shift
-            return torch.cat((torch.index_select(x, axis, torch.arange(-shift, x.shape[axis])), torch.zeros(zero_shape, dtype=int)), axis)
 
-    # Inputs: state has stape (batch, 2, 6, 7), player has shape (batch, ), and lastmove has shape (batch, 6, 7)
-    # Returns a shape (batch, ) boolean saying whether the indicated player is a winner.
-    def is_winner(self, state: torch.Tensor, player: torch.Tensor, lastmove: torch.Tensor) -> torch.Tensor:
-        if state.shape[0] != player.shape[0] or player.shape[0] != lastmove.shape[0]:
-            raise Exception("Batch sizes must agree.")
-        batches = state.shape[0]
 
-        # Get the channel for the indicated player, shape (batch, 6, 7)
-        player_board = state[torch.arange(batches), player[:,0,0,0]]
-
-        filters = []
-        # Make the horizontal filters
-        u1 = self.shift(lastmove, 1, 1)
-        u2 = self.shift(lastmove, 2, 1)
-        u3 = self.shift(lastmove, 3, 1)
-        d1 = self.shift(lastmove, -1, 1)
-        d2 = self.shift(lastmove, -2, 1)
-        d3 = self.shift(lastmove, -3, 1)
-        filters.append(lastmove + u1 + u2 + u3)
-        filters.append(d1 + lastmove + u1 + u2)
-        filters.append(d2 + d1 + lastmove + u1)
-        filters.append(d3 + d2 + d1 + lastmove)
-
-        # Make the horizontal filters
-        r1 = self.shift(lastmove, 1, 2)
-        r2 = self.shift(lastmove, 2, 2)
-        r3 = self.shift(lastmove, 3, 2)
-        l1 = self.shift(lastmove, -1, 2)
-        l2 = self.shift(lastmove, -2, 2)
-        l3 = self.shift(lastmove, -3, 2)
-        filters.append(lastmove + r1 + r2 + r3)
-        filters.append(l1 + lastmove + r1 + r2)
-        filters.append(l2 + l1 + lastmove + r1)
-        filters.append(l3 + l2 + l1 + lastmove)
-        
-        # Make the diagonal filters
-        ur1 = self.shift(self.shift(lastmove, 1, 1), 1, 2)
-        ur2 = self.shift(self.shift(lastmove, 2, 1), 2, 2)
-        ur3 = self.shift(self.shift(lastmove, 3, 1), 3, 2)
-        dl1 = self.shift(self.shift(lastmove, -1, 1), -1, 2)
-        dl2 = self.shift(self.shift(lastmove, -2, 1), -2, 2)
-        dl3 = self.shift(self.shift(lastmove, -3, 1), -3, 2)
-        filters.append(lastmove + ur1 + ur2 + ur3)
-        filters.append(dl1 + lastmove + ur1 + ur2)
-        filters.append(dl2 + dl1 + lastmove + ur1)
-        filters.append(dl3 + dl2 + dl1 + lastmove)
-
-        # Make the diagonal filters
-        ul1 = self.shift(self.shift(lastmove, 1, 1), -1, 2)
-        ul2 = self.shift(self.shift(lastmove, 2, 1), -2, 2)
-        ul3 = self.shift(self.shift(lastmove, 3, 1), -3, 2)
-        dr1 = self.shift(self.shift(lastmove, -1, 1), 1, 2)
-        dr2 = self.shift(self.shift(lastmove, -2, 1), 2, 2)
-        dr3 = self.shift(self.shift(lastmove, -3, 1), 3, 2)
-        filters.append(lastmove + ul1 + ul2 + ul3)
-        filters.append(dr1 + lastmove + ul1 + ul2)
-        filters.append(dr2 + dr1 + lastmove + ul1)
-        filters.append(dr3 + dr2 + dr1 + lastmove)
-
-        # Shape (16, batch, 6, 7)
-        filter_tensor = torch.stack(filters)
-
-        # Sum along the board axes, check how many filters give rise to 4, then sum that number, then check if it is positive
-        return (((player_board[None,:,:,:].expand(16, -1, -1, -1) * filter_tensor).sum((2,3)) == (torch.ones(16, dtype=int) * 4)[:,None].expand(-1, batches)).sum(0) > 0)[:,None, None, None]
-    
-    # The game is short enough that maybe we don't care about intermediate states
-    def get_random_state(self) -> torch.Tensor:
-        return self.get_initial_state()
-
-    # Indicate a terminal state by negating everything.  So, if the maximum value of the negation is positive, then it is a terminal state.
-    def is_terminal(self, state: torch.Tensor) -> torch.Tensor:
-        return ((state * -1).flatten(1,3).max(1).values > 0)[:, None, None, None]
-    
-    # Sum the channels, and board factors.  The result should be 1 * 1 * 6 * 7 = 42.  If it is greater, something went wrong and we won't account for it.
-    def is_full(self, state: torch.Tensor) -> torch.Tensor:
-        return (abs(state.sum((1,2,3))) == 42 * torch.ones(state.shape[0], dtype=int))[:, None, None, None]
     
     
 
 
 
 
-# Some prototyping the neural network
-# Input tensors have shape (batch, 2, 7, 6)
 class C4NN(nn.Module):
     def __init__(self):
         super().__init__()
         self.stack = nn.Sequential(
-            nn.Conv2d(2, 32, (3,3), padding='same'),
+            nn.Conv2d(2, 32, (5,5), padding='same'),
             nn.ReLU(),
             #nn.Dropout(p=0.2),             # Dropout introduces randomness into the Q function.  Not sure if this is desirable.
             #nn.BatchNorm2d(32),
-            nn.Conv2d(32, 64, (5,5), padding='same'),
+            nn.Conv2d(32, 64, (3,3), padding='same'),
             nn.ReLU(),
             #nn.BatchNorm2d(64),
             nn.Flatten(),
-            nn.Linear(64*7*6, 64*7*6),
+            nn.Linear(64*7*6, 128*7*6),
             nn.ReLU(),
+            #nn.Linear(128*7*6, 256*7*6),
+            #nn.ReLU(),
             #nn.BatchNorm1d(64*7*6),
-            nn.Linear(64*7*6, 7)
+            nn.Linear(128*7*6, 7)
         )
-    
-    def zero_out(self):
-        nn.init.zeros_(self.stack[0].weight)
-        nn.init.zeros_(self.stack[0].bias)
-        nn.init.zeros_(self.stack[2].weight)
-        nn.init.zeros_(self.stack[2].bias)
-        nn.init.zeros_(self.stack[5].weight)
-        nn.init.zeros_(self.stack[5].bias)
-        nn.init.zeros_(self.stack[7].weight)
-        nn.init.zeros_(self.stack[7].bias)
 
     def forward(self, x):
         return self.stack(x)
@@ -523,7 +537,7 @@ if "test" in options:
 
     print("\nTesting get_random_action() and NNQFunction.get().")
     q = NNQFunction(mdp, C4NN, torch.nn.HuberLoss(), torch.optim.SGD)
-    s = torch.zeros((64, 2, 6, 7)).float()
+    s = torch.zeros((64, 2, 6, 7)).int()
     a = mdp.get_random_action(s)
     
     if verbose:
@@ -537,8 +551,8 @@ if "test" in options:
 
     print("\nTesting basic execution of val() and policy().")
     ok = True
-    s = torch.zeros((7, 2, 6, 7)).float()
-    a = torch.eye(7).float()
+    s = torch.zeros((7, 2, 6, 7)).int()
+    a = torch.eye(7).int()
     if verbose:
         print("This list is q(s, a), with a ranging through all actions.")
         print(q.get(s, a))

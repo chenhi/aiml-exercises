@@ -54,14 +54,36 @@ class ExperienceReplay():
     
 
 
-#class TensorMDP(MDP):
-#    def 
+class TensorMDP(MDP):
+    def __init__(self, state_shape, action_shape, discount=1, num_players=1, penalty = -2, symb = {}, input_str = "", batched=False):
+        
+        super().__init__(None, None, discount, num_players, penalty, symb, input_str, batched)
 
+        # Whether we filter out illegal moves in training or not
+        #self.filter_illegal = filter_illegal
 
+        self.state_shape = state_shape
+        self.action_shape = action_shape
+
+        # Useful for getting things in the right shape
+        self.state_projshape = (1, ) * len(self.state_shape)
+        self.action_projshape = (1, ) * len(self.action_shape)
+
+        self.state_linshape = 0
+        for i in range(len(self.state_shape)):
+            self.state_linshape += self.state_shape[i]
+        self.action_linshape = 0
+        for i in range(len(self.action_shape)):
+            self.action_linshape += self.action_shape[i]
+
+    def valid_action_filter(self, state: torch.Tensor) -> torch.Tensor:
+        raise NotImplementedError
+
+        
 
 # A Q-function where the inputs and outputs are all tensors
 class NNQFunction(QFunction):
-    def __init__(self, mdp: MDP, q_model, loss_fn, optimizer_class: torch.optim.Optimizer):
+    def __init__(self, mdp: TensorMDP, q_model, loss_fn, optimizer_class: torch.optim.Optimizer):
         if mdp.state_shape == None or mdp.action_shape == None:
             raise Exception("The input MDP must handle tensors.")
         self.q = q_model()
@@ -92,22 +114,23 @@ class NNQFunction(QFunction):
     def val(self, state) -> torch.Tensor:
         if self.q == None:
             return torch.zeros(state.size(0))
-        terminal = torch.flatten(self.mdp.is_terminal(state.float()))
-        return torch.flatten(self.q(state.float()), 1, -1).max(1).values * ~terminal
+        return self.q(state.float()).flatten(1, -1).max(1).values * ~torch.flatten(self.mdp.is_terminal(state.float()))
     
     # Input is a batch of state vectors
     # Returns the value of an optimal policy at a given state, shape (batches, ) + action_shape
-    def policy(self, state) -> torch.Tensor:                        # TODO how does it choose from multiple?
+    def policy(self, state, max_tries=100) -> torch.Tensor:
         if self.q == None:
             return self.mdp.get_random_action(state)
         
-        flattened_indices = torch.flatten(self.q(state.float()), 1, -1).max(1).indices
-        linear_dim = 1
-        for d in self.mdp.action_shape:
-            linear_dim *= d
-        indices_onehot = (torch.eye(linear_dim)[None] * torch.ones((state.size(0), 1, 1)))[torch.arange(state.size(0)), flattened_indices]
-        return indices_onehot.reshape((state.size(0), ) + self.mdp.action_shape)
-
+        filter = self.q(state.float()).flatten(1, -1)
+        filter = (filter == filter.max(1).values[:,None])
+        while (filter.count_nonzero(dim=1) <= 1).prod().item() != 1:                            # Almost always terminates after one step
+            filter = torch.rand(filter.shape) * filter
+            filter = (filter == filter.max(1).values[:,None])
+            max_tries -= 1
+            if max_tries == 0:
+                break
+        return filter.unflatten(1, self.mdp.action_shape).int()   
 
     # Does a Q-update based on some observed set of data
     # TransitionData entries are tensors
@@ -141,7 +164,7 @@ class NNQFunction(QFunction):
 # Input shape (batch_size, ) + state_tensor
 # We implement a random tensor of 0's and 1's generating a random tensor of floats in [0, 1), then converting it to a bool, then back to a float.
 def greedy_tensor(q: NNQFunction, state, eps = 0.):
-    return q.mdp.get_random_action(state) if random.random() < eps else q.policy(state)
+    return q.mdp.get_random_action(state) if random.random() < eps else q.policy(state).int() # TODO int vs float for states
 
 def get_greedy_tensor(q: NNQFunction, eps: float) -> callable:
     return lambda s: greedy_tensor(q, s, eps)
@@ -151,7 +174,7 @@ def get_greedy_tensor(q: NNQFunction, eps: float) -> callable:
 # For now, for simplicity, fix a single strategy
 # Note that qs is policy_qs
 class DQN():
-    def __init__(self, mdp: MDP, q_model: nn.Module, loss_fn, optimizer, memory_capacity: int):
+    def __init__(self, mdp: TensorMDP, q_model: nn.Module, loss_fn, optimizer, memory_capacity: int):
         # An mdp that encodes the rules of the game.  The current player is part of the state, which is of the form (current player, actual state)
         self.mdp = mdp
         self.target_qs = [NNQFunction(mdp, q_model, loss_fn, optimizer) for i in range(mdp.num_players)]
@@ -325,16 +348,15 @@ class DQN():
                 p = self.mdp.get_player(s)                                  # p.shape = (batch, )       s.shape = (batch, 2, 6, 7)
 
                 # To get the actions, apply each player's strategy
-                a = torch.zeros((batch_size, ) + self.mdp.action_shape)
+                a = torch.zeros((batch_size, ) + self.mdp.action_shape, dtype=int)
                 for pi in range(self.mdp.num_players):
                     # Get the indices corresponding to this player's turn
                     indices = torch.arange(batch_size)[p.flatten() == float(pi)].tolist()
                     
                     # Apply thie player's strategy to their turns
                     # Greedy is not parallelized, so there isn't efficiency loss with this
-                    player_actions = torch.cat([greedy_tensor(self.target_qs[pi], s[l:l+1], greed_cur) if l in indices else torch.zeros((1, ) + self.mdp.action_shape) for l in range(batch_size)], 0)
+                    player_actions = torch.cat([greedy_tensor(self.target_qs[pi], s[l:l+1], greed_cur) if l in indices else torch.zeros((1, ) + self.mdp.action_shape, dtype=int) for l in range(batch_size)], 0)
                     a += player_actions
-
 
                 # Do the transition 
                 t, r = self.mdp.transition(s, a)

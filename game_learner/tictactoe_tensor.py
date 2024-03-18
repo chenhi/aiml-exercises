@@ -5,9 +5,9 @@ import torch, sys
 options = sys.argv[1:]
 
 
-class TTTTensorMDP(MDP):
+class TTTTensorMDP(TensorMDP):
     def __init__(self):
-        super().__init__(None, None, discount=1, num_players=2, state_shape=(2,3,3), action_shape=(3,3), batched=True, \
+        super().__init__(state_shape=(2,3,3), action_shape=(3,3), discount=1, num_players=2, batched=True, \
                          symb = {0: "X", 1: "O", None: "-"}, input_str = "Input position to play, e.g. '1, 3' for the 1st row and 3rd column: ", penalty=-2)
 
     def __str__(self):
@@ -162,8 +162,9 @@ class TTTNN(nn.Module):
             #nn.Unflatten(1, (3, 3))
         )
     
+    # Output of the stack is shape (batch, 1, 3, 3), so we do a simple reshaping.
     def forward(self, x):
-        return self.stack(x)
+        return self.stack(x)[:,0]
 
 
 
