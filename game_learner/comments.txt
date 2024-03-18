@@ -22,6 +22,10 @@ The Q-values generally got lower.  Somtimes they became more differentiated, and
 * Tried 0.0005, the loss seemed to converge but it failed the corner test unfortunately.
 * Tried 0.001 and upped the penalty to -2.  This decreased the number of penalties but still the AI isn't playing optimally.  I retrained it once barely changing the parameters and it became optimal.  I trained it again, the exact same parameters, and it sometimes didn't take winning strategies as player 2 (going for ties).  [Side observation: the deep AI tends to play center as player 2, while the classical AI tends to play side.]  Looking at the loss graphs, player 2 for the non-optimal AI had a higher loss and didn't seem to be converging as quickly.
 
+* Revisited classical Q-learning.  You get can an optimal AI with learning rate 0.01 and 300 iterations of 64 episodes (middle greed) which takes about 2 minutes.  Interestingly, the losses for player 1 rise then dive, but the losses for player 2 rise then stay flat.  It's still converging, just to a higher value than its initial.  One reason they don't both converge to 0 is due to randomness in the greedy strategy.  It's interesting that the graphs here are smoother than for NNs, but it might just be because we do fewer updates.  Based on the graph for 500 iterations at 0.1 learning rate, it seems like the place to stop might just be 250-300 iterations, though the difference at that point is marginal.
+
+* I wonder if I can get the NN to be beat this with less training, but so far I can't.
+
 
 
 Connect Four:

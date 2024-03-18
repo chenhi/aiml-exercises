@@ -1,4 +1,4 @@
-import zipfile, os, datetime, random, warnings
+import zipfile, os, random, warnings
 import torch
 from torch import nn
 from collections import namedtuple, deque
@@ -83,14 +83,15 @@ class TensorMDP(MDP):
 
 # A Q-function where the inputs and outputs are all tensors
 class NNQFunction(QFunction):
-    def __init__(self, mdp: TensorMDP, q_model, loss_fn, optimizer_class: torch.optim.Optimizer):
+    def __init__(self, mdp: TensorMDP, q_model, loss_fn, optimizer_class: torch.optim.Optimizer, device="cpu"):
         if mdp.state_shape == None or mdp.action_shape == None:
             raise Exception("The input MDP must handle tensors.")
-        self.q = q_model()
+        self.q = q_model().to(device)
         self.q.eval()
         self.mdp = mdp
         self.loss_fn = loss_fn
         self.optimizer = optimizer_class
+        self.device=device
 
     # Make the Q function perform randomly.
     def lobotomize(self):
@@ -102,19 +103,19 @@ class NNQFunction(QFunction):
         if self.q == None:
             pred = self.mdp.get_random_action(state)    
         else:
-            pred = self.q(state.float())
+            pred = self.q(state)
         if action == None:
             return pred
         else:
             # A little inefficient because we only take the diagonals, 
-            return torch.tensordot(pred.flatten(start_dim=1), action.flatten(start_dim=1).float(), dims=([1],[1])).diagonal()
+            return torch.tensordot(pred.flatten(start_dim=1), action.flatten(start_dim=1), dims=([1],[1])).diagonal()
 
     # Input is a tensor of shape (batches, ) + state.shape
     # Output is a tensor of shape (batches, )
     def val(self, state) -> torch.Tensor:
         if self.q == None:
             return torch.zeros(state.size(0))
-        return self.q(state.float()).flatten(1, -1).max(1).values * ~torch.flatten(self.mdp.is_terminal(state.float()))
+        return self.q(state).flatten(1, -1).max(1).values * ~torch.flatten(self.mdp.is_terminal(state))
     
     # Input is a batch of state vectors
     # Returns the value of an optimal policy at a given state, shape (batches, ) + action_shape
@@ -122,15 +123,15 @@ class NNQFunction(QFunction):
         if self.q == None:
             return self.mdp.get_random_action(state)
         
-        filter = self.q(state.float()).flatten(1, -1)
+        filter = self.q(state).flatten(1, -1)
         filter = (filter == filter.max(1).values[:,None])
         while (filter.count_nonzero(dim=1) <= 1).prod().item() != 1:                            # Almost always terminates after one step
-            filter = torch.rand(filter.shape) * filter
+            filter = torch.rand(filter.shape, device=self.device) * filter
             filter = (filter == filter.max(1).values[:,None])
             max_tries -= 1
             if max_tries == 0:
                 break
-        return filter.unflatten(1, self.mdp.action_shape).int()   
+        return filter.unflatten(1, self.mdp.action_shape)
 
     # Does a Q-update based on some observed set of data
     # TransitionData entries are tensors
@@ -143,8 +144,8 @@ class NNQFunction(QFunction):
 
         self.q.train()
         opt = self.optimizer(self.q.parameters(), lr=learn_rate)
-        pred = self.get(data.s.float(), data.a)
-        y = data.r + self.val(data.t.float())
+        pred = self.get(data.s, data.a)
+        y = data.r + self.val(data.t)
         loss = self.loss_fn(pred, y)
 
         # Optimize
@@ -164,7 +165,7 @@ class NNQFunction(QFunction):
 # Input shape (batch_size, ) + state_tensor
 # We implement a random tensor of 0's and 1's generating a random tensor of floats in [0, 1), then converting it to a bool, then back to a float.
 def greedy_tensor(q: NNQFunction, state, eps = 0.):
-    return q.mdp.get_random_action(state) if random.random() < eps else q.policy(state).int() # TODO int vs float for states
+    return q.mdp.get_random_action(state) if random.random() < eps else q.policy(state)
 
 def get_greedy_tensor(q: NNQFunction, eps: float) -> callable:
     return lambda s: greedy_tensor(q, s, eps)
@@ -174,12 +175,14 @@ def get_greedy_tensor(q: NNQFunction, eps: float) -> callable:
 # For now, for simplicity, fix a single strategy
 # Note that qs is policy_qs
 class DQN():
-    def __init__(self, mdp: TensorMDP, q_model: nn.Module, loss_fn, optimizer, memory_capacity: int):
+    def __init__(self, mdp: TensorMDP, q_model: nn.Module, loss_fn, optimizer, memory_capacity: int, device="cpu"):
         # An mdp that encodes the rules of the game.  The current player is part of the state, which is of the form (current player, actual state)
         self.mdp = mdp
-        self.target_qs = [NNQFunction(mdp, q_model, loss_fn, optimizer) for i in range(mdp.num_players)]
-        self.qs = [NNQFunction(mdp, q_model, loss_fn, optimizer) for i in range(mdp.num_players)]
+        self.target_qs = [NNQFunction(mdp, q_model, loss_fn, optimizer, device=device) for i in range(mdp.num_players)]
+        self.qs = [NNQFunction(mdp, q_model, loss_fn, optimizer, device=device) for i in range(mdp.num_players)]
         self.memories = [ExperienceReplay(memory_capacity) for i in range(mdp.num_players)]
+        self.memory_capacity = memory_capacity
+        self.device = device
 
     def save_q(self, fname):
         zf = zipfile.ZipFile(fname, mode="w")
@@ -275,7 +278,7 @@ class DQN():
             logtext += log(f"Model:\n{self.qs[0].q}", verbose)
             logtext += log(f"Loss function:\n{self.qs[0].loss_fn}", verbose)
             logtext += log(f"Optimizer:\n{self.qs[0].optimizer}", verbose)
-            logtext += log(f"Learn rate: {learn_rate}, start and end greed: {greed_start}->{greed_end}, episodes: {episodes}, episode length: {episode_length}, batch size: {batch_size}, training batch size: {train_batch_size}, memory training threshold: {episodes_before_train}, copy frequency: {copy_frequency}.", verbose)
+            logtext += log(f"Learn rate: {learn_rate}, start and end exploration: {greed_start}->{greed_end}, episodes: {episodes}, episode length: {episode_length}, batch size: {batch_size}, training batch size: {train_batch_size}, memory training threshold: {episodes_before_train}, copy frequency: {copy_frequency}, memory capacity: {self.memory_capacity}.", verbose)
             wins = [0] * self.mdp.num_players
             penalties = [0] * self.mdp.num_players
             episode_losses = [[] for i in range(self.mdp.num_players)]
@@ -283,7 +286,7 @@ class DQN():
         frame = 0
         for j in range(episodes):
             # Set greed
-            greed_cur = ((episodes - j + episodes_before_train) * greed_start +  (j - episodes_before_train) * greed_end)/episodes if j >= episodes_before_train else greed_start
+            greed_cur = ((greed_end - greed_start) * j + episodes * greed_start - episodes_before_train * greed_end)/(episodes - episodes_before_train) if j >= episodes_before_train else greed_start
             if verbose or savelog != None:
                 losses = [0.] * self.mdp.num_players
                 updates = 0
@@ -306,14 +309,14 @@ class DQN():
                 p = self.mdp.get_player(s)                                  # p.shape = (batch, )       s.shape = (batch, 2, 6, 7)
 
                 # To get the actions, apply each player's strategy
-                a = torch.zeros((batch_size, ) + self.mdp.action_shape, dtype=int)
+                a = torch.zeros((batch_size, ) + self.mdp.action_shape, device=self.device)
                 for pi in range(self.mdp.num_players):
                     # Get the indices corresponding to this player's turn
-                    indices = torch.arange(batch_size)[p.flatten() == float(pi)].tolist()
+                    indices = torch.arange(batch_size, device=self.device)[p.flatten() == pi].tolist()
                     
                     # Apply thie player's strategy to their turns
                     # Greedy is not parallelized, so there isn't efficiency loss with this
-                    player_actions = torch.cat([greedy_tensor(self.target_qs[pi], s[l:l+1], greed_cur) if l in indices else torch.zeros((1, ) + self.mdp.action_shape, dtype=int) for l in range(batch_size)], 0)
+                    player_actions = torch.cat([greedy_tensor(self.target_qs[pi], s[l:l+1], greed_cur) if l in indices else torch.zeros((1, ) + self.mdp.action_shape, device=self.device) for l in range(batch_size)], 0)
                     a += player_actions
 
                 # Do the transition 

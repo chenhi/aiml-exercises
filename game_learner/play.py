@@ -12,6 +12,14 @@ open_str = '\nCommand-line options: python play.py <game> <play/train/simulate>\
     If simulate, watch two bots in a model play each other.\n\n'
 
 
+device = (
+    "cuda"
+    if torch.cuda.is_available()
+    else "mps"
+    if torch.backends.mps.is_available()
+    else "cpu"
+)
+
 if len(sys.argv) == 1:
     print(open_str)
 
@@ -20,12 +28,12 @@ if len(sys.argv) == 1:
 tttmdp = ttt.TTTMDP()
 c4mdp = c4.C4MDP()
 c4tmdp = c4t.C4TensorMDP()
-dtttmdp = dttt.TTTTensorMDP()
+dtttmdp = dttt.TTTTensorMDP(device=device)
 
 names = ["Tic-Tac-Toe", "Connect Four", "Deep Tic-Tac-Toe", "Deep Connect Four"]
 shortnames = ["ttt", "c4", "dttt", "dc4"]
 mdps = [tttmdp, c4mdp, dtttmdp, c4tmdp]
-games = [QLearn(tttmdp), QLearn(c4mdp), DQN(dtttmdp, dttt.TTTNN, torch.nn.HuberLoss(), torch.optim.Adam, 1000000), DQN(c4tmdp, c4t.C4NN, torch.nn.HuberLoss(), torch.optim.Adam, 1000000)]
+games = [QLearn(tttmdp), QLearn(c4mdp), DQN(dtttmdp, dttt.TTTNN, torch.nn.HuberLoss(), torch.optim.Adam, 100000, device=device), DQN(c4tmdp, c4t.C4NN, torch.nn.HuberLoss(), torch.optim.Adam, 1000000, device=device)]
 file_exts = ['.ttt.pkl', '.c4.pkl', '.dttt.pt', '.dc4.pt']
 types = ["qlearn", "qlearn", "dqn", "dqn"]
 
@@ -91,6 +99,8 @@ if train_new:
         except:
             print(f"Not a valid value.  Setting greed to {default}.")
             expl = default
+
+
     if type == "dqn":
         default = 1.0
         res = input(f"Start (un-)greed?  A number in [0, 1] (default {default}): ")
@@ -101,6 +111,8 @@ if train_new:
         except:
             print(f"Not a valid value.  Setting greed to {default}.")
             expl_start = default
+
+
         default = 0.1
         res = input(f"End (un-)greed?  A number in [0, 1] (default {default}): ")
         try:
@@ -145,6 +157,37 @@ if train_new:
             print(f"Not a valid value.  Setting iterations to {default}.")
             its = default
         
+    if type == "dqn":
+        default = 2000
+        res = input(f"How many episodes (default {default}): ")
+        try:
+            episodes = int(res)
+            if episodes < 1:
+                raise Exception
+        except:
+            print(f"Not a valid value.  Setting episodes to {default}.")
+            episodes = default
+
+        default = 50
+        res = input(f"How many turns in an episode (default {default}): ")
+        try:
+            turns = int(res)
+            if turns < 1:
+                raise Exception
+        except:
+            print(f"Not a valid value.  Setting turns per episode to {default}.")
+            turns = default
+
+        default = 500
+        res = input(f"Delay before training (default {default}): ")
+        try:
+            delay = int(res)
+            if delay < 1:
+                raise Exception
+        except:
+            print(f"Not a valid value.  Setting training delay to {default}.")
+            delay = default
+
 
 
     res = input("Name of file (alphanumeric only, max length 64, w/o extension): ")
@@ -174,7 +217,7 @@ if train_new:
 
         #game.deep_learn(learn_rate=0.0001, greed_start = 1, greed_end = 0.3, episodes=500, episode_length=20, batch_size=4, episodes_before_train=50, train_batch_size=32, copy_frequency=25, savelog=logpath, verbose=True)
         
-        game.deep_learn(learn_rate=lr, greed_start=expl_start, greed_end=expl_end, episodes=2000, episode_length=50, batch_size=4, episodes_before_train=500, train_batch_size=32, copy_frequency=250, savelog=logpath, verbose=True)
+        game.deep_learn(learn_rate=lr, greed_start=expl_start, greed_end=expl_end, episodes=episodes, episode_length=turns, batch_size=4, episodes_before_train=delay, train_batch_size=32, copy_frequency=250, savelog=logpath, verbose=True)
         
         game.save_q(fname)
 

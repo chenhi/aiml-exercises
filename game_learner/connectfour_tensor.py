@@ -103,6 +103,9 @@ class C4TensorMDP(TensorMDP):
         # Shape (42, 16, 6, 7)
         self.filter_stack = torch.stack(stacks)
 
+    def __str__(self):
+        return f"C4TensorMDP: discount={self.discount}, penalty={self.penalty}"
+
     ##### UI RELATED METHODS #####
     # Non-batch and not used in internal code, efficiency not as important
         
@@ -183,7 +186,7 @@ class C4TensorMDP(TensorMDP):
     ### ACTIONS ###
 
     # Return shape (batch, 7), boolean type
-    def valid_action_filter(self, state: torch.Tensor):
+    def valid_action_filter(self, state: torch.Tensor) -> torch.Tensor:
         return state.sum((1,2)) < 6
 
     # Gets a random valid action; if none, returns zero
@@ -296,16 +299,24 @@ class C4NN(nn.Module):
             nn.ReLU(),
             #nn.Dropout(p=0.2),             # Dropout introduces randomness into the Q function.  Not sure if this is desirable.
             #nn.BatchNorm2d(32),
-            nn.Conv2d(32, 64, (3,3), padding='same'),
-            nn.ReLU(),
+            #nn.Conv2d(32, 64, (3,3), padding='same'),
+            #nn.ReLU(),
             #nn.BatchNorm2d(64),
             nn.Flatten(),
-            nn.Linear(64*7*6, 128*7*6),
+            nn.Linear(32*7*6, 16*7*6),
+            nn.ReLU(),
+            nn.Linear(16*7*6, 8*7*6),
+            nn.ReLU(),
+            nn.Linear(8*7*6, 4*7*6),
+            nn.ReLU(),
+            nn.Linear(4*7*6, 2*7*6),
+            nn.ReLU(),
+            nn.Linear(2*7*6, 7*6),
             nn.ReLU(),
             #nn.Linear(128*7*6, 256*7*6),
             #nn.ReLU(),
             #nn.BatchNorm1d(64*7*6),
-            nn.Linear(128*7*6, 7)
+            nn.Linear(7*6, 7)
         )
 
     def forward(self, x):

@@ -1,5 +1,6 @@
 import random, pickle
-
+from aux import log
+import matplotlib.pyplot as plt
 
 # WARNING: states and actions must be hashable if using with QFunction.
 class MDP():
@@ -169,9 +170,13 @@ class QFunction():
     # Does a Q-update based on some observed set of data
     # Data is a list of the form (state, action, reward, next state)
     def update(self, data: list[tuple[any, any, float, any]], learn_rate):
+        deltas = []
         for d in data:
             s,a,r,t = d[0], d[1], d[2], d[3]
-            self.q[(s,a)] = (1 - learn_rate) * self.get(s,a) + learn_rate * (r + self.mdp.discount * self.val(t))
+            delta = self.get(s,a) - (r + self.mdp.discount * self.val(t))
+            self.q[(s,a)] = self.get(s,a) - learn_rate * delta
+            deltas.append(abs(delta))
+        return deltas
 
     # Learn based on a given strategy for some number of iterations, updating each time.
     # In practice, this doesn't get used so much, because the "game" has to handle rewards between players (not the Q function itself)
@@ -296,10 +301,13 @@ class QLearn():
     # Player data is (start state, action taken, all reward before next action, starting state for next action)
     def batch_learn(self, learn_rate: float, iterations: int, episodes: int, episode_length: int, verbose=False, savefile=None):
         player_experiences = [[] for i in range(self.mdp.num_players)]
+        logtext = ""
+        logtext += log(f"Q-learning with learn rate {learn_rate}, {iterations} iterations, {episodes} episodes of length {episode_length}.", verbose)
+        losses = [[] for i in range(self.mdp.num_players)]
         for i in range(iterations):
             for j in range(episodes):
-                if verbose and j % 10 == 9:
-                    print(f"Training iteration {i+1}, episode {j+1}", end='\r')
+                #if verbose and j % 10 == 9:
+                #print(f"Training iteration {i+1}, episode {j+1}", end='\r')
                 s = self.mdp.get_initial_state()
                 queue =[None for k in range(self.mdp.num_players)]
                 for k in range(episode_length):
@@ -330,15 +338,37 @@ class QLearn():
                     s = t
             # Do an update for each player
             for p in range(self.mdp.num_players):
-                self.qs[p].update(player_experiences[p], learn_rate)
+                deltas = self.qs[p].update(player_experiences[p], learn_rate)
+                losses[p].append(sum(deltas)/len(deltas))
+                logtext += log(f"Iteration {i+1}: {losses[p][-1]/len(player_experiences[p])} loss for player {p+1} over {len(player_experiences[p])} training experiences.")
+
         if verbose:
             total = 0
             for e in player_experiences:
                 total += len(e)
             print(f"Trained on {total} experiences.")
         if savefile != None:
+            plt.figure(figsize=(8, 8))
+            plt.subplot(1, 1, 1)
+            for i in range(self.mdp.num_players):
+                plt.plot(range(iterations), losses[i], label=f'Player {i+1} losses')
+            plt.legend(loc='lower right')
+            plt.title('Losses')
+
+            plotpath = savefile + ".png"
+            plt.savefig(plotpath)
+            logtext += log(f"Saved accuracy/loss plot to {plotpath}", verbose)
+
             with open(savefile, 'wb') as f:
                 pickle.dump(player_experiences, f)
                 if verbose:
                     print(f"Saved experiences to {savefile}")
+            
+            logpath = savefile + ".log"
+            with open(logpath, "w") as f:
+                logtext += log(f"Saved logs to {logpath}", verbose)
+                f.write(logtext)
+            
+
+            
 
