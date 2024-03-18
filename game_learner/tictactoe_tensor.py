@@ -1,6 +1,6 @@
 from qlearn import *
 from deepqlearn import *
-import torch, sys
+import torch, sys, random
 
 options = sys.argv[1:]
 
@@ -136,7 +136,7 @@ class TTTTensorMDP(TensorMDP):
 
 
 # Some prototyping the neural network
-# Input tensors have shape (batch, 2, 7, 6)
+# Input tensors have shape (batch, 2, 3, 3)
 class TTTNN(nn.Module):
     def __init__(self):
         super().__init__()
@@ -163,9 +163,12 @@ class TTTNN(nn.Module):
         )
     
     # Output of the stack is shape (batch, 1, 3, 3), so we do a simple reshaping.
+    # We also do a random rotation and reflection to try to teach the bot about symmetry?
     def forward(self, x):
-        return self.stack(x)[:,0]
-
+        k=int(random.random() * 4)
+        x = torch.rot90(x, k, dims=[2, 3])
+        x = self.stack(x)[:,0]
+        return torch.rot90(x, -k, dims=[1,2])
 
 
 
