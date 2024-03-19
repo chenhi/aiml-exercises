@@ -26,6 +26,10 @@ The Q-values generally got lower.  Somtimes they became more differentiated, and
 
 * I wonder if I can get the NN to be beat this with less training, but so far I can't.
 
+* In some graphs I noticed that there was often a divergence at the end, and that this divergence was independent of the number of iterations (i.e. it happened at whatever scale).  It turns out this was because I was scaling the greed in the following way: initially, the greed starts at the minimum, then it attenuates to the maximum over the full interval.  I thought the point was to generate a random data set to begin with and then ramp up the exploitation.  But actually it doesn't make sense: the random data set isn't that valuable and gets generated anyway, and this doesn't allow time at the end for the network to adjust to the new greed values.  In fact this is the reverse of what DQN prescribes: rising greed until the end, where it is constant at its final value for some time.  Also, the DQN paper suggested ending greed of 0.9, but this is too high for multiplayer games, which are more dynamic; it can cause the bots to get stuck in fixed branches of the game tree.  The result is, e.g., it might play optimally in one case but then in a symmetric case which it never explored, it does not.  I ended the greed around 0.5.
+
+* I also misunderstood the role of the target network.  I thought it was used to get the action during trianing, but it is only used to compute the "y" value.  It's still unclear to me why this is desirable.  I fixed it and the algorithm did seem more stable, with less random bumps in the loss curve (after smoothing).   I think the way I had it previously set up, the policy network basically played no role during training.  It was the one being trained, but all selection was being done by the target network.  Maybe this doesn't make sense; one might as well generate a ton of data using the network, then do all the training at once (instead of copying it over).
+
 
 
 Connect Four:
