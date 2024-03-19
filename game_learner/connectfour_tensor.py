@@ -15,19 +15,19 @@ import torch
 options = sys.argv[1:]
 
 # A shift function with truncation, like torch.roll except without the "rolling over"
-def shift(x: torch.Tensor, shift: int, axis: int) -> torch.Tensor:
+def shift(x: torch.Tensor, shift: int, axis: int, device="cpu") -> torch.Tensor:
     if shift == 0:
         return x
     if abs(shift) >= x.shape[axis]:
-        return torch.zeros(x.shape, dtype=int)
+        return torch.zeros(x.shape, device=device)
     
     zero_shape = list(x.shape)
     if shift > 0:
         zero_shape[axis] = shift
-        return torch.cat((torch.zeros(zero_shape, dtype=int), torch.index_select(x, axis, torch.arange(0, x.shape[axis] - shift))), axis)
+        return torch.cat((torch.zeros(zero_shape, device=device), torch.index_select(x, axis, torch.arange(0, x.shape[axis] - shift))), axis)
     else:
         zero_shape[axis] = -shift
-        return torch.cat((torch.index_select(x, axis, torch.arange(-shift, x.shape[axis])), torch.zeros(zero_shape, dtype=int)), axis)
+        return torch.cat((torch.index_select(x, axis, torch.arange(-shift, x.shape[axis])), torch.zeros(zero_shape, device=device)), axis)
 
 
 
@@ -37,9 +37,10 @@ def shift(x: torch.Tensor, shift: int, axis: int) -> torch.Tensor:
 # Reward tensor (batches, )
 class C4TensorMDP(TensorMDP):
 
-    def __init__(self):
+    def __init__(self, device="cpu"):
         super().__init__(state_shape=(2,6,7), action_shape=(7,), discount=1, num_players=2, batched=True, \
                          symb = {0: "O", 1: "X", None: "-"}, input_str = "Input column to play (1-7). ", penalty=-2)
+        self.device=device
         
         # Generate kernels for detecting winner
         # Shape: (6*7, 16, 6, 7)
@@ -48,51 +49,51 @@ class C4TensorMDP(TensorMDP):
         for i in range(6):
             for j in range(7):
                 filters = []
-                center = torch.zeros((6, 7), dtype=int)
+                center = torch.zeros((6, 7), device=device)
                 center[i, j] = 1
                 # Make the vertical filters
-                u1 = shift(center, 1, 0)
-                u2 = shift(center, 2, 0)
-                u3 = shift(center, 3, 0)
-                d1 = shift(center, -1, 0)
-                d2 = shift(center, -2, 0)
-                d3 = shift(center, -3, 0)
+                u1 = shift(center, 1, 0, device=device)
+                u2 = shift(center, 2, 0, device=device)
+                u3 = shift(center, 3, 0, device=device)
+                d1 = shift(center, -1, 0, device=device)
+                d2 = shift(center, -2, 0, device=device)
+                d3 = shift(center, -3, 0, device=device)
                 filters.append(center + u1 + u2 + u3)
                 filters.append(d1 + center + u1 + u2)
                 filters.append(d2 + d1 + center + u1)
                 filters.append(d3 + d2 + d1 + center)
 
                 # Make the horizontal filters
-                r1 = shift(center, 1, 1)
-                r2 = shift(center, 2, 1)
-                r3 = shift(center, 3, 1)
-                l1 = shift(center, -1, 1)
-                l2 = shift(center, -2, 1)
-                l3 = shift(center, -3, 1)
+                r1 = shift(center, 1, 1, device=device)
+                r2 = shift(center, 2, 1, device=device)
+                r3 = shift(center, 3, 1, device=device)
+                l1 = shift(center, -1, 1, device=device)
+                l2 = shift(center, -2, 1, device=device)
+                l3 = shift(center, -3, 1, device=device)
                 filters.append(center + r1 + r2 + r3)
                 filters.append(l1 + center + r1 + r2)
                 filters.append(l2 + l1 + center + r1)
                 filters.append(l3 + l2 + l1 + center)
                 
                 # Make the diagonal filters
-                ur1 = shift(shift(center, 1, 0), 1, 1)
-                ur2 = shift(shift(center, 2, 0), 2, 1)
-                ur3 = shift(shift(center, 3, 0), 3, 1)
-                dl1 = shift(shift(center, -1, 0), -1, 1)
-                dl2 = shift(shift(center, -2, 0), -2, 1)
-                dl3 = shift(shift(center, -3, 0), -3, 1)
+                ur1 = shift(shift(center, 1, 0, device=device), 1, 1, device=device)
+                ur2 = shift(shift(center, 2, 0, device=device), 2, 1, device=device)
+                ur3 = shift(shift(center, 3, 0, device=device), 3, 1, device=device)
+                dl1 = shift(shift(center, -1, 0, device=device), -1, 1, device=device)
+                dl2 = shift(shift(center, -2, 0, device=device), -2, 1, device=device)
+                dl3 = shift(shift(center, -3, 0, device=device), -3, 1, device=device)
                 filters.append(center + ur1 + ur2 + ur3)
                 filters.append(dl1 + center + ur1 + ur2)
                 filters.append(dl2 + dl1 + center + ur1)
                 filters.append(dl3 + dl2 + dl1 + center)
 
                 # Make the diagonal filters
-                ul1 = shift(shift(center, 1, 0), -1, 1)
-                ul2 = shift(shift(center, 2, 0), -2, 1)
-                ul3 = shift(shift(center, 3, 0), -3, 1)
-                dr1 = shift(shift(center, -1, 0), 1, 1)
-                dr2 = shift(shift(center, -2, 0), 2, 1)
-                dr3 = shift(shift(center, -3, 0), 3, 1)
+                ul1 = shift(shift(center, 1, 0, device=device), -1, 1, device=device)
+                ul2 = shift(shift(center, 2, 0, device=device), -2, 1, device=device)
+                ul3 = shift(shift(center, 3, 0, device=device), -3, 1, device=device)
+                dr1 = shift(shift(center, -1, 0, device=device), 1, 1, device=device)
+                dr2 = shift(shift(center, -2, 0, device=device), 2, 1, device=device)
+                dr3 = shift(shift(center, -3, 0, device=device), 3, 1, device=device)
                 filters.append(center + ul1 + ul2 + ul3)
                 filters.append(dr1 + center + ul1 + ul2)
                 filters.append(dr2 + dr1 + center + ul1)
@@ -113,8 +114,8 @@ class C4TensorMDP(TensorMDP):
     def int_to_action(self, index: int):
         if index < 0 or index > 7:
             warnings.warn("Index out of range.")
-            return np.zeros((1, 7), dtype=int)
-        return torch.eye(7, dtype=int)[index:index+1,:]
+            return np.zeros((1, 7), device=self.device)
+        return torch.eye(7, device=self.device)[index:index+1,:]
     
     def str_to_action(self, input: str) -> torch.Tensor:
         try:
@@ -175,11 +176,11 @@ class C4TensorMDP(TensorMDP):
 
     # Return shape (batch, 2, 1, 1)
     def get_player_vector(self, state: torch.Tensor) -> torch.Tensor:
-        return torch.eye(2, dtype=int)[None].expand(state.size(0),-1,-1)[torch.arange(state.size(0)),self.get_player(state)[:, 0, 0, 0]][:,:,None, None]
+        return torch.eye(2, device=self.device)[None].expand(state.size(0),-1,-1)[torch.arange(state.size(0)),self.get_player(state)[:, 0, 0, 0]][:,:,None, None]
     
     # Return shape (batch, 2, 1, 1)
     def swap_player(self, player_vector: torch.Tensor) -> torch.Tensor:
-        return torch.tensordot(player_vector, torch.tensor([[0,1],[1,0]], dtype=int), dims=([1], [0])).swapaxes(1, -1)
+        return torch.tensordot(player_vector, torch.eye(2, device=self.device)[[1,0]], dims=([1], [0])).swapaxes(1, -1)
 
 
 
@@ -210,7 +211,7 @@ class C4TensorMDP(TensorMDP):
 
     # Return shape (batch_size, 2, 6, 7)
     def get_initial_state(self, batch_size=1) -> torch.Tensor:
-        return torch.zeros((batch_size, 2, 6, 7), dtype=int)   
+        return torch.zeros((batch_size, 2, 6, 7), device=self.device) 
     
     # Checks for a winner centered at a given position
     # Inputs: state has stape (batch, 2, 6, 7), player has shape (batch, ), and center has shape (batch, 6, 7)
@@ -237,7 +238,7 @@ class C4TensorMDP(TensorMDP):
     
     # Sum the channels, and board factors.  The result should be 1 * 1 * 6 * 7 = 42.  If it is greater, something went wrong and we won't account for it.
     def is_full(self, state: torch.Tensor) -> torch.Tensor:
-        return (abs(state.sum((1,2,3))) == 42 * torch.ones(state.shape[0], dtype=int))[:, None, None, None]
+        return (abs(state.sum((1,2,3))) == 42)[:, None, None, None]
 
 
     ### TRANSITION ###
@@ -252,13 +253,13 @@ class C4TensorMDP(TensorMDP):
 
         # Make the move!  Note this operation is safe: if the move is invalid, no move will be made.
         # First, get the position we want to add by summing the channels and columns: state.sum((1,2))
-        # This has shape (batch, 7); we extend it by ones to shape (batch, 6, 7): torch.tensordot(state.sum((1,2)), torch.ones(6, dtype=int), 0)
+        # This has shape (batch, 7); we extend it by ones to shape (batch, 6, 7): torch.tensordot(state.sum((1,2)), torch.ones(6), 0)
         #coltotals = state.sum((1,2))[:,None,:].expand(-1,6,-1)
         # Then, we compare it to tensor of shape (7, 6) to get a tensor of shape (batch, 6, 7).  The result is a board with True along the correct row
-        #rowcounter = torch.arange(6, dtype=int)[:,None].expand(-1,7)
+        #rowcounter = torch.arange(6)[:,None].expand(-1,7)
         # Then, we multiply it with action to isolate the right column, shape (batch, 6, 7)
         #newpos = action[:,None,:].expand(-1,6,-1)  * (coltotals == rowcounter)
-        newpos = action[:,None,:].expand(-1,6,-1)  * (state.sum((1,2))[:,None,:].expand(-1,6,-1) == torch.arange(6, dtype=int)[:,None].expand(-1,7))
+        newpos = action[:,None,:].expand(-1,6,-1)  * (state.sum((1,2))[:,None,:].expand(-1,6,-1) == torch.arange(6, device=self.device)[:,None].expand(-1,7))
         
         # Then, we put the player channel back in to get a shape (batch, 2, 7, 6)
         #newpiece = p_tensor * newpos[:,None,:,:].expand(-1,2,-1,-1)
@@ -331,11 +332,20 @@ class C4NN(nn.Module):
 
 # Testing
 if "test" in options:
+
+    device = (
+        "cuda"
+        if torch.cuda.is_available()
+        else "mps"
+        if torch.backends.mps.is_available()
+        else "cpu"
+    )
+
     print("\nRUNNING TESTS:\n")
 
     # We can print everything or just the pass/fail statements.
     verbose = True if "verbose" in options else False
-    mdp = C4TensorMDP()
+    mdp = C4TensorMDP(device=device)
 
     s = mdp.get_initial_state(batch_size=2)
     print("Testing batching, get_player and get_player_vector.")
@@ -386,10 +396,10 @@ if "test" in options:
     if verbose:
         print("Board 0: two plays in column 1.  Board 1: a play in column 6, then column 5.")
     t = mdp.get_initial_state(batch_size=2)
-    a = torch.zeros((2,7), dtype=int)
+    a = torch.zeros((2,7), device=device)
     a[0, 1] = 1.
     a[1, 6] = 1.
-    b = torch.zeros((2,7), dtype=int)
+    b = torch.zeros((2,7), device=device)
     b[0, 1] = 1.
     b[1, 5] = 1.
     t1, _ = mdp.transition(t, a)
@@ -407,7 +417,7 @@ if "test" in options:
     if verbose:
         print("Players each play 4 times in column 0.  The last two should be reported invalid.")
     v = mdp.get_initial_state()
-    a = torch.zeros((1,7), dtype=int)
+    a = torch.zeros((1,7), dtype=device)
     a[0,0] = 1.
     ok = True
     for i in range(6):
@@ -436,7 +446,7 @@ if "test" in options:
     if pen[0,0].item() >= 0 and pen[0,1].item() != 0:
         ok = False
 
-    b = torch.zeros((1,7), dtype=int)
+    b = torch.zeros((1,7), dtype=device)
     b[0,1] = 1
     if verbose:
         print("is_valid_action", mdp.is_valid_action(v, b))
@@ -470,8 +480,8 @@ if "test" in options:
     if verbose:
         print("Player 0 and 1 will play in columns 0 and 1.  The game should enter a terminal state after play 7, and play 8 should not proceed.")
     v = mdp.get_initial_state()
-    a = torch.tensor([[1,0,0,0,0,0,0]], dtype=int)
-    b = torch.tensor([[0,1,0,0,0,0,0]], dtype=int)
+    a = torch.tensor([[1,0,0,0,0,0,0]], dtype=device)
+    b = torch.tensor([[0,1,0,0,0,0,0]], dtype=device)
     ok = True
     for i in range(4):
         v, r = mdp.transition(v, a)

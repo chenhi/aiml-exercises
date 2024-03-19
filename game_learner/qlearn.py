@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 # WARNING: states and actions must be hashable if using with QFunction.
 class MDP():
-    def __init__(self, states, actions, discount=1, num_players=1, penalty = -1000, symb = {}, input_str = "", batched=False):
+    def __init__(self, states, actions, discount=1, num_players=1, penalty = -1000, symb = {}, input_str = "", default_hyperparameters = {}, batched=False):
         self.actions = actions
         self.discount = discount
         self.num_players = num_players
@@ -12,6 +12,7 @@ class MDP():
         self.penalty=penalty
         self.symb = symb
         self.input_str = input_str
+        self.default_hyperparameters = default_hyperparameters
 
         # The states do not literally have to be tensors for the state_shape to be defined.  This just specifies, when they are turned into tensors, what shape they should be have, ignoring batch dimension
         self.states = states
@@ -130,7 +131,10 @@ class QFunction():
         new_q.q = self.q.copy()
     
     def get(self, s, a) -> float:
-        return 0 if (s, a) not in self.q else self.q[(s, a)]
+        if a == None:
+            return {k[1]: v for k,v in self.q.items() if k[0] == s }
+        else:
+            return 0 if (s, a) not in self.q else self.q[(s, a)]
 
     # Returns the value at a given state, i.e. max_a(Q(s, a))
     # Value of terminal state should always be 0

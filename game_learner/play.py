@@ -89,6 +89,11 @@ if len(sys.argv) > 2:
 
 # Train AI
 if train_new:
+    #hpar = mdp.default_hyperparameters
+    
+
+
+
     if type == "qlearn":
         default=0.5
         res = input(f"How greedy should it be?  A number in [0, 1] (default {default}): ")
@@ -103,9 +108,9 @@ if train_new:
 
     if type == "dqn":
         default = 1.0
-        res = input(f"Start (un-)greed?  A number in [0, 1] (default {default}): ")
+        res = input(f"Start non-greed?  A number in [0, 1] (default {default}): ")
         try:
-            expl_start = 1. - float(res)
+            expl_start = float(res)
             if expl_start < 0 or expl_start > 1:
                 raise Exception
         except:
@@ -113,10 +118,10 @@ if train_new:
             expl_start = default
 
 
-        default = 0.1
-        res = input(f"End (un-)greed?  A number in [0, 1] (default {default}): ")
+        default = 0.5
+        res = input(f"End non-greed?  A number in [0, 1] (default {default}): ")
         try:
-            expl_end = 1. - float(res)
+            expl_end = float(res)
             if expl_end < 0 or expl_end > 1:
                 raise Exception
         except:
@@ -168,7 +173,10 @@ if train_new:
             print(f"Not a valid value.  Setting episodes to {default}.")
             episodes = default
 
-        default = 50
+        if shortname == "dttt":
+            default = 15
+        else:
+            default = 50
         res = input(f"How many turns in an episode (default {default}): ")
         try:
             turns = int(res)
@@ -179,20 +187,20 @@ if train_new:
             turns = default
 
         default = 500
-        res = input(f"Delay before training (default {default}): ")
+        res = input(f"Initial greed annealing episodes (default {default}): ")
         try:
-            delay = int(res)
-            if delay < 1:
+            anneal = int(res)
+            if anneal < 1:
                 raise Exception
         except:
             print(f"Not a valid value.  Setting training delay to {default}.")
-            delay = default
+            anneal = default
 
 
 
     res = input("Name of file (alphanumeric only, max length 64, w/o extension): ")
-    fname_end = re.sub(r'\W+', '', res)[0:64] + f"-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}{file_ext}"
-    fname = 'bots/' + fname_end
+    fname_end = f"{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}_" + re.sub(r'\W+', '', res)[0:64] + f"{file_ext}"
+    fname = f'bots/{shortname}/' + fname_end
     logpath = fname + ".log"
         
     if type == "qlearn":
@@ -217,7 +225,7 @@ if train_new:
 
         #game.deep_learn(learn_rate=0.0001, greed_start = 1, greed_end = 0.3, episodes=500, episode_length=20, batch_size=4, episodes_before_train=50, train_batch_size=32, copy_frequency=25, savelog=logpath, verbose=True)
         
-        game.deep_learn(learn_rate=lr, greed_start=expl_start, greed_end=expl_end, episodes=episodes, episode_length=turns, batch_size=4, episodes_before_train=delay, train_batch_size=32, copy_frequency=250, savelog=logpath, verbose=True)
+        game.deep_learn(learn_rate=lr, greed_anneal_eps=anneal, greed_start=expl_start, greed_end=expl_end, episodes=episodes, episode_length=turns, batch_size=4, train_batch_size=64, copy_interval_eps=200, savelog=logpath, verbose=True)
         
         game.save_q(fname)
 
@@ -225,8 +233,9 @@ if train_new:
 
 #==================== BOT SELECTION ====================#
 
-
-saves = ['RANDOMBOT'] + [each for each in os.listdir('bots/') if each.endswith(file_ext)]
+save_files = [each for each in os.listdir(f'bots/{shortname}/') if each.endswith(file_ext)]
+save_files.sort()
+saves = ['RANDOMBOT'] + save_files
 load_indices = []
 load_index = -1
 
@@ -251,7 +260,7 @@ else:
 if load_index == 0:
     game.null_q()
 elif load_index != -1:
-    game.load_q('bots/' + saves[load_index])
+    game.load_q(f'bots/{shortname}/' + saves[load_index])
 
 
 

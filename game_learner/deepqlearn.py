@@ -32,12 +32,9 @@ class ExperienceReplay():
     def push(self, d: TransitionData):
         self.memory.append(d)
 
-    def push_batch(self, data: TransitionData):
-        if data.s.size(0) != data.a.size(0) or data.a.size(0) != data.t.size(0) or data.t.size(0) != data.r.size(0):
-            raise Exception("Batch sizes do not agree.")
-        batch_size = data.s.size(0)
-        for i in range(batch_size):
-            self.push(TransitionData(data.s[i, ...], data.a[i, ...], data.t[i, ...], data.r[i, ...]))
+    def push_batch(self, data: TransitionData, transforms = {'s': lambda s: s, 'a': lambda a: a, 'r': lambda r: r}):
+        for i in range(data.s.size(0)):
+                self.push(TransitionData(transforms['s'](data.s[i]), transforms['a'](data.a[i]), transforms['s'](data.t[i]), transforms['r'](data.r[i])))
 
             
 
@@ -55,9 +52,9 @@ class ExperienceReplay():
 
 
 class TensorMDP(MDP):
-    def __init__(self, state_shape, action_shape, discount=1, num_players=1, penalty = -2, symb = {}, input_str = "", batched=False):
+    def __init__(self, state_shape, action_shape, discount=1, num_players=1, penalty = -2, default_hyperparameters={}, symb = {}, input_str = "", batched=False):
         
-        super().__init__(None, None, discount, num_players, penalty, symb, input_str, batched)
+        super().__init__(None, None, discount, num_players, penalty, symb, input_str, default_hyperparameters, batched)
 
         # Whether we filter out illegal moves in training or not
         #self.filter_illegal = filter_illegal
@@ -86,8 +83,10 @@ class NNQFunction(QFunction):
     def __init__(self, mdp: TensorMDP, q_model, loss_fn, optimizer_class: torch.optim.Optimizer, device="cpu"):
         if mdp.state_shape == None or mdp.action_shape == None:
             raise Exception("The input MDP must handle tensors.")
-        self.q = q_model().to(device)
+        self.q, self.target_q = q_model().to(device), q_model().to(device)
         self.q.eval()
+        self.target_q.eval()
+
         self.mdp = mdp
         self.loss_fn = loss_fn
         self.optimizer = optimizer_class
@@ -97,9 +96,14 @@ class NNQFunction(QFunction):
     def lobotomize(self):
         self.q = None
 
+    # Copy the weights of one NN to another
+    def copy_policy_to_target(self):
+        self.target_q.load_state_dict(self.q.state_dict())
+
     # If input action = None, then return the entire vector of action values of shape (batch, ) + action_shape
     # Otherwise, output shape (batch, )
     def get(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
+        self.q.eval()
         if self.q == None:
             pred = self.mdp.get_random_action(state)    
         else:
@@ -112,10 +116,11 @@ class NNQFunction(QFunction):
 
     # Input is a tensor of shape (batches, ) + state.shape
     # Output is a tensor of shape (batches, )
-    def val(self, state) -> torch.Tensor:
-        if self.q == None:
+    def val(self, state, target=False) -> torch.Tensor:
+        q = self.target_q if target else self.q
+        if q == None:
             return torch.zeros(state.size(0))
-        return self.q(state).flatten(1, -1).max(1).values * ~torch.flatten(self.mdp.is_terminal(state))
+        return q(state).flatten(1, -1).max(1).values * ~torch.flatten(self.mdp.is_terminal(state))
     
     # Input is a batch of state vectors
     # Returns the value of an optimal policy at a given state, shape (batches, ) + action_shape
@@ -145,7 +150,7 @@ class NNQFunction(QFunction):
         self.q.train()
         opt = self.optimizer(self.q.parameters(), lr=learn_rate)
         pred = self.get(data.s, data.a)
-        y = data.r + self.val(data.t)
+        y = data.r + self.val(data.t, target=True)
         loss = self.loss_fn(pred, y)
 
         # Optimize
@@ -178,7 +183,6 @@ class DQN():
     def __init__(self, mdp: TensorMDP, q_model: nn.Module, loss_fn, optimizer, memory_capacity: int, device="cpu"):
         # An mdp that encodes the rules of the game.  The current player is part of the state, which is of the form (current player, actual state)
         self.mdp = mdp
-        self.target_qs = [NNQFunction(mdp, q_model, loss_fn, optimizer, device=device) for i in range(mdp.num_players)]
         self.qs = [NNQFunction(mdp, q_model, loss_fn, optimizer, device=device) for i in range(mdp.num_players)]
         self.memories = [ExperienceReplay(memory_capacity) for i in range(mdp.num_players)]
         self.memory_capacity = memory_capacity
@@ -188,9 +192,9 @@ class DQN():
         zf = zipfile.ZipFile(fname, mode="w")
         for i in range(self.mdp.num_players):
             model_scripted = torch.jit.script(self.qs[i].q)
-            model_scripted.save(f"{fname}.{i}")
-            zf.write(f"{fname}.{i}", f"{fname}.{i}", compress_type=zipfile.ZIP_STORED)
-            os.remove(f"{fname}.{i}")
+            model_scripted.save(f"temp/player.{i}")
+            zf.write(f"temp/player.{i}", f"player.{i}", compress_type=zipfile.ZIP_STORED)
+            os.remove(f"temp/player.{i}")
         zf.close()
 
             
@@ -199,11 +203,10 @@ class DQN():
         zf = zipfile.ZipFile(fname, mode="r")
         for i in range(self.mdp.num_players):
             if indices == None or i in indices:
-                zf.extract(f"{fname}.{i}")
-                self.qs[i].q = torch.jit.load(f"{fname}.{i}")
-                os.remove(f"{fname}.{i}")
-            self.copy_policy_to_target()
-            self.qs[i].q.eval()					# Set to evaluation mode
+                zf.extract(f"player.{i}", "temp/")
+                self.qs[i].q = torch.jit.load(f"temp/player.{i}")
+                self.qs[i].copy_policy_to_target()
+                os.remove(f"temp/player.{i}")
         zf.close()
 
 
@@ -211,11 +214,6 @@ class DQN():
         for i in range(self.mdp.num_players):
             if indices == None or i in indices:
                 self.qs[i].lobotomize()
-
-    # Copy the weights of one NN to another
-    def copy_policy_to_target(self):
-        for i in range(self.mdp.num_players):
-            self.target_qs[i].q.load_state_dict(self.qs[i].q.state_dict())
                 
     def stepthru_game(self):
         s = self.mdp.get_initial_state()
@@ -266,19 +264,18 @@ class DQN():
     # Handling multiplayer: each player keeps their own "record", separate from memory
     # When any entry in the record has source = target, then the player "banks" it in their memory
     # The next time an action is taken, if the source = target, then it gets overwritten
-    def deep_learn(self, learn_rate: float, greed_start: int, greed_end: int, episodes: int, episode_length: int, batch_size: int, train_batch_size: int, episodes_before_train: int, copy_frequency: int, savelog=None, verbose=False):
+    def deep_learn(self, learn_rate: float, episodes: int, episode_length: int, greed_anneal_eps: int, greed_start: int, greed_end: int, batch_size: int, train_batch_size: int, copy_interval_eps: int, savelog=None, verbose=False):
         if train_batch_size < 2:
             Exception("Training batch size must be greater than 1 for sampling.")
-        if greed_start < 0 or greed_end < 0 or greed_start > 1 or greed_end > 1:
-            Exception("Greed must be in the range [0, 1].")
         
         logtext = ""
         if verbose or savelog != None:
+            logtext += log(f"Device: {self.device}", verbose)
             logtext += log(f"MDP:\n{self.mdp}", verbose)
             logtext += log(f"Model:\n{self.qs[0].q}", verbose)
             logtext += log(f"Loss function:\n{self.qs[0].loss_fn}", verbose)
             logtext += log(f"Optimizer:\n{self.qs[0].optimizer}", verbose)
-            logtext += log(f"Learn rate: {learn_rate}, start and end exploration: {greed_start}->{greed_end}, episodes: {episodes}, episode length: {episode_length}, batch size: {batch_size}, training batch size: {train_batch_size}, memory training threshold: {episodes_before_train}, copy frequency: {copy_frequency}, memory capacity: {self.memory_capacity}.", verbose)
+            logtext += log(f"Learn rate: {learn_rate}, start and end exploration: {greed_start}->{greed_end}, episodes: {episodes}, episode length: {episode_length}, batch size: {batch_size}, training batch size: {train_batch_size}, initial greed annealing time: {greed_anneal_eps}, copy frequency: {copy_interval_eps}, memory capacity: {self.memory_capacity}.", verbose)
             wins = [0] * self.mdp.num_players
             penalties = [0] * self.mdp.num_players
             episode_losses = [[] for i in range(self.mdp.num_players)]
@@ -286,13 +283,16 @@ class DQN():
         frame = 0
         for j in range(episodes):
             # Set greed
-            greed_cur = ((greed_end - greed_start) * j + episodes * greed_start - episodes_before_train * greed_end)/(episodes - episodes_before_train) if j >= episodes_before_train else greed_start
+            greed_cur = ((greed_anneal_eps - j) * greed_start + j * greed_end)/greed_anneal_eps if j <= greed_anneal_eps else greed_end
             if verbose or savelog != None:
                 losses = [0.] * self.mdp.num_players
                 updates = 0
 
             # Make sure the target network is the same as the policy network
-            self.copy_policy_to_target()
+            for i in range(self.mdp.num_players):
+                self.qs[i].copy_policy_to_target()
+            
+            
             if verbose or savelog != None:
                 memorylen = [self.memories[i].size() for i in range(self.mdp.num_players)]
                 logtext += log(f"Initializing episode {j+1}. Greed {1-greed_cur:>0.5f}. Batch size {batch_size}. Memory {memorylen}. Player wins {wins}, penalties {penalties}.", verbose)
@@ -316,7 +316,7 @@ class DQN():
                     
                     # Apply thie player's strategy to their turns
                     # Greedy is not parallelized, so there isn't efficiency loss with this
-                    player_actions = torch.cat([greedy_tensor(self.target_qs[pi], s[l:l+1], greed_cur) if l in indices else torch.zeros((1, ) + self.mdp.action_shape, device=self.device) for l in range(batch_size)], 0)
+                    player_actions = torch.cat([greedy_tensor(self.qs[pi], s[l:l+1], greed_cur) if l in indices else torch.zeros((1, ) + self.mdp.action_shape, device=self.device) for l in range(batch_size)], 0)
                     a += player_actions
 
                 # Do the transition 
@@ -340,20 +340,23 @@ class DQN():
                         
                 # Train the policy on a random sample in memory (once the memory bank is big enough)
                 for i in range(self.mdp.num_players):
-                    if j >= episodes_before_train:
+                    if len(self.memories[i]) >= train_batch_size:
                         losses[i] += self.qs[i].update(self.memories[i].sample(train_batch_size), learn_rate)
                         updates += train_batch_size
 
                 # Restart terminal states TODO for now, just check if the whole thing is done and end the episode to hasten things up
-                if torch.prod(self.mdp.is_terminal(s)).item() == 1:
-                    break
-
-                # Copy the target network to the policy network if it is time
-                if (frame+1) % copy_frequency == 0:
-                    self.copy_policy_to_target()
+                # if torch.prod(self.mdp.is_terminal(s)).item() == 1:
+                #     break
 
                 # Don't forget to set the state to the next state
                 s = t
+            
+            # Copy the target network to the policy network if it is time
+            if (j+1) % copy_interval_eps == 0:
+                for i in range(self.mdp.num_players):
+                    self.qs[i].copy_policy_to_target()
+                logtext += log("Copied policy to target networks for all players.", verbose)
+            
             
             if (verbose or savelog != None) and updates > 0:
                 for i in range(len(losses)):
@@ -361,10 +364,6 @@ class DQN():
                     episode_losses[i].append(losses[i])
                 logtext += log(f"Episode {j+1} average loss: {losses}", verbose)
                 
-
-            # TODO At the end of the episode, commit the remaining records to memory
-
-        
 
         if savelog != None:
             # First, do an averaging of the losses
@@ -379,11 +378,10 @@ class DQN():
                             num += 1
                     convolved_losses[i].append(total/num)
 
-            eps_range = range(episodes_before_train, episodes)
             plt.figure(figsize=(8, 8))
             plt.subplot(1, 1, 1)
             for i in range(self.mdp.num_players):
-                plt.plot(eps_range, convolved_losses[i], label=f'Player {i} smoothed losses')
+                plt.plot(range(episodes - len(convolved_losses[i]), episodes), convolved_losses[i], label=f'Player {i} smoothed losses')
             plt.legend(loc='lower right')
             plt.title('Losses with convolution kernel size 11')
 

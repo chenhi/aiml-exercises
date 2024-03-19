@@ -8,7 +8,8 @@ options = sys.argv[1:]
 class TTTTensorMDP(TensorMDP):
 
     def __init__(self, device = "cpu"):
-        super().__init__(state_shape=(2,3,3), action_shape=(3,3), discount=1, num_players=2, batched=True, \
+        hyperpar = {'lr': 0.00025, 'ungreed_start': 1.0, 'ungreed_end': 0.5, 'epis': 2500, 'epis_len': 15, 'sim_batch': 4, 'train_batch': 64, 'anneal_eps': 500, 'copy_freq_eps': 200}
+        super().__init__(state_shape=(2,3,3), action_shape=(3,3), discount=1, num_players=2, batched=True, default_hyperparameters=hyperpar, \
                          symb = {0: "X", 1: "O", None: "-"}, input_str = "Input position to play, e.g. '1, 3' for the 1st row and 3rd column: ", penalty=-2)
         self.device = device
         
@@ -184,31 +185,25 @@ class TTTNN(nn.Module):
             nn.LeakyReLU(),
             nn.Conv2d(32, 64, (3,3), padding='same'),
             nn.LeakyReLU(),
-            nn.Conv2d(64, 128, (3,3), padding='same'),
+            nn.Conv2d(64, 32, (3,3), padding='same'),
             nn.LeakyReLU(),
             #nn.BatchNorm2d(64),
             #nn.Flatten(),
             #nn.Linear(128*3*3, 64*3*3),
-            nn.Conv2d(128, 256, (3,3), padding='same'),
+            nn.Conv2d(32, 8, (3,3), padding='same'),
             nn.LeakyReLU(),
             #nn.Linear(64*3*3, 64),
             #nn.ReLU(),
             #nn.BatchNorm1d(64*7*6),
             #nn.Linear(64, 9), 
-            nn.Conv2d(256, 1, (3,3), padding='same'),
+            nn.Conv2d(8, 1, (3,3), padding='same'),
             #nn.Unflatten(1, (3, 3))
         )
     
     # Output of the stack is shape (batch, 1, 3, 3), so we do a simple reshaping.
-    # We also do a random rotation and reflection to try to teach the bot about symmetry.
     def forward(self, x):
-        k = int(torch.rand(1).item() * 4)
-        flip = torch.rand(1).item()
-        x = torch.rot90(x, k, dims=[2, 3])
-        x = torch.flip(x, [1]) if flip < 0.5 else x
-        x = self.stack(x)[:,0]
-        x = torch.flip(x, [1]) if flip < 0.5 else x
-        return torch.rot90(x, -k, dims=[1,2])
+        return self.stack(x)[:,0]
+
 
 
 
