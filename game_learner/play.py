@@ -87,116 +87,32 @@ if len(sys.argv) > 2:
         train_new = True if res == 't' else False
         simulate = False
 
+
+prompts = {
+    'lr': 'Learn rate in [0, 1]:',
+    'expl': 'The ungreed/exploration rate in [0, 1]',
+    'expl_start': 'The starting exploration rate in [0, 1]',
+    'expl_end': 'The ending exporation rate in [0, 1]',
+    'anneal_eps': 'Number of initial episodes to anneal exploration', 
+    'dq_episodes': 'The number of episodes (iterations of the game)',
+    'q_episodes': 'The number of episodes (experience generations)',
+    'episode_length': 'The length of each episode',
+    'iterations': 'The number of training iterations',
+    'sim_batch': 'The size of each simulation batch',
+    'train_batch': 'The size of each training batch',
+    'copy_interval_eps': 'Interval between copying policy to target in episodes',
+}
+
 # Train AI
 if train_new:
-    #hpar = mdp.default_hyperparameters
+    hpar = mdp.default_hyperparameters
     
-
-
-
-    if type == "qlearn":
-        default=0.5
-        res = input(f"How greedy should it be?  A number in [0, 1] (default {default}): ")
+    for k, v in hpar.items():
+        res = input(f"{prompts[k] if k in prompts else k} (default {v}): ")
         try:
-            expl = 1. - float(res)
-            if expl < 0 or expl > 1:
-                raise Exception
+            hpar[k] = float(res)
         except:
-            print(f"Not a valid value.  Setting greed to {default}.")
-            expl = default
-
-
-    if type == "dqn":
-        default = 1.0
-        res = input(f"Start non-greed?  A number in [0, 1] (default {default}): ")
-        try:
-            expl_start = float(res)
-            if expl_start < 0 or expl_start > 1:
-                raise Exception
-        except:
-            print(f"Not a valid value.  Setting greed to {default}.")
-            expl_start = default
-
-
-        default = 0.5
-        res = input(f"End non-greed?  A number in [0, 1] (default {default}): ")
-        try:
-            expl_end = float(res)
-            if expl_end < 0 or expl_end > 1:
-                raise Exception
-        except:
-            print(f"Not a valid value.  Setting greed to {default}.")
-            expl_end = default
-        
-    if type == "qlearn":
-        default=0.1
-    elif type == "dqn":
-        default = 0.00025
-    res = input(f"Learning rate? A number in [0, 1] (default {default}): ")
-    try:
-        lr = float(res)
-        if lr < 0 or lr > 1:
-            raise Exception
-    except:
-        print(f"Not a valid value.  Setting learning rate to {default}.")
-        lr = default
-
-    if type == "qlearn":
-        default = 64
-        res = input(f"How many game runs between AI updates (default {default}): ")
-        try:
-            eps = int(res)
-            if eps < 1:
-                raise Exception
-        except:
-            print(f"Not a valid value.  Setting episodes to {default}.")
-            eps = default
-
-        default = 100
-        res = input(f"How many AI updates (default {default}): ")
-        try:
-            its = int(res)
-            if its < 1:
-                raise Exception
-        except:
-            print(f"Not a valid value.  Setting iterations to {default}.")
-            its = default
-        
-    if type == "dqn":
-        default = 2000
-        res = input(f"How many episodes (default {default}): ")
-        try:
-            episodes = int(res)
-            if episodes < 1:
-                raise Exception
-        except:
-            print(f"Not a valid value.  Setting episodes to {default}.")
-            episodes = default
-
-        if shortname == "dttt":
-            default = 15
-        else:
-            default = 50
-        res = input(f"How many turns in an episode (default {default}): ")
-        try:
-            turns = int(res)
-            if turns < 1:
-                raise Exception
-        except:
-            print(f"Not a valid value.  Setting turns per episode to {default}.")
-            turns = default
-
-        default = 500
-        res = input(f"Initial greed annealing episodes (default {default}): ")
-        try:
-            anneal = int(res)
-            if anneal < 1:
-                raise Exception
-        except:
-            print(f"Not a valid value.  Setting training delay to {default}.")
-            anneal = default
-
-
+            print(f"Not a valid value.  Setting greed to {v}.")
 
     res = input("Name of file (alphanumeric only, max length 64, w/o extension): ")
     fname_end = f"{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}_" + re.sub(r'\W+', '', res)[0:64] + f"{file_ext}"
@@ -204,29 +120,12 @@ if train_new:
     logpath = fname + ".log"
         
     if type == "qlearn":
-        game.set_greed(expl)
-        game.batch_learn(lr, its, eps, 1000, verbose=True, savefile=fname + ".exp")
-
-        # Save the AI
+        #game.set_greed(expl)
+        game.batch_learn(**hpar, verbose=True, savefile=fname + ".exp")
         game.save_q(fname)
 
     if type == "dqn":
-        
-        
-        #game.deep_learn(learn_rate=0.0001, greed_start = 1, greed_end = 0.3, episodes=5000, episode_length=20, batch_size=4, episodes_before_train=500, train_batch_size=32, copy_frequency=250, savelog=logpath, verbose=True)
-        
-        # This one gave good results for tic tac toe
-        #game.deep_learn(learn_rate=0.0001, greed_start =1.0, greed_end = 0.1, episodes=2000, episode_length=20, batch_size=4, episodes_before_train=200, train_batch_size=32, copy_frequency=250, savelog=logpath, verbose=True)
-        
-        # Trying C4
-        #game.deep_learn(learn_rate=0.0001, greed_start = 1, greed_end = 0.1, episodes=2000, episode_length=50, batch_size=4, episodes_before_train=500, train_batch_size=32, copy_frequency=250, savelog=logpath, verbose=True)
-        
-        
-
-        #game.deep_learn(learn_rate=0.0001, greed_start = 1, greed_end = 0.3, episodes=500, episode_length=20, batch_size=4, episodes_before_train=50, train_batch_size=32, copy_frequency=25, savelog=logpath, verbose=True)
-        
-        game.deep_learn(learn_rate=lr, greed_anneal_eps=anneal, greed_start=expl_start, greed_end=expl_end, episodes=episodes, episode_length=turns, batch_size=4, train_batch_size=64, copy_interval_eps=200, savelog=logpath, verbose=True)
-        
+        game.deep_learn(**hpar, savelog=logpath, verbose=True)
         game.save_q(fname)
 
 

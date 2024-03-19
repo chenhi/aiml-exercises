@@ -13,10 +13,6 @@ import matplotlib.pyplot as plt
 
 #################### DEEP Q-LEARNING ####################
 
-
-
-
-
 # Source, action, target, reward
 TransitionData = namedtuple('TransitionData', ('s', 'a', 't', 'r'))
 
@@ -148,6 +144,7 @@ class NNQFunction(QFunction):
             return
 
         self.q.train()
+        self.target_q.eval()
         opt = self.optimizer(self.q.parameters(), lr=learn_rate)
         pred = self.get(data.s, data.a)
         y = data.r + self.val(data.t, target=True)
@@ -171,10 +168,6 @@ class NNQFunction(QFunction):
 # We implement a random tensor of 0's and 1's generating a random tensor of floats in [0, 1), then converting it to a bool, then back to a float.
 def greedy_tensor(q: NNQFunction, state, eps = 0.):
     return q.mdp.get_random_action(state) if random.random() < eps else q.policy(state)
-
-def get_greedy_tensor(q: NNQFunction, eps: float) -> callable:
-    return lambda s: greedy_tensor(q, s, eps)
-
 
 
 # For now, for simplicity, fix a single strategy
@@ -264,10 +257,12 @@ class DQN():
     # Handling multiplayer: each player keeps their own "record", separate from memory
     # When any entry in the record has source = target, then the player "banks" it in their memory
     # The next time an action is taken, if the source = target, then it gets overwritten
-    def deep_learn(self, learn_rate: float, episodes: int, episode_length: int, greed_anneal_eps: int, greed_start: int, greed_end: int, batch_size: int, train_batch_size: int, copy_interval_eps: int, savelog=None, verbose=False):
-        if train_batch_size < 2:
+    def deep_learn(self, lr: float, dq_episodes: int, episode_length: int, anneal_eps: int, expl_start: float, expl_end: float, sim_batch: int, train_batch: int, copy_interval_eps: int, savelog=None, verbose=False):
+
+        dq_episodes, episode_length, anneal_eps, sim_batch, train_batch, copy_interval_eps = int(dq_episodes), int(episode_length), int(anneal_eps), int(sim_batch), int(train_batch), int(copy_interval_eps)
+        if train_batch < 2:
             Exception("Training batch size must be greater than 1 for sampling.")
-        
+
         logtext = ""
         if verbose or savelog != None:
             logtext += log(f"Device: {self.device}", verbose)
@@ -275,15 +270,15 @@ class DQN():
             logtext += log(f"Model:\n{self.qs[0].q}", verbose)
             logtext += log(f"Loss function:\n{self.qs[0].loss_fn}", verbose)
             logtext += log(f"Optimizer:\n{self.qs[0].optimizer}", verbose)
-            logtext += log(f"Learn rate: {learn_rate}, start and end exploration: {greed_start}->{greed_end}, episodes: {episodes}, episode length: {episode_length}, batch size: {batch_size}, training batch size: {train_batch_size}, initial greed annealing time: {greed_anneal_eps}, copy frequency: {copy_interval_eps}, memory capacity: {self.memory_capacity}.", verbose)
+            logtext += log(f"Learn rate: {lr}, start and end exploration: {expl_start}->{expl_end}, episodes: {dq_episodes}, episode length: {episode_length}, batch size: {sim_batch}, training batch size: {train_batch}, initial greed annealing time: {anneal_eps}, copy frequency: {copy_interval_eps}, memory capacity: {self.memory_capacity}.", verbose)
             wins = [0] * self.mdp.num_players
             penalties = [0] * self.mdp.num_players
             episode_losses = [[] for i in range(self.mdp.num_players)]
 
         frame = 0
-        for j in range(episodes):
+        for j in range(dq_episodes):
             # Set greed
-            greed_cur = ((greed_anneal_eps - j) * greed_start + j * greed_end)/greed_anneal_eps if j <= greed_anneal_eps else greed_end
+            greed_cur = ((anneal_eps - j) * expl_start + j * expl_end)/anneal_eps if j <= anneal_eps else expl_end
             if verbose or savelog != None:
                 losses = [0.] * self.mdp.num_players
                 updates = 0
@@ -295,9 +290,9 @@ class DQN():
             
             if verbose or savelog != None:
                 memorylen = [self.memories[i].size() for i in range(self.mdp.num_players)]
-                logtext += log(f"Initializing episode {j+1}. Greed {1-greed_cur:>0.5f}. Batch size {batch_size}. Memory {memorylen}. Player wins {wins}, penalties {penalties}.", verbose)
+                logtext += log(f"Initializing episode {j+1}. Greed {1-greed_cur:>0.5f}. Batch size {sim_batch}. Memory {memorylen}. Player wins {wins}, penalties {penalties}.", verbose)
             
-            s = self.mdp.get_initial_state(batch_size)
+            s = self.mdp.get_initial_state(sim_batch)
             # "Records" for each player
             player_record = [None for i in range(self.mdp.num_players)]
             
@@ -309,14 +304,14 @@ class DQN():
                 p = self.mdp.get_player(s)                                  # p.shape = (batch, )       s.shape = (batch, 2, 6, 7)
 
                 # To get the actions, apply each player's strategy
-                a = torch.zeros((batch_size, ) + self.mdp.action_shape, device=self.device)
+                a = torch.zeros((sim_batch, ) + self.mdp.action_shape, device=self.device)
                 for pi in range(self.mdp.num_players):
                     # Get the indices corresponding to this player's turn
-                    indices = torch.arange(batch_size, device=self.device)[p.flatten() == pi].tolist()
+                    indices = torch.arange(sim_batch, device=self.device)[p.flatten() == pi].tolist()
                     
                     # Apply thie player's strategy to their turns
                     # Greedy is not parallelized, so there isn't efficiency loss with this
-                    player_actions = torch.cat([greedy_tensor(self.qs[pi], s[l:l+1], greed_cur) if l in indices else torch.zeros((1, ) + self.mdp.action_shape, device=self.device) for l in range(batch_size)], 0)
+                    player_actions = torch.cat([greedy_tensor(self.qs[pi], s[l:l+1], greed_cur) if l in indices else torch.zeros((1, ) + self.mdp.action_shape, device=self.device) for l in range(sim_batch)], 0)
                     a += player_actions
 
                 # Do the transition 
@@ -340,9 +335,9 @@ class DQN():
                         
                 # Train the policy on a random sample in memory (once the memory bank is big enough)
                 for i in range(self.mdp.num_players):
-                    if len(self.memories[i]) >= train_batch_size:
-                        losses[i] += self.qs[i].update(self.memories[i].sample(train_batch_size), learn_rate)
-                        updates += train_batch_size
+                    if len(self.memories[i]) >= train_batch:
+                        losses[i] += self.qs[i].update(self.memories[i].sample(train_batch), lr)
+                        updates += train_batch
 
                 # Restart terminal states TODO for now, just check if the whole thing is done and end the episode to hasten things up
                 # if torch.prod(self.mdp.is_terminal(s)).item() == 1:
@@ -381,7 +376,7 @@ class DQN():
             plt.figure(figsize=(8, 8))
             plt.subplot(1, 1, 1)
             for i in range(self.mdp.num_players):
-                plt.plot(range(episodes - len(convolved_losses[i]), episodes), convolved_losses[i], label=f'Player {i} smoothed losses')
+                plt.plot(range(dq_episodes - len(convolved_losses[i]), dq_episodes), convolved_losses[i], label=f'Player {i} smoothed losses')
             plt.legend(loc='lower right')
             plt.title('Losses with convolution kernel size 11')
 
@@ -392,11 +387,3 @@ class DQN():
             with open(savelog, "w") as f:
                 logtext += log(f"Saved logs to {savelog}", verbose)
                 f.write(logtext)
-
-        
-                    
-
-
-# TODO carefuly about eval vs train
-# TODO verbose
-# TODO greed scaling

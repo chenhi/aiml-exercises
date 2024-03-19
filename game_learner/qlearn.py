@@ -173,18 +173,18 @@ class QFunction():
 
     # Does a Q-update based on some observed set of data
     # Data is a list of the form (state, action, reward, next state)
-    def update(self, data: list[tuple[any, any, float, any]], learn_rate):
+    def update(self, data: list[tuple[any, any, float, any]], lr):
         deltas = []
         for d in data:
             s,a,r,t = d[0], d[1], d[2], d[3]
             delta = self.get(s,a) - (r + self.mdp.discount * self.val(t))
-            self.q[(s,a)] = self.get(s,a) - learn_rate * delta
+            self.q[(s,a)] = self.get(s,a) - lr * delta
             deltas.append(abs(delta))
         return deltas
 
     # Learn based on a given strategy for some number of iterations, updating each time.
     # In practice, this doesn't get used so much, because the "game" has to handle rewards between players (not the Q function itself)
-    def learn(self, strategy: callable, learn_rate: float, iterations: int):
+    def learn(self, strategy: callable, lr: float, iterations: int):
         s = self.mdp.get_initial_state()
         for i in range(iterations):
             if self.mdp.is_terminal(s):
@@ -192,12 +192,12 @@ class QFunction():
                 continue
             a = strategy(s)
             t, r = self.mdp.transition(s, a)
-            self.update([(s,a,r,t)], learn_rate)
+            self.update([(s,a,r,t)], lr)
             s = t
 
     # Learn in batches.  An update happens each iteration, on all past experiences (including previous iterations).  A state reset happpens each episode.
     # In practice, this doesn't get used so much, because the "game" has to handle rewards between players (not the Q function itself)
-    def batch_learn(self, strategy: callable, learn_rate: float, iterations: int, episodes: int, episode_length: int, remember_experiences = True):
+    def batch_learn(self, strategy: callable, lr: float, iterations: int, episodes: int, episode_length: int, remember_experiences = True):
         experiences = []
         for i in range(iterations):
             for j in range(episodes):
@@ -209,7 +209,7 @@ class QFunction():
                     if self.mdp.is_terminal(t):
                         break
                     s = t
-            self.update(experiences, learn_rate)
+            self.update(experiences, lr)
             if not remember_experiences:
                 experiences = []
                 
@@ -250,12 +250,6 @@ class QLearn():
         self.mdp = mdp
         self.qs = [QFunction(self.mdp) for i in range(mdp.num_players)]
         self.state = None
-
-    def set_greed(self, eps):
-        if type(eps) == list:
-            self.strategies = [get_greedy(self.qs[i], eps[i]) for i in range(self.mdp.num_players)]
-        else:
-            self.strategies = [get_greedy(self.qs[i], eps) for i in range(self.mdp.num_players)]
 
     def save_q(self, fname):
         with open(fname, 'wb') as f:
@@ -303,20 +297,22 @@ class QLearn():
             return self.mdp.get_player(s)
 
     # Player data is (start state, action taken, all reward before next action, starting state for next action)
-    def batch_learn(self, learn_rate: float, iterations: int, episodes: int, episode_length: int, verbose=False, savefile=None):
+    def batch_learn(self, lr: float, expl: float, iterations: int, q_episodes: int, episode_length: int, verbose=False, savefile=None):
+        iterations, q_episodes, episode_length = int(iterations), int(q_episodes), int(episode_length)
+        
         player_experiences = [[] for i in range(self.mdp.num_players)]
         logtext = ""
-        logtext += log(f"Q-learning with learn rate {learn_rate}, {iterations} iterations, {episodes} episodes of length {episode_length}.", verbose)
+        logtext += log(f"Q-learning with learn rate {lr}, {iterations} iterations, {q_episodes} episodes of length {episode_length}.", verbose)
         losses = [[] for i in range(self.mdp.num_players)]
         for i in range(iterations):
-            for j in range(episodes):
+            for j in range(q_episodes):
                 #if verbose and j % 10 == 9:
                 #print(f"Training iteration {i+1}, episode {j+1}", end='\r')
                 s = self.mdp.get_initial_state()
                 queue =[None for k in range(self.mdp.num_players)]
                 for k in range(episode_length):
                     p = self.current_player(s)
-                    a = self.strategies[p](s)
+                    a = greedy(self.qs[p], s, expl)
                     t, r = self.mdp.transition(s, a)
 
                     # For this player, bump the queue and add
@@ -342,7 +338,7 @@ class QLearn():
                     s = t
             # Do an update for each player
             for p in range(self.mdp.num_players):
-                deltas = self.qs[p].update(player_experiences[p], learn_rate)
+                deltas = self.qs[p].update(player_experiences[p], lr)
                 losses[p].append(sum(deltas)/len(deltas))
                 logtext += log(f"Iteration {i+1}: {losses[p][-1]/len(player_experiences[p])} loss for player {p+1} over {len(player_experiences[p])} training experiences.")
 

@@ -17,7 +17,14 @@ ttt_actions = [(i, j) for i in range(3) for j in range(3)]
 # The players are 1, and -1 in that order
 class TTTMDP(MDP):
     def __init__(self):
-        super().__init__(None, ttt_actions, discount=1, num_players=2, \
+        hyperpar = {
+            'lr': 0.1,
+            'expl': 0.5,
+            'iterations': 500,
+            'q_episodes': 64,
+            'episode_length': 1000
+        }
+        super().__init__(None, ttt_actions, discount=1, num_players=2, default_hyperparameters=hyperpar, \
                          symb = {0: "X", 1: "O", -1: "-"}, input_str = "Input position to play, e.g. '1, 3' for the 1st row and 3rd column: ")
 
     # States are tuples (0 or 1, 9-tuples of 1,0,-1). Arrays are tuples (1 or -1, 3x3 array).
