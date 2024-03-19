@@ -8,7 +8,17 @@ options = sys.argv[1:]
 class TTTTensorMDP(TensorMDP):
 
     def __init__(self, device = "cpu"):
-        hyperpar = {'lr': 0.00025, 'expl_start': 1.0, 'expl_end': 0.5, 'dq_episodes': 2500, 'episode_length': 15, 'sim_batch': 4, 'train_batch': 64, 'anneal_eps': 500, 'copy_interval_eps': 200}
+        hyperpar = {
+            'lr': 0.00025, 
+            'expl_start': 1.0, 
+            'expl_end': 0.5, 
+            'dq_episodes': 2000, 
+            'episode_length': 15, 
+            'sim_batch': 4, 
+            'train_batch': 64, 
+            'anneal_eps': 500, 
+            'copy_interval_eps': 200
+            }
         super().__init__(state_shape=(2,3,3), action_shape=(3,3), discount=1, num_players=2, batched=True, default_hyperparameters=hyperpar, \
                          symb = {0: "X", 1: "O", None: "-"}, input_str = "Input position to play, e.g. '1, 3' for the 1st row and 3rd column: ", penalty=-2)
         self.device = device

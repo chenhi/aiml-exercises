@@ -89,7 +89,7 @@ if len(sys.argv) > 2:
 
 
 prompts = {
-    'lr': 'Learn rate in [0, 1]:',
+    'lr': 'Learn rate in [0, 1]',
     'expl': 'The ungreed/exploration rate in [0, 1]',
     'expl_start': 'The starting exploration rate in [0, 1]',
     'expl_end': 'The ending exporation rate in [0, 1]',
@@ -105,7 +105,14 @@ prompts = {
 
 # Train AI
 if train_new:
-    hpar = mdp.default_hyperparameters
+    
+    hpar = mdp.default_hyperparameters    
+    
+    res = input("Name of file (alphanumeric only, max length 64, w/o extension): ")
+    fname_end = f"{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}_" + re.sub(r'\W+', '', res)[0:64] + f"{file_ext}"
+    fname = f'bots/{shortname}/' + fname_end
+    logpath = fname + ".log"
+        
     
     for k, v in hpar.items():
         res = input(f"{prompts[k] if k in prompts else k} (default {v}): ")
@@ -114,11 +121,6 @@ if train_new:
         except:
             print(f"Not a valid value.  Setting greed to {v}.")
 
-    res = input("Name of file (alphanumeric only, max length 64, w/o extension): ")
-    fname_end = f"{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}_" + re.sub(r'\W+', '', res)[0:64] + f"{file_ext}"
-    fname = f'bots/{shortname}/' + fname_end
-    logpath = fname + ".log"
-        
     if type == "qlearn":
         #game.set_greed(expl)
         game.batch_learn(**hpar, verbose=True, savefile=fname + ".exp")
@@ -203,7 +205,7 @@ while True:
     
     s = game.mdp.get_initial_state()
     while item(game.mdp.is_terminal(s), mdp) == False:
-        p = item(game.mdp.get_player(s), mdp)
+        p = int(item(game.mdp.get_player(s), mdp))
         print(f"\n{item(game.mdp.board_str(s), mdp, is_list=True)}")
         if p == player_index:
             res = input(mdp.input_str)

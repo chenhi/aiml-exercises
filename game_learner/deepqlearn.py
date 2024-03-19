@@ -99,10 +99,10 @@ class NNQFunction(QFunction):
     # If input action = None, then return the entire vector of action values of shape (batch, ) + action_shape
     # Otherwise, output shape (batch, )
     def get(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
-        self.q.eval()
         if self.q == None:
             pred = self.mdp.get_random_action(state)    
         else:
+            self.q.eval()
             pred = self.q(state)
         if action == None:
             return pred

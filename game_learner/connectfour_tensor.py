@@ -38,7 +38,18 @@ def shift(x: torch.Tensor, shift: int, axis: int, device="cpu") -> torch.Tensor:
 class C4TensorMDP(TensorMDP):
 
     def __init__(self, device="cpu"):
-        super().__init__(state_shape=(2,6,7), action_shape=(7,), discount=1, num_players=2, batched=True, \
+        hyperpar = {
+            'lr': 0.00001, 
+            'expl_start': 1.0, 
+            'expl_end': 0.5, 
+            'dq_episodes': 2000, 
+            'episode_length': 50, 
+            'sim_batch': 4, 
+            'train_batch': 64, 
+            'anneal_eps': 500, 
+            'copy_interval_eps': 200
+            }
+        super().__init__(state_shape=(2,6,7), action_shape=(7,), discount=1, num_players=2, batched=True, default_hyperparameters=hyperpar, \
                          symb = {0: "O", 1: "X", None: "-"}, input_str = "Input column to play (1-7). ", penalty=-2)
         self.device=device
         
@@ -176,7 +187,7 @@ class C4TensorMDP(TensorMDP):
 
     # Return shape (batch, 2, 1, 1)
     def get_player_vector(self, state: torch.Tensor) -> torch.Tensor:
-        return torch.eye(2, device=self.device)[None].expand(state.size(0),-1,-1)[torch.arange(state.size(0)),self.get_player(state)[:, 0, 0, 0]][:,:,None, None]
+        return torch.eye(2, device=self.device)[None].expand(state.size(0),-1,-1)[torch.arange(state.size(0)),self.get_player(state).int()[:, 0, 0, 0]][:,:,None, None]
     
     # Return shape (batch, 2, 1, 1)
     def swap_player(self, player_vector: torch.Tensor) -> torch.Tensor:
@@ -217,7 +228,7 @@ class C4TensorMDP(TensorMDP):
     # Inputs: state has stape (batch, 2, 6, 7), player has shape (batch, ), and center has shape (batch, 6, 7)
     # Returns a shape (batch, 1, 1, 1) boolean saying whether the indicated player is a winner.
     def is_winner(self, state: torch.Tensor, player: torch.Tensor, center: torch.Tensor) -> torch.Tensor:
-        return ((torch.tensordot((state[torch.arange(state.shape[0]), player[:,0,0,0]][:,None,None,:,:] * center[:,:,:,None,None]).flatten(1, 2), self.filter_stack, ([1,2,3], [0,2,3])) == 4).sum(1) > 0)[:,None, None, None]
+        return ((torch.tensordot((state[torch.arange(state.shape[0]), player.int()[:,0,0,0]][:,None,None,:,:] * center[:,:,:,None,None]).flatten(1, 2), self.filter_stack, ([1,2,3], [0,2,3])) == 4).sum(1) > 0)[:,None, None, None]
         # Unwound version
         # Get the channel for the indicated player, shape (batch, 6, 7)
         #player_board = state[torch.arange(state.shape[0]), player[:,0,0,0]]

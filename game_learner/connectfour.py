@@ -12,7 +12,14 @@ options = sys.argv[1:]
 # Set of actions: integers [0, 6]
 class C4MDP(MDP):
     def __init__(self):
-        super().__init__(None, range(0, 7), discount=1, num_players=2, \
+        hyperpar = {
+            'lr': 0.1,
+            'expl': 0.5,
+            'iterations': 500,
+            'q_episodes': 64,
+            'episode_length': 1000
+        }
+        super().__init__(None, range(0, 7), discount=1, num_players=2, default_hyperparameters=hyperpar, \
                          symb={0: "O", 1: "X", None: "-"}, input_str="Input column to play (1-7). ")
 
     def board_str(self, s):
