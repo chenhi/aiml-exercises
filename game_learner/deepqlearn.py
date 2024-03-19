@@ -198,7 +198,7 @@ class DQN():
             if indices == None or i in indices:
                 zf.extract(f"player.{i}", "temp/")
                 self.qs[i].q = torch.jit.load(f"temp/player.{i}")
-                self.qs[i].copy_policy_to_target()
+                self.qs[i].target_q = torch.jit.load(f"temp/player.{i}")
                 os.remove(f"temp/player.{i}")
         zf.close()
 
