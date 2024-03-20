@@ -39,13 +39,13 @@ class C4TensorMDP(TensorMDP):
 
     def __init__(self, device="cpu"):
         hyperpar = {
-            'lr': 0.00001, 
+            'lr': 0.00025, 
             'expl_start': 1.0, 
             'expl_end': 0.5, 
             'dq_episodes': 2000, 
             'episode_length': 50, 
-            'sim_batch': 64, 
-            'train_batch': 128, 
+            'sim_batch': 128, 
+            'train_batch': 256, 
             'anneal_eps': 500, 
             'copy_interval_eps': 200
             }
@@ -294,6 +294,7 @@ class C4TensorMDP(TensorMDP):
         reward += ((self.is_valid_action(state, action) == False).float() * self.penalty * p_tensor)[:,:,0,0]
         
         return newstate, reward
+    
 
 
 

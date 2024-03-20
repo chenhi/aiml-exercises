@@ -73,7 +73,7 @@ class TensorMDP(MDP):
         raise NotImplementedError
     
     def tests(self, qs: list[PrototypeQFunction]):
-        raise NotImplementedError
+        return []
         
 
 # A Q-function where the inputs and outputs are all tensors
@@ -259,7 +259,7 @@ class DQN():
     # Handling multiplayer: each player keeps their own "record", separate from memory
     # When any entry in the record has source = target, then the player "banks" it in their memory
     # The next time an action is taken, if the source = target, then it gets overwritten
-    def deep_learn(self, lr: float, dq_episodes: int, episode_length: int, anneal_eps: int, expl_start: float, expl_end: float, sim_batch: int, train_batch: int, copy_interval_eps: int, savelog=None, verbose=False, debug=False):
+    def deep_learn(self, lr: float, dq_episodes: int, episode_length: int, anneal_eps: int, expl_start: float, expl_end: float, sim_batch: int, train_batch: int, copy_interval_eps: int, savelog=None, verbose=False, graph_smoothing=10, debug=False):
 
         dq_episodes, episode_length, anneal_eps, sim_batch, train_batch, copy_interval_eps = int(dq_episodes), int(episode_length), int(anneal_eps), int(sim_batch), int(train_batch), int(copy_interval_eps)
         verbose = verbose or debug
@@ -278,7 +278,10 @@ class DQN():
             wins = [0] * self.mdp.num_players
             penalties = [0] * self.mdp.num_players
             episode_losses = [[] for i in range(self.mdp.num_players)]
-            tests = [self.mdp.tests(self.qs)]
+            tests = []                                          # Format: tests[i][j] is the jth iteration of the ith test
+            initial_test = self.mdp.tests(self.qs)
+            for i in range(len(initial_test)):
+                tests.append([initial_test[i]])
             start_time = datetime.datetime.now()
             logtext += log(f"Starting training at {start_time}\n", verbose)
                         
@@ -398,10 +401,10 @@ class DQN():
         if savelog != None:
             
             # Plot losses
-            plt.figure(figsize=(8, 8))
+            plt.figure(figsize=(12, 12))
             plt.subplot(1, 1, 1)
             for i in range(self.mdp.num_players):
-                plt.plot(range(dq_episodes - len(episode_losses[i]), dq_episodes), smoothing(episode_losses[i], 5), label=f'Player {i}')
+                plt.plot(range(dq_episodes - len(episode_losses[i]), dq_episodes), smoothing(episode_losses[i], graph_smoothing), label=f'Player {i}')
             plt.legend(loc='lower left')
             plt.title('Smoothed Loss')
             plotpath = savelog + f".losses.png"
@@ -410,18 +413,18 @@ class DQN():
 
             # Plot test results
             for j in range(len(tests)):
-                plt.figure(figsize=(8, 8))
+                plt.figure(figsize=(12, 12))
                 plt.subplot(1, 1, 1)
                 for k in tests[j][0].keys():
                     vals = []
                     for i in range(len(tests[j])):
                         vals.append(tests[j][i][k])
-                    plt.plot(range(dq_episodes + 1), smoothing(vals, 5), label=f'{k}')
+                    plt.plot(range(dq_episodes + 1), smoothing(vals, graph_smoothing), label=f'{k}')
                 plt.legend(loc='lower left')
                 plt.title(f'Test {j} (smoothed)')
-            plotpath = savelog + f".test{j}.png"
-            plt.savefig(plotpath)
-            logtext += log(f"Saved test {i} plot to {plotpath}", verbose)
+                plotpath = savelog + f".test{j}.png"
+                plt.savefig(plotpath)
+                logtext += log(f"Saved test {j} plot to {plotpath}", verbose)
 
             with open(savelog, "w") as f:
                 logtext += log(f"Saved logs to {savelog}", verbose)

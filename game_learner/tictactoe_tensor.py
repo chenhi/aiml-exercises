@@ -156,8 +156,46 @@ class TTTTensorMDP(TensorMDP):
         return (abs(state.sum((1,2,3))) == 9)[:, None, None, None]
     
 
+    ##### TESTING FUNCTIONS #####
+
+    def orbit(self, y: torch.Tensor) -> torch.Tensor:
+        y = torch.cat([y, y.flip(-1)])
+        return torch.cat([y, y.rot90(k=1, dims=[-1,-2]), y.rot90(k=2, dims=[-1,-2]), y.rot90(k=3, dims=[-1,-2])])
+
     def tests(self, qs: list[PrototypeQFunction]):
-        # First test: the AI is playing as player 1 (second player, O). We are interested in the boards:
+        
+
+        # Test 0: the AI is playing as player 0 (first player, X).  We are interested in the 8 boards in the orbit of:
+        # XO-
+        # -X-
+        # --O
+        # For X, placing in the 2 positions in the left column results in a win, and placing in the other 3 positions results in a tie.
+
+        s = torch.tensor([[[[1.,0.,0.],[0.,1.,0.],[0.,0.,0.]], [[0.,1.,0.],[0.,0.,0.],[0.,0.,1.]]]])                                         
+        win_s = torch.cat([s,s])
+        tie_s = torch.cat([s,s,s])
+        win_a = torch.tensor([[[0.,0.,0.],[1.,0.,0.],[0.,0.,0.]],[[0.,0.,0.],[0.,0.,0.],[1.,0.,0.]]])                                      
+        tie_a = torch.tensor([[[0.,0.,0.],[0.,0.,0.],[0.,1.,0.]],[[0.,0.,1.],[0.,0.,0.],[0.,0.,0.]],[[0.,0.,0.],[0.,0.,1.],[0.,0.,0.]]]) 
+        
+        win_values = qs[0].get(self.orbit(win_s), self.orbit(win_a))
+        tie_values = qs[0].get(self.orbit(tie_s), self.orbit(tie_a))
+
+        win_stdev = win_values.std().item()
+        tie_stdev = tie_values.std().item()
+        mean_diff = win_values.mean().item() - tie_values.mean().item()
+        min_diff = win_values.min().item() - tie_values.max().item()
+        
+        separated_win_max = win_values.reshape(8,-1).flatten(1,-1).max(1).values
+        separated_tie_max = tie_values.reshape(8,-1).flatten(1,-1).max(1).values
+        pass_score = (separated_win_max - separated_tie_max).min().item()
+
+        
+        #diff_max = win_values.max().item() - tie_values.max().item()
+
+        test0 = {'winning play stdev': win_stdev, 'losing stdev': tie_stdev, 'diff of means': mean_diff, 'min distance': min_diff, 'test pass score': pass_score}
+        
+        
+        # Test 1: the AI is playing as player 1 (second player, O). We are interested in the boards:
         # X--   --X
         # -O-   -O-
         # --X   X--
@@ -172,13 +210,19 @@ class TTTTensorMDP(TensorMDP):
         # (1) standard deviations for each desired cluster should be low
         # (2) the difference between the means should be positive and as high as possible
         # (3) 
-        side_mean, side_stdev = side_values.mean().item(), side_values.std().item()
-        corner_mean, corner_stdev = corner_values.mean().item(), corner_values.std().item()
-        mean_diff = side_mean - corner_mean
+        side_stdev = side_values.std().item()
+        corner_stdev = corner_values.std().item()
+        mean_diff = side_values.mean().item() - corner_values.mean().item()
         min_diff = side_values.min().item() - corner_values.max().item()
-        test1 = {'side stdev': side_stdev, 'corner_stdev': corner_stdev, 'diff of means': mean_diff, 'min diff': min_diff}
+        #diff_max = side_values.max().item() - corner_values.max().item()
 
-        return [test1]
+        separated_side_max = side_values.reshape(2,-1).flatten(1,-1).max(1).values
+        separated_corner_max = corner_values.reshape(2,-1).flatten(1,-1).max(1).values
+        pass_score = (separated_side_max - separated_corner_max).min().item()
+
+        test1 = {'side play (tie) stdev': side_stdev, 'corner play (lose) stdev': corner_stdev, 'diff of means': mean_diff, 'min distance': min_diff, 'test pass score': pass_score}
+
+        return [test0, test1]
 
     
 

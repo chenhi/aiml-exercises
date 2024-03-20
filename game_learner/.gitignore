@@ -3,4 +3,5 @@ bots/*/*.pt
 bots/*/*.log
 bots/*/*.png
 bots/*/*.pkl
+bots/*/*.exp
 temp*
