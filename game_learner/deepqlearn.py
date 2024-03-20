@@ -1,9 +1,9 @@
-import zipfile, os, random, warnings
+import zipfile, os, random, warnings, datetime
 import torch
 from torch import nn
 from collections import namedtuple, deque
-from qlearn import MDP, QFunction
-from aux import log
+from qlearn import MDP, QFunction, PrototypeQFunction
+from aux import log, smoothing
 import matplotlib.pyplot as plt
 
 # The player order matches their names.
@@ -71,7 +71,9 @@ class TensorMDP(MDP):
 
     def valid_action_filter(self, state: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError
-
+    
+    def tests(self, qs: list[PrototypeQFunction]):
+        raise NotImplementedError
         
 
 # A Q-function where the inputs and outputs are all tensors
@@ -257,9 +259,11 @@ class DQN():
     # Handling multiplayer: each player keeps their own "record", separate from memory
     # When any entry in the record has source = target, then the player "banks" it in their memory
     # The next time an action is taken, if the source = target, then it gets overwritten
-    def deep_learn(self, lr: float, dq_episodes: int, episode_length: int, anneal_eps: int, expl_start: float, expl_end: float, sim_batch: int, train_batch: int, copy_interval_eps: int, savelog=None, verbose=False):
+    def deep_learn(self, lr: float, dq_episodes: int, episode_length: int, anneal_eps: int, expl_start: float, expl_end: float, sim_batch: int, train_batch: int, copy_interval_eps: int, savelog=None, verbose=False, debug=False):
 
         dq_episodes, episode_length, anneal_eps, sim_batch, train_batch, copy_interval_eps = int(dq_episodes), int(episode_length), int(anneal_eps), int(sim_batch), int(train_batch), int(copy_interval_eps)
+        verbose = verbose or debug
+
         if train_batch < 2:
             Exception("Training batch size must be greater than 1 for sampling.")
 
@@ -274,6 +278,11 @@ class DQN():
             wins = [0] * self.mdp.num_players
             penalties = [0] * self.mdp.num_players
             episode_losses = [[] for i in range(self.mdp.num_players)]
+            tests = [self.mdp.tests(self.qs)]
+            start_time = datetime.datetime.now()
+            logtext += log(f"Starting training at {start_time}\n", verbose)
+                        
+
 
         frame = 0
         for j in range(dq_episodes):
@@ -290,7 +299,7 @@ class DQN():
             
             if verbose or savelog != None:
                 memorylen = [self.memories[i].size() for i in range(self.mdp.num_players)]
-                logtext += log(f"Initializing episode {j+1}. Greed {1-greed_cur:>0.5f}. Batch size {sim_batch}. Memory {memorylen}. Player wins {wins}, penalties {penalties}.", verbose)
+                logtext += log(f"Initializing episode {j+1}. Greed {1-greed_cur:>0.5f}. Memory {memorylen}. Player wins {wins}, penalties {penalties}.", verbose)
             
             s = self.mdp.get_initial_state(sim_batch)
             # "Records" for each player
@@ -298,6 +307,12 @@ class DQN():
             
             for k in range(episode_length):
                 frame += 1
+
+                if debug:
+                    boards = ""
+                    for i in range(sim_batch):
+                        boards += f"Board {i}:\n{self.mdp.board_str(s)[i]}\n"
+                    input(f"Current boards:\n{boards}")
 
                 # Execute the transition on the "actual" state
                 # To do this, we need to iterate over players, because each has a different q function for determining the strategy
@@ -309,15 +324,25 @@ class DQN():
                     # Get the indices corresponding to this player's turn
                     indices = torch.arange(sim_batch, device=self.device)[p.flatten() == pi].tolist()
                     
-                    # Apply thie player's strategy to their turns
+                    # Apply the player's strategy to their turns
                     # Greedy is not parallelized, so there isn't efficiency loss with this
                     player_actions = torch.cat([greedy_tensor(self.qs[pi], s[l:l+1], greed_cur) if l in indices else torch.zeros((1, ) + self.mdp.action_shape, device=self.device) for l in range(sim_batch)], 0)
                     a += player_actions
 
+                if debug:
+                    input(f"Chosen actions:\n{a}")
+
                 # Do the transition 
                 t, r = self.mdp.transition(s, a)
                 
-                # Tracking wins and penalities
+                if debug:
+                    boards = ""
+                    for i in range(sim_batch):
+                        boards += f"Board {i}:\n{self.mdp.board_str(t)[i]}\nReward: {r[i]}"
+                    input(f"New boards:\n{boards}")
+
+
+                # Tracking wins and penalities TODO more robust
                 if verbose or savelog != None:
                     for pi in range(self.mdp.num_players):
                         wins[pi] += torch.sum(r[:,pi] > 0).item()
@@ -346,43 +371,57 @@ class DQN():
                 # Don't forget to set the state to the next state
                 s = t
             
+            # Record statistics at end of episode
+            if (verbose or savelog != None):
+                if updates > 0:
+                    for i in range(len(losses)):
+                        losses[i] = losses[i]/updates
+                        episode_losses[i].append(losses[i])
+                    logtext += log(f"Episode {j+1} average loss: {losses}", verbose)
+                test_results = self.mdp.tests(self.qs)
+                for j in range(len(test_results)):
+                    tests[j].append(test_results[j])
+
+            
             # Copy the target network to the policy network if it is time
             if (j+1) % copy_interval_eps == 0:
                 for i in range(self.mdp.num_players):
                     self.qs[i].copy_policy_to_target()
                 logtext += log("Copied policy to target networks for all players.", verbose)
-            
-            
-            if (verbose or savelog != None) and updates > 0:
-                for i in range(len(losses)):
-                    losses[i] = losses[i]/updates
-                    episode_losses[i].append(losses[i])
-                logtext += log(f"Episode {j+1} average loss: {losses}", verbose)
-                
+
+        if verbose or savelog != None:
+            end_time = datetime.datetime.now()
+            logtext += log(f"\nTraining finished at {end_time}")
+            logtext += log(f"Total time: {end_time - start_time}")
+
 
         if savelog != None:
-            # First, do an averaging of the losses
-            convolved_losses = [[] for i in range(self.mdp.num_players)]
-            for i in range(self.mdp.num_players):
-                for j in range(len(episode_losses[i])):
-                    total = 0.
-                    num = 0
-                    for k in range(-5, 6):
-                        if j + k >= 0 and j + k < len(episode_losses[i]):
-                            total += episode_losses[i][j+k]
-                            num += 1
-                    convolved_losses[i].append(total/num)
-
+            
+            # Plot losses
             plt.figure(figsize=(8, 8))
             plt.subplot(1, 1, 1)
             for i in range(self.mdp.num_players):
-                plt.plot(range(dq_episodes - len(convolved_losses[i]), dq_episodes), convolved_losses[i], label=f'Player {i} smoothed losses')
-            plt.legend(loc='lower right')
-            plt.title('Losses with convolution kernel size 11')
-
-            plotpath = savelog + ".png"
+                plt.plot(range(dq_episodes - len(episode_losses[i]), dq_episodes), smoothing(episode_losses[i], 5), label=f'Player {i}')
+            plt.legend(loc='lower left')
+            plt.title('Smoothed Loss')
+            plotpath = savelog + f".losses.png"
             plt.savefig(plotpath)
-            logtext += log(f"Saved accuracy/loss plot to {plotpath}", verbose)
+            logtext += log(f"Saved losses plot to {plotpath}", verbose)
+
+            # Plot test results
+            for j in range(len(tests)):
+                plt.figure(figsize=(8, 8))
+                plt.subplot(1, 1, 1)
+                for k in tests[j][0].keys():
+                    vals = []
+                    for i in range(len(tests[j])):
+                        vals.append(tests[j][i][k])
+                    plt.plot(range(dq_episodes + 1), smoothing(vals, 5), label=f'{k}')
+                plt.legend(loc='lower left')
+                plt.title(f'Test {j} (smoothed)')
+            plotpath = savelog + f".test{j}.png"
+            plt.savefig(plotpath)
+            logtext += log(f"Saved test {i} plot to {plotpath}", verbose)
 
             with open(savelog, "w") as f:
                 logtext += log(f"Saved logs to {savelog}", verbose)

@@ -1,3 +1,6 @@
 __pycache__
-bots/*
+bots/*/*.pt
+bots/*/*.log
+bots/*/*.png
+bots/*/*.pkl
 temp*

@@ -14,10 +14,10 @@ class TTTTensorMDP(TensorMDP):
             'expl_end': 0.5, 
             'dq_episodes': 2000, 
             'episode_length': 15, 
-            'sim_batch': 4, 
-            'train_batch': 64, 
+            'sim_batch': 16, 
+            'train_batch': 128, 
             'anneal_eps': 500, 
-            'copy_interval_eps': 200
+            'copy_interval_eps': 10
             }
         super().__init__(state_shape=(2,3,3), action_shape=(3,3), discount=1, num_players=2, batched=True, default_hyperparameters=hyperpar, \
                          symb = {0: "X", 1: "O", None: "-"}, input_str = "Input position to play, e.g. '1, 3' for the 1st row and 3rd column: ", penalty=-2)
@@ -154,6 +154,32 @@ class TTTTensorMDP(TensorMDP):
     
     def is_full(self, state: torch.Tensor) -> torch.Tensor:
         return (abs(state.sum((1,2,3))) == 9)[:, None, None, None]
+    
+
+    def tests(self, qs: list[PrototypeQFunction]):
+        # First test: the AI is playing as player 1 (second player, O). We are interested in the boards:
+        # X--   --X
+        # -O-   -O-
+        # --X   X--
+        # We want to see clustering amongst the Q-values for playing on the sides vs. on the corners, with the sides being higher.
+        s = torch.tensor([[[[1.,0.,0.],[0.,0.,0.],[0.,0.,1.]],[[0.,0.,0.],[0.,1.,0.],[0.,0.,0.]]], [[[0.,0.,1.],[0.,0.,0.],[1.,0.,0.]],[[0.,0.,0.],[0.,1.,0.],[0.,0.,0.]]]])
+        side_a = torch.tensor([[[0.,1.,0.],[0.,0.,0.],[0.,0.,0.]], [[0.,0.,0.],[1.,0.,0.],[0.,0.,0.]], [[0.,0.,0.],[0.,0.,1.],[0.,0.,0.]], [[0.,0.,0.],[0.,0.,0.],[0.,1.,0.]]])
+        side_values = qs[1].get(s[[0,0,0,0,1,1,1,1]], side_a[[0,1,2,3,0,1,2,3]])
+        corner_a = torch.tensor([[[0.,0.,1.],[0.,0.,0.],[0.,0.,0.]], [[0.,0.,0.],[0.,0.,0.],[1.,0.,0.]],[[1.,0.,0.],[0.,0.,0.],[0.,0.,0.]], [[0.,0.,0.],[0.,0.,0.],[0.,0.,1.]]])
+        corner_values = qs[1].get(s[[0,0,1,1]], corner_a)
+
+        # Metrics:
+        # (1) standard deviations for each desired cluster should be low
+        # (2) the difference between the means should be positive and as high as possible
+        # (3) 
+        side_mean, side_stdev = side_values.mean().item(), side_values.std().item()
+        corner_mean, corner_stdev = corner_values.mean().item(), corner_values.std().item()
+        mean_diff = side_mean - corner_mean
+        min_diff = side_values.min().item() - corner_values.max().item()
+        test1 = {'side stdev': side_stdev, 'corner_stdev': corner_stdev, 'diff of means': mean_diff, 'min diff': min_diff}
+
+        return [test1]
+
     
 
 

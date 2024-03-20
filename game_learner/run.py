@@ -70,6 +70,8 @@ print(f"\nPlaying {name}.\n")
 
 #==================== BOT TRAINING ====================#
 
+debug = True if 'debug' in sys.argv else False
+
 train_new = False
 simulate = False
 if len(sys.argv) > 2:
@@ -127,7 +129,7 @@ if train_new:
         game.save_q(fname)
 
     if type == "dqn":
-        game.deep_learn(**hpar, savelog=logpath, verbose=True)
+        game.deep_learn(**hpar, savelog=logpath, verbose=True, debug=debug)
         game.save_q(fname)
 
 

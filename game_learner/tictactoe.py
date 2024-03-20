@@ -1,6 +1,6 @@
 from qlearn import *
 import numpy as np
-import random
+import random, statistics
 
 # State format: (player, 9-tuple)
 # While this is finite, we will just model it as a 10 dimensional vector.
@@ -139,3 +139,29 @@ class TTTMDP(MDP):
     
     def get_player(self, state):
         return state[0]
+
+    def tests(self, q: QFunction):
+        # First test: the AI is playing as player 1 (second player, O). We are interested in the boards:
+        # X--   --X
+        # -O-   -O-
+        # --X   X--
+        # We want to see clustering amongst the Q-values for playing on the sides vs. on the corners, with the sides being higher.
+        diag_s = (-1, (1,0,0,0,-1,0,0,0,1))
+        adiag_s = (-1, (0,0,1,0,-1,0,1,0,0))
+        side_values = [q.get(diag_s, (0,1)), q.get(diag_s, (1,0)), q.get(diag_s, (1,2)), q.get(diag_s, (2,1)), q.get(adiag_s, (0,1)), q.get(adiag_s, (1,0)), q.get(adiag_s, (1,2)), q.get(adiag_s, (2,1))]
+        corner_values = [q.get(diag_s, (0,2)), q.get(diag_s, (2,0)), q.get(adiag_s, (0,0)), q.get(adiag_s, (2,2))]
+
+        # Metrics:
+        # (1) standard deviations for each desired cluster should be low
+        # (2) the difference between the means should be positive and as high as possible
+        # (3) 
+        side_mean, side_stdev = statistics.mean(side_values), statistics.stdev(corner_values)
+        corner_mean, corner_stdev = statistics.mean(corner_values), statistics.stdev(side_values)
+        mean_diff = side_mean - corner_mean
+        test1 = {'side stdev': side_stdev, 'corner_stdev': corner_stdev, 'mean diff': mean_diff}
+
+        return test1
+
+        
+
+

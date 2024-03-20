@@ -189,3 +189,6 @@ class C4MDP(MDP):
     def get_player(self, state):
         return state[0]
     
+    def tests(self, q: QFunction):
+        return None
+    

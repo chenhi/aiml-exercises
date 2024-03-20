@@ -2,6 +2,15 @@ import random, pickle
 from aux import log
 import matplotlib.pyplot as plt
 
+
+class PrototypeQFunction():
+    def __init__():
+        raise NotImplementedError
+    
+    def get(self, state, action) -> float:
+        raise NotImplementedError
+
+
 # WARNING: states and actions must be hashable if using with QFunction.
 class MDP():
     def __init__(self, states, actions, discount=1, num_players=1, penalty = -1000, symb = {}, input_str = "", default_hyperparameters = {}, batched=False):
@@ -120,7 +129,7 @@ def valmax(args: list, f: callable):
 # Given a set of states S and a set of actions A, a value function maps Q: S x A ---> R and reflects the value (in terms of rewards) of performing a given action at the state.
 # The sets S and A might be infinite.  Therefore in practice we do not require Q to be defined everywhere.
 # We may or may not specify a set from which 
-class QFunction():
+class QFunction(PrototypeQFunction):
 
     def __init__(self, mdp: MDP):
         self.q = {}
@@ -302,8 +311,9 @@ class QLearn():
         
         player_experiences = [[] for i in range(self.mdp.num_players)]
         logtext = ""
-        logtext += log(f"Q-learning with learn rate {lr}, {iterations} iterations, {q_episodes} episodes of length {episode_length}.", verbose)
+        logtext += log(f"Q-learning with learn rate {lr}, fixed exploration rate {expl}, {iterations} iterations, {q_episodes} episodes of length {episode_length}.", verbose)
         losses = [[] for i in range(self.mdp.num_players)]
+
         for i in range(iterations):
             for j in range(q_episodes):
                 #if verbose and j % 10 == 9:
@@ -336,9 +346,12 @@ class QLearn():
                     if self.mdp.is_terminal(t):
                         break
                     s = t
-            # Do an update for each player
+
+            # Do an update for each player, and record statistics
             for p in range(self.mdp.num_players):
                 deltas = self.qs[p].update(player_experiences[p], lr)
+
+                # Record statistics
                 losses[p].append(sum(deltas)/len(deltas))
                 logtext += log(f"Iteration {i+1}: {losses[p][-1]/len(player_experiences[p])} loss for player {p+1} over {len(player_experiences[p])} training experiences.")
 
@@ -348,6 +361,8 @@ class QLearn():
                 total += len(e)
             print(f"Trained on {total} experiences.")
         if savefile != None:
+
+            # Save loss plot
             plt.figure(figsize=(8, 8))
             plt.subplot(1, 1, 1)
             for i in range(self.mdp.num_players):
@@ -358,6 +373,9 @@ class QLearn():
             plotpath = savefile + ".png"
             plt.savefig(plotpath)
             logtext += log(f"Saved accuracy/loss plot to {plotpath}", verbose)
+
+
+
 
             with open(savefile, 'wb') as f:
                 pickle.dump(player_experiences, f)
