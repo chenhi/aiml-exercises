@@ -9,7 +9,8 @@ import os, datetime, re, sys, torch
 open_str = '\nCommand-line options: python play.py <game> <play/train/simulate>\n\
     If play (default), play against a model.\n\
     If train, continue to play after training.\n\
-    If simulate, watch two bots in a model play each other.\n\n'
+    If simulate, watch two bots in a model play each other.\n\
+    If benchmark, simulates games between a bot and a random bot.\n\n'
 
 
 device = (

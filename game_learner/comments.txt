@@ -125,6 +125,8 @@ LESSONS:
 
 The next goal is to understand what it means when the losses stabilize.  Does it mean the AI is no longer learning?  Theoretically, no.  So how can we interpret it?  For the tic-toc-toe AI, the loss graph just looks so much different from all the connect 4 ones.  Maybe it means the learning rate is too high?  Or too low?  I will code in an option to save the model every 100 iterations or so and can try it out.
 
+I noticed that when I bumped up the learning rate for tic tac toe, the losses (20240324020352_lrup.dttt.pt.log.losses.png) would drop but then stay pretty level instead of converging in a curve-like way.  This is probably indicating that the learning rate is too high then.
+
 
 Connect Four:
 * 100 episodes, 1000 iterations is taking maybe 2 hours.  The AI is not great because there are large branches of the tree it hasn't explored at all.  Will try training it with a neural network.

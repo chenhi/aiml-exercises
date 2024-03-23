@@ -304,6 +304,47 @@ class QLearn():
             return self.mdp.get_player(s).item()
         else:
             return self.mdp.get_player(s)
+        
+
+    def simulate_against_random(self, num_simulations: int, replay_loss = False, verbose = False):
+        output = []
+        for i in range(self.mdp.num_players):
+            if verbose:
+                print(f"Playing as player {i}.")
+            wins, losses, ties, invalids, unknowns  = 0, 0, 0, 0, 0
+            for j in range(num_simulations):
+                s = self.mdp.get_initial_state()
+                if replay_loss:
+                    history = [s]
+                while self.mdp.is_terminal(s) == False:
+                    p = int(self.mdp.get_player(s))
+                    if p == i:
+                        a = self.qs[i].policy(s)
+                        if self.mdp.is_valid_action(s, a):
+                            s, r = self.mdp.transition(s, a)
+                        else:
+                            invalids += 1
+                            a = self.mdp.get_random_action(s)
+                            s, r = self.mdp.transition(s, a)
+                    else:
+                        a = self.mdp.get_random_action(s)
+                        s, r = self.mdp.transition(s, a)
+                    if replay_loss:
+                        history.append(s)
+                if r[i] == 1.:
+                    wins += 1
+                elif r[i] == -1.:
+                    losses += 1
+                    if replay_loss:
+                        for s in history:
+                            print(self.mdp.board_str(s))
+                            input()
+                elif r[i] == 0.:
+                    ties += 1
+                else:
+                    unknowns += 1
+            output.append((wins, losses, ties, invalids, unknowns))
+        return output
 
     # Player data is (start state, action taken, all reward before next action, starting state for next action)
     def batch_learn(self, lr: float, expl: float, iterations: int, q_episodes: int, episode_length: int, verbose=False, savefile=None, save_interval=-1):
