@@ -32,6 +32,100 @@ The Q-values generally got lower.  Somtimes they became more differentiated, and
 
 * I noticed that the NN AI was still failing the "side vs. corners" test case from above, i.e. not distinguishing the cases very well.  I tried bumping up the simulation batches from 4 to 16 and the training batches from 64 to 128 and this immediately improved it.  I guessed that it was probably the simulation batches going up that helped; this meant it could explore more branches of the tree.  I then ran a test only bumping up the training batches.  This actually made performance worse than the original.  I ran a test bumping up only the simulation batches and it was still not optimal.  So I think maybe both of these just need to be high enough: we need enough simulations to explore enough of the tree each "update", and we need enough training to be done so that these branches are sufficiently sampled.
 
+EXPERIMENT: Start with defaults1, and tweak one hyperparameter at a time.
+
+** Learning rate from 0.00025 to 0.001. **
+Didn't decrease the passing time.  It got there faster on average, but it became much more noisy so if the goal was to avoid failing troughs then it's actually not improved.
+
+** Final exploration rate from 0.5 to 0.7, and endpoint from 500/2000 to 1000/2000. **
+According to the graph, this one didn't pass test 0, but it's because I overlooked an issue: it's possible for the AI to force the user into a different but equivalent (not under any symmetry) configuration.  So, one of the branches for test 0 was basically unexplored (and the AI can prevent it from being explored).  Because of this oversight, I wasn't able to get a sense of the minimum iterations needed, but the gap between the clusters seemed much larger so this seemed better in general.  I can maybe infer from the mean difference that it might start passing when the mean difference exceeds the sum of the standard deviations (maybe root of sum of squares?  too annoying to compute).  It doesn't really start to pull away until the end, so maybe this is the best we can do.   For test 1, after a bit of initial noise, it basically remained positive for the remainder with less variation.  Standard deviation was also lower here by a half (not a surprise).  General conclusion is that this was an improvement that I can play with.
+
+Reduced to 1500 iterations on this setting, and was optimal.
+
+** Final exploration rate from 0.5 to 0.1, and endpoint from 500/2000 to 1300/2000. **
+
+Still optimal.  Going to try reducing to 1500 iterations.  Interestingly, player 1 took a different approach.  Reduced it to 1500, still seems optimal.  Interestingly, in test 0, there's a drop in the test pass score and in fact it doesn't pass.  I think at that point it "dropped" the tracked strategy for the untracked one, and started to unlearn the abandoned branch so to speak.
+
+** Decreasing copy interval from 10 to 5. **
+
+I lost the actual state dict on this one, probably because I was editing the file while it was running.  But looking at the graphs, it just looks like an improvement.  There's no stability issues and we see separation between the difference of means and the standard deviations much sooner.  This AI looks optimal around 1500 episodes.
+
+** Decreasing training batch to 64. **
+
+Seem to make not a lot of difference other than the losses were generally higher.  This means it's slower to converge, but this could be OK -- it's possible to reach an optimal strategy even at an early stage of convergence.
+
+** Join all of the above into defaults2 and do for 1500 iterations. **
+
+Really bad.  Need to adjust.  Increasing training batch, that seemed to be negative above (and only saved 1-2 minutes out of 14).
+
+** Join all of the above except decreasing the training batch. **
+
+Optimal.  Maybe could've stopped at 1200.  Note: it can sometimes be non-optimal.
+
+** Increase the learning rate from 0.00025 to 0.0005. **
+
+Still optimal.  Though, from test 0, it actually seems to converge *slower* somehow!
+
+** Attenuate along the entire training period **
+
+In the original paper, they had a greed plateau at the end.  However, for us, because this can cause the AI to unlearn some old strategies, and because of the dynamic nature of multiplayer games, I think we want to tend toward less greed.  Also, I've noticed sometimes a dropoff in test 0 pass score improvement around this threshold.  Result: it just failed test 1.
+
+** Reduce number of channels. **
+
+I want to play around with the architecture and see how that affects the speed and performance.  Our benchmark time is 13:33 for 1500 episodes.
+
+There are 8 possible 3-in-a-rows, so I want to make each layer just 8 channels.  This very quickly started to diverge.
+
+Next, I tried just capping the size at 32.  This one was optimal, time 11:01.  The losses looked similar.  For test 0, it does much worse for the first 200 iterations before jumping back.  It never quite gets the same separation as before.  For test 1, it looks similar, if not better, but this might just be randomness.
+
+Next, I capped the size at 16 but added another layer.  Time 12:29, non optimal.  Failed test 1 (kind of -- it took a different strategy for one of the cases).  And avoided test 0 altogether.
+
+** Reduce greed and iterations, greed first. **
+
+There's a performance dropoff at the end.  I want to reduce the greed and slightly reduce the iterations and see if I can get rid of that dropoff.  Reduced to 0.2 at end, still optimal.  Trying to go to 1400 iterations.  Not optimal.
+
+I'm not really sure what I'm trying to do at this point.
+
+** Double the batches. **
+
+I want to know the effect of doubling the training and test batch sizes.  I just got an OK connect 4 bot after 6 hours of training and will train one on the cloud, but want to get the parameters right.  Doubling the batch size resulted in 15 minute vs 11 minute training, but much better separation.  The loss graph shows faster, less noisy convergence, though both are still relatively flat before 900-1000 iterations.  I wonder if we could have stopped at 1000 iterations.
+
+Trying 1100 iterations (ramp [0, 900]).  Failed test 1, 10 minutes.  Really good loss curve though, maybe a fluke.  Trying again, 1200 iterations.  I'm going to make the ramp [0, 1200] and greed [0, 0.8].  Optimal, 11:25.
+
+The lesson here might be increasing the batch size is always good.  The advantages should become even more apparent with more parallelization.
+
+DEFAULTS 3: Now ramp is [100 1100] out of 1200 with greed [0, 0.8], learning rate 0.001.  Optimal, 10:51 training time.  Test 1 looked like it was starting to fail a bit, though it stayed afloat.  I wonder why test 1 tends to have this semi random feel to it, especially toward the end.  I think it's because the optimal play ends in a tie and is kind of boring, so the AI starts to like not remember anything.  Intution tells me I should probably keep the greed lower.  This learn rate seems OK though, with the bigger batches it's not as noisy.
+
+** Trying greed [0, 0.5] with ramp [100, 600]. **
+
+Not optimal, but close.  Maybe a little more greed?  Let's try 0.6.  0.6 was good, and maybe could've stopped at 1000.  Trying 0.7.  Still optimal but maybe a bit worse?  Hard to tell.
+
+Trying to decrease to 1000 episodes and compare.  0.6 is still optimal and looks good, not sure it could go much lower, trained in 8:34.  0.7 fails test 1, non-optimal.
+
+DEFAULTS 4: Greed [0, 0.6] with ramp [100, 900] and 1000 episodes.
+
+Missed one case in test 0, time 8:27.  Maybe better with a longer off-ramp, trying ramp [100, 800].  This was optimal.  I'll keep these as the defualts, but I think there's a little bit of chance here, which is probably resolved just by training a bit more.
+
+I turned on batch normalization.  Time was now 11:02 so this made it take a bit longer.  However the test graphs do look better, less noisy, notably fewer big jumps and dips, and test 1 is clearly better, with an upward trend instead of hovering.  The strategy for player 1 is now different; it takes the corner now which to me is the better move.  I wonder if this might make test 0 obselete and I need to revise it.  There does seem ot be a clear improvement.  Running it again.  Still optimal, but the graph doesn't look as good, and the player 0 strategy went back to as before.
+
+Trying a learning rate of 0.005 with batch normalization.  It was optimal; test 0 seemed bad but I think it's because the AI chose the non-tracked route (maybe I should track it).  Test 1 was okay but just didn't seem as stable.  Not sure I can reduce the time here.  But let's just try, say 500 episodes.  Failed one case in test 0, and the graph doesn't look good.  Learning rate 0.01 was bad, failed some easier cases.
+
+Why is it that a nice loss curve (e.g. 20240322200229_batchnormagain.dttt.pt.log.losses.png) seems to reflect better performance while a sharp decrease then flat (e.g. 20240322201930_lrup.dttt.pt.log.losses.png) tends to behave poorly?  Maybe it's beacuse we increased the learning rate so it learns fast, but then it bounces around randomly and doesn't get close enough to the minimum to be optimal.  Indeed, we see that in the tests the behavior seems to move randomly and we don't get separation.  So, this seems to indicate a learning rate of 0.001 is good, but 0.005 is too big.  Let's try 0.0025.  This was also fine and optimal.  But it jumps around a lot and it doesn't seem like a good idea to shorten the training time.  So I don't really want to change from 0.001.
+
+
+
+
+LESSONS:
+* In this setting, training on high greed causes divergence since the robots play the same game over and over.  This causes them to forget other parts of the tree they would naturally encounter in actual play.  So, we should never hit high greed like 90%.  Experimentally, in this case, 60% and 70% seem like good maximums.  One possibly way to mitigate this is to train multiple AI at the same time and have them play each other, but of course this is computationally expensive.
+* Increasing batches helps because we can increase the learning rate and decrease the iterations, and is a general speedup (until some point, presumably).
+* Increasing learning rate can cause instability, or failure to get close enough to an optimum, or divergence.
+* Batch normalization helps stability but increases time by a nontrivial amount, maybe 30-40%.
+
+
+
+The next goal is to understand what it means when the losses stabilize.  Does it mean the AI is no longer learning?  Theoretically, no.  So how can we interpret it?  For the tic-toc-toe AI, the loss graph just looks so much different from all the connect 4 ones.  Maybe it means the learning rate is too high?  Or too low?  I will code in an option to save the model every 100 iterations or so and can try it out.
+
+
 Connect Four:
 * 100 episodes, 1000 iterations is taking maybe 2 hours.  The AI is not great because there are large branches of the tree it hasn't explored at all.  Will try training it with a neural network.
 * I wrote the code.  A few initial questions.

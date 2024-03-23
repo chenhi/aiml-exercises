@@ -40,14 +40,16 @@ class C4TensorMDP(TensorMDP):
     def __init__(self, device="cpu"):
         hyperpar = {
             'lr': 0.00025, 
-            'expl_start': 1.0, 
-            'expl_end': 0.5, 
-            'dq_episodes': 2000, 
+            'greed_start': 0.0, 
+            'greed_end': 0.6,
+            'dq_episodes': 5000, 
+            'ramp_start': 500,
+            'ramp_end': 4500,
+            'training_delay': 500,
             'episode_length': 50, 
-            'sim_batch': 128, 
+            'sim_batch': 32, 
             'train_batch': 256, 
-            'anneal_eps': 500, 
-            'copy_interval_eps': 200
+            'copy_interval_eps': 10
             }
         super().__init__(state_shape=(2,6,7), action_shape=(7,), discount=1, num_players=2, batched=True, default_hyperparameters=hyperpar, \
                          symb = {0: "O", 1: "X", None: "-"}, input_str = "Input column to play (1-7). ", penalty=-2)
@@ -201,21 +203,22 @@ class C4TensorMDP(TensorMDP):
     def valid_action_filter(self, state: torch.Tensor) -> torch.Tensor:
         return state.sum((1,2)) < 6
 
-    # Gets a random valid action; if none, returns zero
-    def get_random_action(self, state, max_tries=100):
-        filter = self.valid_action_filter(state)
-        while (filter.count_nonzero(dim=1) <= 1).prod().item() != 1:                            # Almost always terminates after one step
-            filter = torch.rand(filter.shape) * filter
-            filter = (filter == filter.max(1).values[:,None])
-            max_tries -= 1
-            if max_tries == 0:
-                break
-        return filter.int()
+    # # Gets a random valid action; if none, returns zero
+    # def get_random_action(self, state, max_tries=100):
+    #     filter = self.valid_action_filter(state)
+    #     while (filter.count_nonzero(dim=1) <= 1).prod().item() != 1:                            # Almost always terminates after one step
+    #         filter = torch.rand(filter.shape) * filter
+    #         filter = (filter == filter.max(1).values[:,None])
+    #         max_tries -= 1
+    #         if max_tries == 0:
+    #             break
+    #     return filter.int()
 
     # Sum the channels and columns, add the action, should be <= 6.  Then, do an "and" along the rows.
     # Input shape (batch, 2, 6, 7) and (batch, 7), return shape (batch, 1)
-    def is_valid_action(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
-        return torch.prod(state.sum((1,2)) + action <= 6, 1)
+    # def is_valid_action(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
+    #     return torch.prod(state.sum((1,2)) + action <= 6, 1)
+
 
 
     ### STATES ###
@@ -290,8 +293,8 @@ class C4TensorMDP(TensorMDP):
         
         # Give out a reward if there is a winner.
         reward = (winner.float() * p_tensor - winner * self.swap_player(p_tensor))[:,:,0,0]
-        # Invalid moves don't result in a change in the board.  However, we want to impose a penalty.
-        reward += ((self.is_valid_action(state, action) == False).float() * self.penalty * p_tensor)[:,:,0,0]
+        # Invalid moves don't result in a change in the board.  However, we want to impose a penalty (except when it's a terminal state)
+        reward += (torch.logical_and(self.is_valid_action(state, action) == False, self.is_terminal(state).reshape((-1,) + self.state_projshape) == False).float() * self.penalty * p_tensor)[:,:,0,0]
         
         return newstate, reward
     
@@ -307,36 +310,67 @@ class C4TensorMDP(TensorMDP):
 class C4NN(nn.Module):
     def __init__(self):
         super().__init__()
+        # self.stack = nn.Sequential(
+        #     nn.Conv2d(2, 32, (5,5), padding='same'),
+        #     nn.LeakyReLU(),
+        #     nn.BatchNorm2d(32),
+        #     nn.Conv2d(32, 32, (3,3), padding='same'),
+        #     nn.LeakyReLU(),
+        #     nn.BatchNorm2d(32),
+        #     nn.Conv2d(32, 16, (3,3), padding='same'),
+        #     nn.LeakyReLU(),
+        #     nn.BatchNorm2d(16),
+        #     nn.Conv2d(16, 16, (3,3), padding='same'),
+        #     nn.LeakyReLU(),
+        #     nn.BatchNorm2d(16),
+        #     nn.Conv2d(16, 16, (3,3), padding='same'),
+        #     nn.LeakyReLU(),
+        #     nn.BatchNorm2d(16),
+        #     nn.Conv2d(16, 8, (3,3), padding='same'),
+        #     nn.LeakyReLU(),
+        #     nn.BatchNorm2d(8),
+        #     nn.Conv2d(8, 8, (3,3), padding='same'),
+        #     nn.LeakyReLU(),
+        #     nn.BatchNorm2d(8),
+        #     nn.Flatten(),
+        #     nn.Linear(8*7*6, 4*7*6),
+        #     nn.LeakyReLU(),
+        #     nn.BatchNorm1d(4*7*6),
+        #     nn.Linear(4*7*6, 2*7*6),
+        #     nn.LeakyReLU(),
+        #     nn.BatchNorm1d(2*7*6),
+        #     nn.Linear(2*7*6, 7)
+        # )
         self.stack = nn.Sequential(
             nn.Conv2d(2, 32, (5,5), padding='same'),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.BatchNorm2d(32),
             nn.Conv2d(32, 32, (3,3), padding='same'),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.BatchNorm2d(32),
-            nn.Conv2d(32, 32, (3,3), padding='same'),
-            nn.ReLU(),
-            nn.BatchNorm2d(32),
-            nn.Conv2d(32, 32, (3,3), padding='same'),
-            nn.ReLU(),
-            nn.BatchNorm2d(32),
-            nn.Conv2d(32, 32, (3,3), padding='same'),
-            nn.ReLU(),
-            nn.BatchNorm2d(32),
-            nn.Conv2d(32, 32, (3,3), padding='same'),
-            nn.ReLU(),
-            nn.BatchNorm2d(32),
-            nn.Conv2d(32, 32, (3,3), padding='same'),
-            nn.ReLU(),
-            nn.BatchNorm2d(32),
+            nn.Conv2d(32, 16, (3,3), padding='same'),
+            nn.LeakyReLU(),
+            nn.BatchNorm2d(16),
+            nn.Conv2d(16, 16, (3,3), padding='same'),
+            nn.LeakyReLU(),
+            nn.BatchNorm2d(16),
             nn.Flatten(),
-            nn.Linear(32*7*6, 8*7*6),
-            nn.ReLU(),
+            nn.Linear(16*7*6, 8*7*6),
+            nn.LeakyReLU(),
             nn.BatchNorm1d(8*7*6),
-            nn.Linear(8*7*6, 2*7*6),
-            nn.ReLU(),
+            nn.Linear(8*7*6, 4*7*6),
+            nn.LeakyReLU(),
+            nn.BatchNorm1d(4*7*6),
+            nn.Linear(4*7*6, 2*7*6),
+            nn.LeakyReLU(),
             nn.BatchNorm1d(2*7*6),
-            nn.Linear(2*7*6, 7)
+            nn.Linear(2*7*6, 7*6),
+            nn.LeakyReLU(),
+            nn.BatchNorm1d(7*6),
+            nn.Linear(7*6, 7*3),
+            nn.LeakyReLU(),
+            nn.BatchNorm1d(7*3),
+            nn.Linear(7*3, 7)
         )
 
     def forward(self, x):
@@ -436,7 +470,7 @@ if "test" in options:
     if verbose:
         print("Players each play 4 times in column 0.  The last two should be reported invalid.")
     v = mdp.get_initial_state()
-    a = torch.zeros((1,7), dtype=device)
+    a = torch.zeros((1,7), device=device)
     a[0,0] = 1.
     ok = True
     for i in range(6):
@@ -465,7 +499,7 @@ if "test" in options:
     if pen[0,0].item() >= 0 and pen[0,1].item() != 0:
         ok = False
 
-    b = torch.zeros((1,7), dtype=device)
+    b = torch.zeros((1,7), device=device)
     b[0,1] = 1
     if verbose:
         print("is_valid_action", mdp.is_valid_action(v, b))
@@ -499,8 +533,8 @@ if "test" in options:
     if verbose:
         print("Player 0 and 1 will play in columns 0 and 1.  The game should enter a terminal state after play 7, and play 8 should not proceed.")
     v = mdp.get_initial_state()
-    a = torch.tensor([[1,0,0,0,0,0,0]], dtype=device)
-    b = torch.tensor([[0,1,0,0,0,0,0]], dtype=device)
+    a = torch.tensor([[1,0,0,0,0,0,0]], device=device).float()
+    b = torch.tensor([[0,1,0,0,0,0,0]], device=device).float()
     ok = True
     for i in range(4):
         v, r = mdp.transition(v, a)
@@ -577,7 +611,7 @@ if "test" in options:
 
     print("\nTesting get_random_action() and NNQFunction.get().")
     q = NNQFunction(mdp, C4NN, torch.nn.HuberLoss(), torch.optim.SGD)
-    s = torch.zeros((64, 2, 6, 7)).int()
+    s = torch.zeros((64, 2, 6, 7))
     a = mdp.get_random_action(s)
     
     if verbose:
@@ -591,8 +625,8 @@ if "test" in options:
 
     print("\nTesting basic execution of val() and policy().")
     ok = True
-    s = torch.zeros((7, 2, 6, 7)).int()
-    a = torch.eye(7).int()
+    s = torch.zeros((7, 2, 6, 7))
+    a = torch.eye(7)
     if verbose:
         print("This list is q(s, a), with a ranging through all actions.")
         print(q.get(s, a))

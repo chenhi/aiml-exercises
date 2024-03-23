@@ -306,7 +306,7 @@ class QLearn():
             return self.mdp.get_player(s)
 
     # Player data is (start state, action taken, all reward before next action, starting state for next action)
-    def batch_learn(self, lr: float, expl: float, iterations: int, q_episodes: int, episode_length: int, verbose=False, savefile=None):
+    def batch_learn(self, lr: float, expl: float, iterations: int, q_episodes: int, episode_length: int, verbose=False, savefile=None, save_interval=-1):
         iterations, q_episodes, episode_length = int(iterations), int(q_episodes), int(episode_length)
         
         player_experiences = [[] for i in range(self.mdp.num_players)]

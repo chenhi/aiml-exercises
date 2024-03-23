@@ -23,6 +23,18 @@ device = (
 if len(sys.argv) == 1:
     print(open_str)
 
+# Play the AI
+# Assumptions: all AI play from a single model, and only one human player.
+def item(obj, mdp: MDP, is_list=False):
+    if mdp.batched:
+        if is_list:
+            return obj[0]
+        elif torch.numel(obj) == 1:
+            return obj[0].item()
+        else:
+            return obj[0].tolist()
+    return obj
+
 #==================== GAME DEFINITION AND SELECTION ====================#
 
 tttmdp = ttt.TTTMDP()
@@ -78,7 +90,7 @@ if len(sys.argv) > 2:
     if sys.argv[2] == "train":
         train_new = True
         simulate = False
-    elif sys.argv[2] == "play":
+    elif sys.argv[2] == "play" or sys.argv[2] == "benchmark":
         train_new = False
         simulate = False
     elif sys.argv[2] == "simulate":
@@ -93,9 +105,10 @@ if len(sys.argv) > 2:
 prompts = {
     'lr': 'Learn rate in [0, 1]',
     'expl': 'The ungreed/exploration rate in [0, 1]',
-    'expl_start': 'The starting exploration rate in [0, 1]',
-    'expl_end': 'The ending exporation rate in [0, 1]',
-    'anneal_eps': 'Number of initial episodes to anneal exploration', 
+    'greed_start': 'The starting greed in [0, 1] (0 means random)',
+    'greed_end': 'The ending greed in [0, 1] (0 means random)',
+    'ramp_start': 'Which episode to start ramping up greed',
+    'ramp_end': 'Which episode to end greed ramp', 
     'dq_episodes': 'The number of episodes (iterations of the game)',
     'q_episodes': 'The number of episodes (experience generations)',
     'episode_length': 'The length of each episode',
@@ -121,7 +134,7 @@ if train_new:
         try:
             hpar[k] = float(res)
         except:
-            print(f"Not a valid value.  Setting greed to {v}.")
+            print(f"Not a valid value.  Setting {k} to {v}.")
 
     if type == "qlearn":
         #game.set_greed(expl)
@@ -167,6 +180,21 @@ elif load_index != -1:
 
 
 
+#==================== BENCHMARK AGAINST RANDOM ====================#
+
+if sys.argv[2] == "benchmark":   
+    sims = int(input("How many iterations against random bot? "))
+    replay = True if input("Enter 'y' to replay losses: ").lower() == 'y' else False
+
+    results = game.simulate_against_random(sims, replay_loss=replay, verbose=True)
+    
+    for i in range(mdp.num_players):
+        print(f"As player {i}, {results[i][0]} wins, {results[i][1]} losses, {results[i][2]} ties, {results[i][3]} invalid moves, and {results[i][4]} unknown results.")
+    exit()
+    
+
+
+
 
 #==================== PLAY THE GAME ====================#
 
@@ -174,22 +202,11 @@ if simulate:
     game.stepthru_game()
     exit()
 
-
 # TODO Load two computers vs two humans?
 
 bot_list = [False for i in range(mdp.num_players)]
 
-# Play the AI
-# Assumptions: all AI play from a single model, and only one human player.
-def item(obj, mdp: MDP, is_list=False):
-    if mdp.batched:
-        if is_list:
-            return obj[0]
-        elif torch.numel(obj) == 1:
-            return obj[0].item()
-        else:
-            return obj[0].tolist()
-    return obj
+
 
 while True:
     if load_index >= 0:

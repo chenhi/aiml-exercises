@@ -48,7 +48,7 @@ class ExperienceReplay():
 
 
 class TensorMDP(MDP):
-    def __init__(self, state_shape, action_shape, discount=1, num_players=1, penalty = -2, default_hyperparameters={}, symb = {}, input_str = "", batched=False):
+    def __init__(self, state_shape, action_shape, discount=1, num_players=1, penalty = -2, num_simulations=1000, default_hyperparameters={}, symb = {}, input_str = "", batched=False):
         
         super().__init__(None, None, discount, num_players, penalty, symb, input_str, default_hyperparameters, batched)
 
@@ -69,9 +69,31 @@ class TensorMDP(MDP):
         for i in range(len(self.action_shape)):
             self.action_linshape += self.action_shape[i]
 
+        self.num_simulations = num_simulations
+
+    ##### ACTIONS #####
+
     def valid_action_filter(self, state: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError
     
+    def get_random_action(self, state, max_tries=100) -> torch.Tensor:
+        filter = self.valid_action_filter(state).float()
+        while (filter.flatten(1,-1).count_nonzero(dim=1) <= 1).prod().item() != 1:                             # Almost always terminates after one step
+            temp = torch.rand((state.size(0),) + self.action_shape, device=self.device) * filter
+            #filter = temp == temp.max()
+            filter = (temp == temp.flatten(1,-1).max(1).values.reshape((-1,) + self.action_projshape)).float()
+            max_tries -= 1
+            if max_tries == 0:
+                break
+        return filter * 1.
+    
+    # Output has state shape
+    def is_valid_action(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
+        return (self.valid_action_filter(state) * action).flatten(1,-1).sum(1, keepdim=True).reshape((-1,) + self.state_projshape) == 1.
+
+    
+
+
     def tests(self, qs: list[PrototypeQFunction]):
         return []
         
@@ -134,7 +156,7 @@ class NNQFunction(QFunction):
             max_tries -= 1
             if max_tries == 0:
                 break
-        return filter.unflatten(1, self.mdp.action_shape)
+        return filter.unflatten(1, self.mdp.action_shape) * 1.
 
     # Does a Q-update based on some observed set of data
     # TransitionData entries are tensors
@@ -255,13 +277,55 @@ class DQN():
         return (TransitionData(new_s, new_a, new_t, new_r), TransitionData(new_s[filter], new_a[filter], new_t[filter], new_r[filter]))
 
 
+    def simulate_against_random(self, num_simulations: int, replay_loss = False, verbose = False):
+        output = []
+        for i in range(self.mdp.num_players):
+            if verbose:
+                print(f"Playing as player {i}.")
+            wins, losses, ties, invalids, unknowns  = 0, 0, 0, 0, 0
+            for j in range(num_simulations):
+                s = self.mdp.get_initial_state()
+                if replay_loss:
+                    history = [s]
+                while self.mdp.is_terminal(s).item() == False:
+                    p = int(self.mdp.get_player(s).item())
+                    if p == i:
+                        a = self.qs[i].policy(s)
+                        if self.mdp.is_valid_action(s, a).item():
+                            s, r = self.mdp.transition(s, a)
+                        else:
+                            invalids += 1
+                            a = self.mdp.get_random_action(s)
+                            s, r = self.mdp.transition(s, a)
+                    else:
+                        a = self.mdp.get_random_action(s)
+                        s, r = self.mdp.transition(s, a)
+                    if replay_loss:
+                        history.append(s)
+                if r[0,i].item() == 1.:
+                    wins += 1
+                elif r[0, i].item() == -1.:
+                    losses += 1
+                    if replay_loss:
+                        for s in history:
+                            print(self.mdp.board_str(s)[0])
+                            input()
+                elif r[0, i].item() == 0.:
+                    ties += 1
+                else:
+                    unknowns += 1
+            output.append((wins, losses, ties, invalids, unknowns))
+        return output
+            
+        
 
     # Handling multiplayer: each player keeps their own "record", separate from memory
     # When any entry in the record has source = target, then the player "banks" it in their memory
     # The next time an action is taken, if the source = target, then it gets overwritten
-    def deep_learn(self, lr: float, dq_episodes: int, episode_length: int, anneal_eps: int, expl_start: float, expl_end: float, sim_batch: int, train_batch: int, copy_interval_eps: int, savelog=None, verbose=False, graph_smoothing=10, debug=False):
+    def deep_learn(self, lr: float, dq_episodes: int, episode_length: int, ramp_start: int, ramp_end: int, greed_start: float, greed_end: float, training_delay: int, sim_batch: int, train_batch: int, copy_interval_eps: int, savelog=None, verbose=False, graph_smoothing=10, debug=False):
 
-        dq_episodes, episode_length, anneal_eps, sim_batch, train_batch, copy_interval_eps = int(dq_episodes), int(episode_length), int(anneal_eps), int(sim_batch), int(train_batch), int(copy_interval_eps)
+        dq_episodes, episode_length, ramp_start, ramp_end, sim_batch, train_batch, copy_interval_eps, training_delay = int(dq_episodes), int(episode_length), int(ramp_start), int(ramp_end), int(sim_batch), int(train_batch), int(copy_interval_eps), int(training_delay)
+        expl_start, expl_end = 1. - greed_start, 1. - greed_end
         verbose = verbose or debug
 
         if train_batch < 2:
@@ -274,7 +338,7 @@ class DQN():
             logtext += log(f"Model:\n{self.qs[0].q}", verbose)
             logtext += log(f"Loss function:\n{self.qs[0].loss_fn}", verbose)
             logtext += log(f"Optimizer:\n{self.qs[0].optimizer}", verbose)
-            logtext += log(f"Learn rate: {lr}, start and end exploration: {expl_start}->{expl_end}, episodes: {dq_episodes}, episode length: {episode_length}, batch size: {sim_batch}, training batch size: {train_batch}, initial greed annealing time: {anneal_eps}, copy frequency: {copy_interval_eps}, memory capacity: {self.memory_capacity}.", verbose)
+            logtext += log(f"Learn rate: {lr}, episodes: {dq_episodes}, start and end exploration: [{expl_start}, {expl_end}], ramp: [{ramp_start}, {ramp_end}], training delay: {training_delay}, episode length: {episode_length}, batch size: {sim_batch}, training batch size: {train_batch}, copy frequency: {copy_interval_eps}, memory capacity: {self.memory_capacity}.", verbose)
             wins = [0] * self.mdp.num_players
             penalties = [0] * self.mdp.num_players
             episode_losses = [[] for i in range(self.mdp.num_players)]
@@ -290,7 +354,7 @@ class DQN():
         frame = 0
         for j in range(dq_episodes):
             # Set greed
-            greed_cur = ((anneal_eps - j) * expl_start + j * expl_end)/anneal_eps if j <= anneal_eps else expl_end
+            greed_cur = min(max(((expl_end - expl_start) * j + (ramp_end * expl_start - ramp_start * expl_end))/(ramp_end - ramp_start), expl_end), expl_start)
             if verbose or savelog != None:
                 losses = [0.] * self.mdp.num_players
                 updates = 0
@@ -321,20 +385,21 @@ class DQN():
                 # To do this, we need to iterate over players, because each has a different q function for determining the strategy
                 p = self.mdp.get_player(s)                                  # p.shape = (batch, )       s.shape = (batch, 2, 6, 7)
 
-                # To get the actions, apply each player's strategy
+                # Get the actions using each player's policy #TODO can make this more efficient
                 a = torch.zeros((sim_batch, ) + self.mdp.action_shape, device=self.device)
                 for pi in range(self.mdp.num_players):
                     # Get the indices corresponding to this player's turn
-                    indices = torch.arange(sim_batch, device=self.device)[p.flatten() == pi].tolist()
+                    indices = torch.arange(sim_batch, device=self.device)[p.flatten() == pi]
+                    a[indices] = greedy_tensor(self.qs[pi], s[indices], greed_cur)
                     
-                    # Apply the player's strategy to their turns
-                    # Greedy is not parallelized, so there isn't efficiency loss with this
-                    player_actions = torch.cat([greedy_tensor(self.qs[pi], s[l:l+1], greed_cur) if l in indices else torch.zeros((1, ) + self.mdp.action_shape, device=self.device) for l in range(sim_batch)], 0)
-                    a += player_actions
+                    #indices = torch.arange(sim_batch, device=self.device)[p.flatten() == pi].tolist()
+                    #player_actions = torch.cat([greedy_tensor(self.qs[pi], s[l:l+1], greed_cur) if l in indices else torch.zeros((1, ) + self.mdp.action_shape, device=self.device) for l in range(sim_batch)], 0)
+                    #a += player_actions
 
                 if debug:
                     input(f"Chosen actions:\n{a}")
 
+                
                 # Do the transition 
                 t, r = self.mdp.transition(s, a)
                 
@@ -363,7 +428,7 @@ class DQN():
                         
                 # Train the policy on a random sample in memory (once the memory bank is big enough)
                 for i in range(self.mdp.num_players):
-                    if len(self.memories[i]) >= train_batch:
+                    if len(self.memories[i]) >= train_batch and j >= training_delay:
                         losses[i] += self.qs[i].update(self.memories[i].sample(train_batch), lr)
                         updates += train_batch
 
@@ -396,6 +461,11 @@ class DQN():
             end_time = datetime.datetime.now()
             logtext += log(f"\nTraining finished at {end_time}")
             logtext += log(f"Total time: {end_time - start_time}")
+
+        simulation_results = self.simulate_against_random(self.mdp.num_simulations)
+        for i in range(self.mdp.num_players):
+            logtext += log(f"In {self.mdp.num_simulations} simulations by player {i}, {simulation_results[i][0]} wins, {simulation_results[i][1]} losses, {simulation_results[i][2]} ties, {simulation_results[i][3]} invalid moves, {simulation_results[i][4]} unknown results.")
+
 
 
         if savelog != None:

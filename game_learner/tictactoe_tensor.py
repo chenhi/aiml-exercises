@@ -8,18 +8,59 @@ options = sys.argv[1:]
 class TTTTensorMDP(TensorMDP):
 
     def __init__(self, device = "cpu"):
-        hyperpar = {
+        defaults1 = {
             'lr': 0.00025, 
-            'expl_start': 1.0, 
-            'expl_end': 0.5, 
+            'greed_start': 0.0, 
+            'greed_end': 0.5, 
             'dq_episodes': 2000, 
             'episode_length': 15, 
             'sim_batch': 16, 
             'train_batch': 128, 
-            'anneal_eps': 500, 
+            'ramp_start': 0,
+            'ramp_end': 500,
+            'training_delay': 0, 
             'copy_interval_eps': 10
             }
-        super().__init__(state_shape=(2,3,3), action_shape=(3,3), discount=1, num_players=2, batched=True, default_hyperparameters=hyperpar, \
+        defaults2 = {
+            'lr': 0.00025, 
+            'greed_start': 0.0, 
+            'greed_end': 0.9, 
+            'dq_episodes': 1500, 
+            'ramp_start': 100,
+            'ramp_end': 1400,
+            'training_delay': 100,
+            'episode_length': 15, 
+            'sim_batch': 16, 
+            'train_batch': 128,
+            'copy_interval_eps': 5
+            }
+        defaults3 = {
+            'lr': 0.001, 
+            'greed_start': 0.0, 
+            'greed_end': 0.8, 
+            'dq_episodes': 1200, 
+            'ramp_start': 100,
+            'ramp_end': 1100,
+            'training_delay': 100,
+            'episode_length': 15, 
+            'sim_batch': 32, 
+            'train_batch': 256,
+            'copy_interval_eps': 5
+            }
+        defaults4 = {
+            'lr': 0.00025, 
+            'greed_start': 0.0, 
+            'greed_end': 0.65, 
+            'dq_episodes': 1500, 
+            'ramp_start': 100,
+            'ramp_end': 1400,
+            'training_delay': 100,
+            'episode_length': 15, 
+            'sim_batch': 32, 
+            'train_batch': 256,
+            'copy_interval_eps': 5
+            }
+        super().__init__(state_shape=(2,3,3), action_shape=(3,3), discount=1, num_players=2, batched=True, default_hyperparameters=defaults4, \
                          symb = {0: "X", 1: "O", None: "-"}, input_str = "Input position to play, e.g. '1, 3' for the 1st row and 3rd column: ", penalty=-2)
         self.device = device
         
@@ -90,28 +131,6 @@ class TTTTensorMDP(TensorMDP):
     def valid_action_filter(self, state: torch.Tensor) -> torch.Tensor:
         return state.sum((1)) == 0
     
-    def get_random_action(self, state, max_tries=100) -> torch.Tensor:
-        filter = self.valid_action_filter(state)
-        tries = 0
-        while (filter.count_nonzero(dim=(1,2)) <= 1).prod().item() != 1:                             # Almost always terminates after one step
-            temp = torch.rand(state.size(0), 3, 3, device=self.device) * filter
-            filter = temp == temp.max()
-            tries += 1
-            if tries >= max_tries:
-                break
-        return filter
-    
-    # def is_valid_action(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
-    #     if state.shape[0] != action.shape[0]:
-    #         raise Exception("Batch sizes must agree.")
-    #     return torch.prod(torch.prod(state.sum(1) + action <= 1, 1), 1)
-
-
-    def is_valid_action(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
-        if state.shape[0] != action.shape[0]:
-            raise Exception("Batch sizes must agree.")
-        return (torch.prod(torch.prod(state.sum(1) + action <= 1, dim=1), dim=1) == 1)[:,None, None, None]
-
 
 
     ### STATES ###
@@ -122,10 +141,6 @@ class TTTTensorMDP(TensorMDP):
 
     # Reward is 1 for winning the game, -1 for losing, and 0 for a tie; awarded upon entering terminal state
     def transition(self, state, action):
-
-        if state.shape[0] != action.shape[0]:
-            raise Exception("Batch sizes must agree.")
-        
         action = (self.is_terminal(state) == False)[:, 0, :, :] * action
         p = self.get_player(state)
         p_tensor = self.get_player_vector(state)
@@ -138,7 +153,7 @@ class TTTTensorMDP(TensorMDP):
         new_state = (1 - 2 * (~self.is_terminal(state) & (winner | full))) * new_state
 
         reward = (winner * p_tensor - winner * self.swap_player(p_tensor))[:,:,0,0]
-        reward += ((self.is_valid_action(state, action) == False) * self.penalty * p_tensor)[:,:,0,0]
+        reward += (torch.logical_and(self.is_valid_action(state, action) == False, self.is_terminal(state).reshape((-1,) + self.state_projshape) == False) * self.penalty * p_tensor)[:,:,0,0]
 
         return new_state, reward
 
@@ -165,11 +180,13 @@ class TTTTensorMDP(TensorMDP):
     def tests(self, qs: list[PrototypeQFunction]):
         
 
-        # Test 0: the AI is playing as player 0 (first player, X).  We are interested in the 8 boards in the orbit of:
-        # XO-
-        # -X-
-        # --O
-        # For X, placing in the 2 positions in the left column results in a win, and placing in the other 3 positions results in a tie.
+        # Test 0: the AI is playing as player 0 (first player, X).  We are interested in the 8 boards in the orbit of the first board:
+        # XO.    +O.    +OO
+        # +X.    XXO    -X-
+        # +.O    +..    X--
+        # Here, + means a winning move, . a tie move, and - a losing move.
+        # The other two board to the right are also possibilities.  We only track the first one.  Note that it is possible for the bot to select other branches, so
+        # the pass score might be negative with a still-optimal AI.
 
         s = torch.tensor([[[[1.,0.,0.],[0.,1.,0.],[0.,0.,0.]], [[0.,1.,0.],[0.,0.,0.],[0.,0.,1.]]]])                                         
         win_s = torch.cat([s,s])
@@ -189,16 +206,13 @@ class TTTTensorMDP(TensorMDP):
         separated_tie_max = tie_values.reshape(8,-1).flatten(1,-1).max(1).values
         pass_score = (separated_win_max - separated_tie_max).min().item()
 
-        
-        #diff_max = win_values.max().item() - tie_values.max().item()
-
         test0 = {'winning play stdev': win_stdev, 'losing stdev': tie_stdev, 'diff of means': mean_diff, 'min distance': min_diff, 'test pass score': pass_score}
         
         
         # Test 1: the AI is playing as player 1 (second player, O). We are interested in the boards:
-        # X--   --X
-        # -O-   -O-
-        # --X   X--
+        # X.-   -.X
+        # .O.   .O.
+        # -.X   X.-
         # We want to see clustering amongst the Q-values for playing on the sides vs. on the corners, with the sides being higher.
         s = torch.tensor([[[[1.,0.,0.],[0.,0.,0.],[0.,0.,1.]],[[0.,0.,0.],[0.,1.,0.],[0.,0.,0.]]], [[[0.,0.,1.],[0.,0.,0.],[1.,0.,0.]],[[0.,0.,0.],[0.,1.,0.],[0.,0.,0.]]]])
         side_a = torch.tensor([[[0.,1.,0.],[0.,0.,0.],[0.,0.,0.]], [[0.,0.,0.],[1.,0.,0.],[0.,0.,0.]], [[0.,0.,0.],[0.,0.,1.],[0.,0.,0.]], [[0.,0.,0.],[0.,0.,0.],[0.,1.,0.]]])
@@ -206,15 +220,10 @@ class TTTTensorMDP(TensorMDP):
         corner_a = torch.tensor([[[0.,0.,1.],[0.,0.,0.],[0.,0.,0.]], [[0.,0.,0.],[0.,0.,0.],[1.,0.,0.]],[[1.,0.,0.],[0.,0.,0.],[0.,0.,0.]], [[0.,0.,0.],[0.,0.,0.],[0.,0.,1.]]])
         corner_values = qs[1].get(s[[0,0,1,1]], corner_a)
 
-        # Metrics:
-        # (1) standard deviations for each desired cluster should be low
-        # (2) the difference between the means should be positive and as high as possible
-        # (3) 
         side_stdev = side_values.std().item()
         corner_stdev = corner_values.std().item()
         mean_diff = side_values.mean().item() - corner_values.mean().item()
         min_diff = side_values.min().item() - corner_values.max().item()
-        #diff_max = side_values.max().item() - corner_values.max().item()
 
         separated_side_max = side_values.reshape(2,-1).flatten(1,-1).max(1).values
         separated_corner_max = corner_values.reshape(2,-1).flatten(1,-1).max(1).values
@@ -234,51 +243,56 @@ class TTTTensorMDP(TensorMDP):
 # Some prototyping the neural network
 # Input tensors have shape (batch, 2, 3, 3)
 class TTTNN(nn.Module):
-    # def __init__(self):
-    #     super().__init__()
-    #     self.stack = nn.Sequential(
-    #         nn.Conv2d(2, 32, (3,3), padding='same'),
-    #         nn.LeakyReLU(),
-    #         #nn.Dropout(p=0.2),             # Dropout introduces randomness into the Q function.  Not sure if this is desirable.
-    #         #nn.BatchNorm2d(32),
-    #         nn.Conv2d(32, 64, (3,3), padding='same'),
-    #         nn.LeakyReLU(),
-    #         nn.Conv2d(64, 128, (3,3), padding='same'),
-    #         nn.LeakyReLU(),
-    #         #nn.BatchNorm2d(64),
-    #         #nn.Flatten(),
-    #         #nn.Linear(128*3*3, 64*3*3),
-    #         nn.Conv2d(128, 256, (3,3), padding='same'),
-    #         nn.LeakyReLU(),
-    #         #nn.Linear(64*3*3, 64),
-    #         #nn.ReLU(),
-    #         #nn.BatchNorm1d(64*7*6),
-    #         #nn.Linear(64, 9), 
-    #         nn.Conv2d(256, 1, (3,3), padding='same'),
-    #         #nn.Unflatten(1, (3, 3))
-    #     )
+
 
     def __init__(self):
         super().__init__()
+        self.stack = {}
+
+        # self.verybig = nn.Sequential(
+        #     nn.Conv2d(2, 32, (3,3), padding='same'),
+        #     nn.LeakyReLU(),
+        #     nn.Conv2d(32, 64, (3,3), padding='same'),
+        #     nn.LeakyReLU(),
+        #     nn.Conv2d(64, 128, (3,3), padding='same'),
+        #     nn.LeakyReLU(),
+        #     nn.Conv2d(128, 256, (3,3), padding='same'),
+        #     nn.LeakyReLU(),
+        #     nn.Conv2d(256, 1, (3,3), padding='same'),
+        # )
+
+
+        # self.medium= nn.Sequential(
+        #     nn.Conv2d(2, 32, (3,3), padding='same'),
+        #     nn.LeakyReLU(),
+        #     nn.Conv2d(32, 64, (3,3), padding='same'),
+        #     nn.LeakyReLU(),
+        #     nn.Conv2d(64, 32, (3,3), padding='same'),
+        #     nn.LeakyReLU(),
+        #     nn.Conv2d(32, 8, (3,3), padding='same'),
+        #     nn.LeakyReLU(),
+        #     nn.Conv2d(8, 1, (3,3), padding='same'),
+        # )
+
+        # Narrow
         self.stack = nn.Sequential(
             nn.Conv2d(2, 32, (3,3), padding='same'),
             nn.LeakyReLU(),
-            nn.Conv2d(32, 64, (3,3), padding='same'),
+            nn.BatchNorm2d(32),
+            nn.Conv2d(32, 32, (3,3), padding='same'),
             nn.LeakyReLU(),
-            nn.Conv2d(64, 32, (3,3), padding='same'),
+            nn.BatchNorm2d(32),
+            nn.Conv2d(32, 32, (3,3), padding='same'),
             nn.LeakyReLU(),
-            #nn.BatchNorm2d(64),
-            #nn.Flatten(),
-            #nn.Linear(128*3*3, 64*3*3),
+            nn.BatchNorm2d(32),
             nn.Conv2d(32, 8, (3,3), padding='same'),
             nn.LeakyReLU(),
-            #nn.Linear(64*3*3, 64),
-            #nn.ReLU(),
-            #nn.BatchNorm1d(64*7*6),
-            #nn.Linear(64, 9), 
+            nn.BatchNorm2d(8),
             nn.Conv2d(8, 1, (3,3), padding='same'),
-            #nn.Unflatten(1, (3, 3))
         )
+
+
+
     
     # Output of the stack is shape (batch, 1, 3, 3), so we do a simple reshaping.
     def forward(self, x):
@@ -293,8 +307,13 @@ if "test" in options:
     verbose = True if "verbose" in options else False
 
     mdp = TTTTensorMDP()
-    s = mdp.get_initial_state()
+    s = mdp.get_initial_state(2)
     print(mdp.board_str(s)[0])
+    print(mdp.board_str(s)[1])
+
+    print("Fixed action to check:")
+    b = mdp.get_random_action(s)
+    print(b)
 
     for i in range(12):
         print("play")
@@ -302,9 +321,8 @@ if "test" in options:
         print(a.tolist())
         t, r = mdp.transition(s, a)
         print(mdp.board_str(t)[0])
+        print(mdp.board_str(t)[1])
         print(r.tolist())
         s = t
-
-    dqn = DQN(mdp, TTTNN, torch.nn.HuberLoss(), torch.optim.SGD, 100000)
-    dqn.deep_learn(0.1, 0.5, 0.5, 50, 10, 16, 16, 16, 4, True)
-
+        print("is the original action still valid")
+        print(mdp.is_valid_action(s, b))
