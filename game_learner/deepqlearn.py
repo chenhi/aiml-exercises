@@ -160,7 +160,7 @@ class NNQFunction(QFunction):
 
     # Does a Q-update based on some observed set of data
     # TransitionData entries are tensors
-    def update(self, data: TransitionData, learn_rate):
+    def update(self, data: TransitionData, learn_rate, stagger_target=False):
         if not isinstance(self.q, nn.Module):
             Exception("NNQFunction needs to have a class extending nn.Module.")
 
@@ -171,7 +171,7 @@ class NNQFunction(QFunction):
         self.target_q.eval()
         opt = self.optimizer(self.q.parameters(), lr=learn_rate)
         pred = self.get(data.s, data.a)
-        y = data.r + self.val(data.t, target=True)
+        y = data.r + self.val(data.t, target=stagger_target)
         loss = self.loss_fn(pred, y)
 
         # Optimize
@@ -336,17 +336,19 @@ class DQN():
     # Handling multiplayer: each player keeps their own "record", separate from memory
     # When any entry in the record has source = target, then the player "banks" it in their memory
     # The next time an action is taken, if the source = target, then it gets overwritten
-    def deep_learn(self, lr: float, dq_episodes: int, episode_length: int, ramp_start: int, ramp_end: int, greed_start: float, greed_end: float, training_delay: int, sim_batch: int, train_batch: int, copy_interval_eps: int, savelog=None, verbose=False, graph_smoothing=10, debug=False):
+    def deep_learn(self, lr: float, dq_episodes: int, episode_length: int, ramp_start: int, ramp_end: int, greed_start: float, greed_end: float, training_delay: int, sim_batch: int, train_batch: int, copy_interval_eps: int, save_interval=500, save_path=None, verbose=False, graph_smoothing=10, debug=False):
 
-        dq_episodes, episode_length, ramp_start, ramp_end, sim_batch, train_batch, copy_interval_eps, training_delay = int(dq_episodes), int(episode_length), int(ramp_start), int(ramp_end), int(sim_batch), int(train_batch), int(copy_interval_eps), int(training_delay)
+        dq_episodes, episode_length, ramp_start, ramp_end, sim_batch, train_batch, copy_interval_eps, training_delay = int(dq_episodes), int(episode_length), int(ramp_start), int(ramp_end), int(sim_batch), int(train_batch), max(1, int(copy_interval_eps)), int(training_delay)
         expl_start, expl_end = 1. - greed_start, 1. - greed_end
         verbose = verbose or debug
+
+        stagger_target = False if copy_interval_eps == 1 else True
 
         if train_batch < 2:
             Exception("Training batch size must be greater than 1 for sampling.")
 
         logtext = ""
-        if verbose or savelog != None:
+        if verbose or save_path != None:
             logtext += log(f"Device: {self.device}", verbose)
             logtext += log(f"MDP:\n{self.mdp}", verbose)
             logtext += log(f"Model:\n{self.qs[0].q}", verbose)
@@ -366,10 +368,10 @@ class DQN():
 
 
         frame = 0
-        for j in range(dq_episodes):
+        for ep_num in range(dq_episodes):
             # Set greed
-            greed_cur = min(max(((expl_end - expl_start) * j + (ramp_end * expl_start - ramp_start * expl_end))/(ramp_end - ramp_start), expl_end), expl_start)
-            if verbose or savelog != None:
+            greed_cur = min(max(((expl_end - expl_start) * ep_num + (ramp_end * expl_start - ramp_start * expl_end))/(ramp_end - ramp_start), expl_end), expl_start)
+            if verbose or save_path != None:
                 losses = [0.] * self.mdp.num_players
                 updates = 0
 
@@ -378,9 +380,9 @@ class DQN():
                 self.qs[i].copy_policy_to_target()
             
             
-            if verbose or savelog != None:
+            if verbose or save_path != None:
                 memorylen = [self.memories[i].size() for i in range(self.mdp.num_players)]
-                logtext += log(f"Initializing episode {j+1}. Greed {1-greed_cur:>0.5f}. Memory {memorylen}. Player wins {wins}, penalties {penalties}.", verbose)
+                logtext += log(f"Initializing episode {ep_num+1}. Greed {1-greed_cur:>0.5f}. Memory {memorylen}. Player wins {wins}, penalties {penalties}.", verbose)
             
             s = self.mdp.get_initial_state(sim_batch)
             # "Records" for each player
@@ -425,7 +427,7 @@ class DQN():
 
 
                 # Tracking wins and penalities TODO more robust
-                if verbose or savelog != None:
+                if verbose or save_path != None:
                     for pi in range(self.mdp.num_players):
                         wins[pi] += torch.sum(r[:,pi] > 0).item()
                         penalties[pi] += torch.sum(r[:,pi] <= self.mdp.penalty).item()
@@ -442,8 +444,8 @@ class DQN():
                         
                 # Train the policy on a random sample in memory (once the memory bank is big enough)
                 for i in range(self.mdp.num_players):
-                    if len(self.memories[i]) >= train_batch and j >= training_delay:
-                        losses[i] += self.qs[i].update(self.memories[i].sample(train_batch), lr)
+                    if len(self.memories[i]) >= train_batch and ep_num >= training_delay:
+                        losses[i] += self.qs[i].update(self.memories[i].sample(train_batch), lr, stagger_target=stagger_target)
                         updates += train_batch
 
                 # Restart terminal states TODO for now, just check if the whole thing is done and end the episode to hasten things up
@@ -454,24 +456,29 @@ class DQN():
                 s = t
             
             # Record statistics at end of episode
-            if (verbose or savelog != None):
+            if (verbose or save_path != None):
                 if updates > 0:
                     for i in range(len(losses)):
                         losses[i] = losses[i]/updates
                         episode_losses[i].append(losses[i])
-                    logtext += log(f"Episode {j+1} average loss: {losses}", verbose)
+                    logtext += log(f"Episode {ep_num+1} average loss: {losses}", verbose)
                 test_results = self.mdp.tests(self.qs)
                 for j in range(len(test_results)):
                     tests[j].append(test_results[j])
 
             
-            # Copy the target network to the policy network if it is time
-            if (j+1) % copy_interval_eps == 0:
+            # Copy the target network to the policy network if it is time, if we have a stagger at all
+            if stagger_target and (ep_num+1) % copy_interval_eps == 0:
                 for i in range(self.mdp.num_players):
                     self.qs[i].copy_policy_to_target()
                 logtext += log("Copied policy to target networks for all players.", verbose)
 
-        if verbose or savelog != None:
+            # Save a copy of the model if time
+            if save_path != None and (ep_num+1) % save_interval == 0:
+                self.save_q(f"{save_path}.{ep_num}")
+                logtext += log(f"Saved {ep_num}-iteration model to {save_path}.{ep_num}") 
+
+        if verbose or save_path != None:
             end_time = datetime.datetime.now()
             logtext += log(f"\nTraining finished at {end_time}")
             logtext += log(f"Total time: {end_time - start_time}")
@@ -482,7 +489,10 @@ class DQN():
 
 
 
-        if savelog != None:
+        if save_path != None:
+            # Save final model
+            self.save_q(save_path)
+            logtext += log(f"Saved final model to {save_path}")
             
             # Plot losses
             plt.figure(figsize=(12, 12))
@@ -491,7 +501,7 @@ class DQN():
                 plt.plot(range(dq_episodes - len(episode_losses[i]), dq_episodes), smoothing(episode_losses[i], graph_smoothing), label=f'Player {i}')
             plt.legend(loc='lower left')
             plt.title('Smoothed Loss')
-            plotpath = savelog + f".losses.png"
+            plotpath = save_path + f".losses.png"
             plt.savefig(plotpath)
             logtext += log(f"Saved losses plot to {plotpath}", verbose)
 
@@ -506,10 +516,11 @@ class DQN():
                     plt.plot(range(dq_episodes + 1), smoothing(vals, graph_smoothing), label=f'{k}')
                 plt.legend(loc='lower left')
                 plt.title(f'Test {j} (smoothed)')
-                plotpath = savelog + f".test{j}.png"
+                plotpath = save_path + f".test{j}.png"
                 plt.savefig(plotpath)
                 logtext += log(f"Saved test {j} plot to {plotpath}", verbose)
 
-            with open(savelog, "w") as f:
-                logtext += log(f"Saved logs to {savelog}", verbose)
+            logpath = save_path + ".log"
+            with open(logpath, "w") as f:
+                logtext += log(f"Saved logs to {logpath}", verbose)
                 f.write(logtext)

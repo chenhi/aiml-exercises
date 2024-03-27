@@ -119,7 +119,7 @@ if mode == "train":
     res = input("Name of file (alphanumeric only, max length 64, w/o extension): ")
     fname_end = f"{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}_" + re.sub(r'\W+', '', res)[0:64] + f"{file_ext}"
     fname = f'bots/{shortname}/' + fname_end
-    logpath = fname + ".log"
+
         
     
     for k, v in hpar.items():
@@ -135,8 +135,7 @@ if mode == "train":
         game.save_q(fname)
 
     if type == "dqn":
-        game.deep_learn(**hpar, savelog=logpath, verbose=True, debug=debug)
-        game.save_q(fname)
+        game.deep_learn(**hpar, verbose=True, debug=debug, save_path=fname)
 
 
 #==================== LOAD SAVES ====================#
@@ -296,13 +295,14 @@ if mode == "benchmark":
         replay = True if input("Enter 'y' to replay losses: ").lower() == 'y' else False
         game.simulate_against_random(sims, replay_loss=replay, verbose=True)
     else:
-        logtext = f"Simulating {name} random bot for {sims} simulations.\n\n"
+        logtext = ""
+        logtext += log("Simulating {name} random bot for {sims} simulations.\n\n")
         for i in range(1, len(saves)):
             game.load_q(f'bots/{shortname}/' + saves[i])
-            result = game.simulate_against_random(sims, replay_loss=False, verbose=True)
-            logtext += f"\n"
+            result = game.simulate_against_random(sims, replay_loss=False, verbose=False)
+            logtext += log(f"\n")
             for j in range(len(result)):
-                logtext += f"Bot {saves[i]} as player {j}: {result[j][0]} wins, {result[j][1]} losses, {result[j][2]} ties, {result[j][3]} invalid moves, {result[j][4]} unknown results.\n"
+                logtext += log(f"Bot {saves[i]} as player {j}: {result[j][0]} wins, {result[j][1]} losses, {result[j][2]} ties, {result[j][3]} invalid moves, {result[j][4]} unknown results.\n")
 
         with open(f"logs/benchmark.{shortname}.{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.log", "w") as f:
             f.write(logtext)

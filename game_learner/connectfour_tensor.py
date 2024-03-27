@@ -49,7 +49,7 @@ class C4TensorMDP(TensorMDP):
             'episode_length': 50, 
             'sim_batch': 32, 
             'train_batch': 256, 
-            'copy_interval_eps': 10
+            'copy_interval_eps': 1
             }
         super().__init__(state_shape=(2,6,7), action_shape=(7,), discount=1, num_players=2, batched=True, default_hyperparameters=hyperpar, \
                          symb = {0: "O", 1: "X", None: "-"}, input_str = "Input column to play (1-7). ", penalty=-2)
