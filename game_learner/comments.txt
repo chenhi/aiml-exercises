@@ -112,20 +112,21 @@ Trying a learning rate of 0.005 with batch normalization.  It was optimal; test 
 
 Why is it that a nice loss curve (e.g. 20240322200229_batchnormagain.dttt.pt.log.losses.png) seems to reflect better performance while a sharp decrease then flat (e.g. 20240322201930_lrup.dttt.pt.log.losses.png) tends to behave poorly?  Maybe it's beacuse we increased the learning rate so it learns fast, but then it bounces around randomly and doesn't get close enough to the minimum to be optimal.  Indeed, we see that in the tests the behavior seems to move randomly and we don't get separation.  So, this seems to indicate a learning rate of 0.001 is good, but 0.005 is too big.  Let's try 0.0025.  This was also fine and optimal.  But it jumps around a lot and it doesn't seem like a good idea to shorten the training time.  So I don't really want to change from 0.001.
 
+The next goal is to understand what it means when the losses stabilize.  Does it mean the AI is no longer learning?  Theoretically, no.  So how can we interpret it?  For the tic-toc-toe AI, the loss graph just looks so much different from all the connect 4 ones.  Maybe it means the learning rate is too high?  Or too low?  I will code in an option to save the model every 100 iterations or so and can try it out.
 
+I noticed that when I bumped up the learning rate for tic tac toe, the losses (20240324020352_lrup.dttt.pt.log.losses.png) would drop but then stay pretty level instead of converging in a curve-like way.  The resulting bot is also non-optimal.  I tried doing it again for 4000 iterations and the curve looked better, but the bot was still non-optimal with the higher learning rate.  The curve looked more noisy.  I wonder if the inherent "high variance" nature of this problem makes lower learning rates more beneficial.
+
+Another observation is that the curve more or less has the same shape with both learning rates.  Hypothesis: it's the greed ramp that's controlling this somewhat.  This resulted in an AI that seemed to converge around 2500 rather than 3500, so this seems to really be the factor determining rate of convergence.  One worrying thing though is that one of the tests metrics started to fall toward the end.  
 
 
 LESSONS:
-* In this setting, training on high greed causes divergence since the robots play the same game over and over.  This causes them to forget other parts of the tree they would naturally encounter in actual play.  So, we should never hit high greed like 90%.  Experimentally, in this case, 60% and 70% seem like good maximums.  One possibly way to mitigate this is to train multiple AI at the same time and have them play each other, but of course this is computationally expensive.
+* In this setting, training on high greed causes divergence since the robots play the same game over and over.  This causes them to forget other parts of the tree they would naturally encounter in actual play (evidenced by drops in the metrics in the tracked tests).  This might not happen with classical Q-learning, since the effect might be that those branches just never get updated again (which can also be bad, if they're non-optimized).  In some sense, this might be an example of overfitting?  Anyway, probably we should never hit high greed like 90%.  Experimentally, in this case, 60% and 70% seem like good maximums.  One possibly way to mitigate this is to train multiple AI at the same time and have them play each other, but of course this is computationally expensive.
 * Increasing batches helps because we can increase the learning rate and decrease the iterations, and is a general speedup (until some point, presumably).
-* Increasing learning rate can cause instability, or failure to get close enough to an optimum, or divergence.
+* Increasing learning rate can cause instability, or failure to get close enough to an optimum, or divergence.  This is even more pronounced for DQN, which is by nature more random and higher variance.  I think with a high learning rate it's possible for this high variance to cause the gradient descent to keep "missing" the minimum.  One sign of this is if the losses drop initially but then stay pretty flat/noisy rather than having a nice concave convergence?
 * Batch normalization helps stability but increases time by a nontrivial amount, maybe 30-40%.
+* Even seemlingly good AIs can be non-optimal, as we checked by random simulations.  Squeezing out the last bit of perfection can take a long time.  It can take 10 minutes to train a 99.5% win AI, 15 minutes to train a very good 99.8% accurate, but then 45 minutes to get it to 100%.
 
 
-
-The next goal is to understand what it means when the losses stabilize.  Does it mean the AI is no longer learning?  Theoretically, no.  So how can we interpret it?  For the tic-toc-toe AI, the loss graph just looks so much different from all the connect 4 ones.  Maybe it means the learning rate is too high?  Or too low?  I will code in an option to save the model every 100 iterations or so and can try it out.
-
-I noticed that when I bumped up the learning rate for tic tac toe, the losses (20240324020352_lrup.dttt.pt.log.losses.png) would drop but then stay pretty level instead of converging in a curve-like way.  This is probably indicating that the learning rate is too high then.
 
 
 Connect Four:

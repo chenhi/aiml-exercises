@@ -86,8 +86,8 @@ class TTTTensorMDP(TensorMDP):
             'train_batch': 256,
             'copy_interval_eps': 5
             }
-        super().__init__(state_shape=(2,3,3), action_shape=(3,3), discount=1, num_players=2, batched=True, default_hyperparameters=defaults5, \
-                         symb = {0: "X", 1: "O", None: "-"}, input_str = "Input position to play, e.g. '1, 3' for the 1st row and 3rd column: ", penalty=-2)
+        super().__init__(state_shape=(2,3,3), action_shape=(3,3), discount=1, num_players=2, batched=True, default_hyperparameters=optimal, \
+                         symb = {0: "X", 1: "O", None: "-"}, input_str = "Input position to play, e.g. '1, 3' for the 1st row and 3rd column: ", penalty=-1)
         self.device = device
         
     def __str__(self):

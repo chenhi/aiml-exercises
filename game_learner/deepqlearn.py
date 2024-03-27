@@ -238,7 +238,7 @@ class DQN():
         turn = 0
         while self.mdp.is_terminal(s) == False:
             turn += 1
-            p = self.mdp.get_player(s)[0].item()
+            p = int(self.mdp.get_player(s)[0].item())
             print(f"Turn {turn}, player {p+1} ({self.mdp.symb[p]})")
             a = self.qs[p].policy(s)
             print(f"Chosen action: {self.mdp.action_str(a)[0]}")
@@ -247,6 +247,18 @@ class DQN():
             print(f"Rewards for players: {r[0].tolist()}")
             input("Enter to continue.\n")
         input("Terminal state reached.  Enter to end. ")
+
+    def simulate(self):
+        s = self.mdp.get_initial_state()
+        while self.mdp.is_terminal(s) == False:
+            p = int(self.mdp.get_player(s)[0].item())
+            a = self.qs[p].policy(s)
+            if self.mdp.is_valid_action(s, a):
+                s, r = self.mdp.transition(s, a)
+            else:
+                a = self.mdp.get_random_action(s)
+                s, r = self.mdp.transition(s, a)
+        return r
 
 
     # Keeps the first action; the assumption is the later actions are "passive" (i.e. not performed by the given player)
@@ -281,7 +293,7 @@ class DQN():
         output = []
         for i in range(self.mdp.num_players):
             if verbose:
-                print(f"Playing as player {i}.")
+                print(f"Simulating player {i} against random bot for {num_simulations} simulations.")
             wins, losses, ties, invalids, unknowns  = 0, 0, 0, 0, 0
             for j in range(num_simulations):
                 s = self.mdp.get_initial_state()
@@ -315,6 +327,8 @@ class DQN():
                 else:
                     unknowns += 1
             output.append((wins, losses, ties, invalids, unknowns))
+            if verbose:
+                print(f"Player {i} {wins} wins, {losses} losses, {ties} ties, {invalids} invalid moves, {unknowns} unknown results.")
         return output
             
         

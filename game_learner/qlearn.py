@@ -344,6 +344,8 @@ class QLearn():
                 else:
                     unknowns += 1
             output.append((wins, losses, ties, invalids, unknowns))
+            if verbose:
+                print(f"Player {i} {wins} wins, {losses} losses, {ties} ties, {invalids} invalid moves, {unknowns} unknown results.")
         return output
 
     # Player data is (start state, action taken, all reward before next action, starting state for next action)

@@ -39,12 +39,12 @@ class C4TensorMDP(TensorMDP):
 
     def __init__(self, device="cpu"):
         hyperpar = {
-            'lr': 0.00025, 
+            'lr': 0.000005, 
             'greed_start': 0.0, 
             'greed_end': 0.6,
-            'dq_episodes': 5000, 
+            'dq_episodes': 3000, 
             'ramp_start': 500,
-            'ramp_end': 4500,
+            'ramp_end': 2900,
             'training_delay': 500,
             'episode_length': 50, 
             'sim_batch': 32, 

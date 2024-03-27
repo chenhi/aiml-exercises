@@ -6,11 +6,12 @@ from qlearn import *
 from deepqlearn import *
 import os, datetime, re, sys, torch
 
-open_str = '\nCommand-line options: python play.py <game> <play/train/simulate>\n\
+open_str = '\nCommand-line options: python play.py <game> <play/train/simulate/benchmark/tournament>\n\
     If play (default), play against a model.\n\
     If train, continue to play after training.\n\
     If simulate, watch two bots in a model play each other.\n\
-    If benchmark, simulates games between a bot and a random bot.\n\n'
+    If benchmark, simulates games between a bot and a random bot.\n\
+    If tournament, simulates a tournament between all trained bots.\n\n'
 
 
 device = (
@@ -35,6 +36,13 @@ def item(obj, mdp: MDP, is_list=False):
         else:
             return obj[0].tolist()
     return obj
+
+#==================== GAMEMODE LOGIC ====================#
+
+mode = "play"
+
+if len(sys.argv) > 2:
+    mode = sys.argv[2]
 
 #==================== GAME DEFINITION AND SELECTION ====================#
 
@@ -85,23 +93,6 @@ print(f"\nPlaying {name}.\n")
 
 debug = True if 'debug' in sys.argv else False
 
-train_new = False
-simulate = False
-if len(sys.argv) > 2:
-    if sys.argv[2] == "train":
-        train_new = True
-        simulate = False
-    elif sys.argv[2] == "play" or sys.argv[2] == "benchmark":
-        train_new = False
-        simulate = False
-    elif sys.argv[2] == "simulate":
-        train_new = False
-        simulate = True
-    else:
-        res = input("Enter 't' to train a new bot, or anything else to skip. ")
-        train_new = True if res == 't' else False
-        simulate = False
-
 
 prompts = {
     'lr': 'Learn rate in [0, 1]',
@@ -117,13 +108,14 @@ prompts = {
     'sim_batch': 'The size of each simulation batch',
     'train_batch': 'The size of each training batch',
     'copy_interval_eps': 'Interval between copying policy to target in episodes',
+    'training_delay': 'What episode to start training'
 }
 
 # Train AI
-if train_new:
-    
-    hpar = mdp.default_hyperparameters    
-    
+
+if mode == "train":    
+    hpar = mdp.default_hyperparameters
+
     res = input("Name of file (alphanumeric only, max length 64, w/o extension): ")
     fname_end = f"{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}_" + re.sub(r'\W+', '', res)[0:64] + f"{file_ext}"
     fname = f'bots/{shortname}/' + fname_end
@@ -147,50 +139,174 @@ if train_new:
         game.save_q(fname)
 
 
+#==================== LOAD SAVES ====================#
 
-#==================== BOT SELECTION ====================#
 
 save_files = [each for each in os.listdir(f'bots/{shortname}/') if each.endswith(file_ext)]
 save_files.sort()
-saves = ['RANDOMBOT'] + save_files
-load_indices = []
-load_index = -1
 
-if train_new:
-    load_index = saves.index(fname_end)
-    print(f"Loaded the newly trained bot: {fname_end}")
-else:
+#==================== BOT TOURNAMENT OR SIMULATION ====================#
+    
+if mode == "tournament":
+    saves = save_files
+    
+    logtext = "Bot Tournament\n\nList of bots:\n"
+    for i in range(len(saves)):
+        logtext += log(f"[{i}] {saves[i]}")
+    
+
+    # Generate all n-tuples of k numbers
+    k = len(saves)
+    n = mdp.num_players
+    matches = []
+    for i in range(k**n):
+        total = i
+        modulus = total % k
+        match = (modulus)
+        for i in range(n):
+            modulus = total % k
+            match = match + (modulus, ) if i > 0 else (modulus, )
+            total = (total - modulus)//k
+        matches.append(match)
+
+    # Bot records
+    records = [{'win': 0, 'loss': 0, 'tie': 0} for i in range(k)]
+    logtext += log("")
+
+    for match in matches:
+        for i in range(n):
+            game.load_q(f'bots/{shortname}/' + saves[match[i]], [i])
+        r = game.simulate()
+        logtext += log(f"Result of match {match}: {r[0].int().tolist()}")
+        for i in range(n):
+            if r[0,i].item() > 0:
+                records[match[i]]['win'] += 1
+            elif r[0,i].item() < 0:
+                records[match[i]]['loss'] += 1
+            else:
+                records[match[i]]['tie'] += 1
+    
+    logtext += log("\n\nFinal standings:")
+    # First log the raw standings
+    for i in range(k):
+        logtext += log(f"{saves[i]}: {records[i]}")
+    
+    # Sort by wins, loss, and score = win - loss
+    indices = list(range(k))
+    by_win = sorted(indices, key=lambda t: records[t]['win'], reverse=True)
+    by_loss = sorted(indices, key=lambda t: records[t]['loss'])
+    by_score = sorted(indices, key=lambda t: records[t]['loss'] - records[t]['win'])
+    
+    logtext += log("\nBy wins:")
+    for i in range(k):
+        logtext += log(f"{saves[by_win[i]]}: {records[by_win[i]]}")
+    
+    logtext += log("\nBy losses:")
+    for i in range(k):
+        logtext += log(f"{saves[by_loss[i]]}: {records[by_loss[i]]}")
+
+    logtext += log("\nBy score:")
+    for i in range(k):
+        logtext += log(f"{saves[by_score[i]]}: {records[by_score[i]]}")
+
+    with open(f"logs/tournament.{shortname}.{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.log", "w") as f:
+        f.write(logtext)
+    
+    exit()
+
+
+if mode == "simulate":
+    saves = save_files
+    load_indices = []
     savestr = ""
     for i in range(len(saves)):
         savestr += f"[{i}] {saves[i]}\n"
-    res = input(f"\nThere are some saved bots:\n{savestr}\n\nIf you want to load them, enter the number.  Otherwise, enter anything else.\n")
+    print(f"Saved bots:\n{savestr}\n\n")
+    for i in range(mdp.num_players):
+        res = input(f"Bot for player {i+1}/{mdp.num_players}: ")
+        try:
+            res = int(res)
+            if res >= 0 and res < len(saves):
+                game.load_q(f'bots/{shortname}/' + saves[res], [i])
+                print(f"Loaded {saves[int(res)]}\n")
+        except:
+            print("Didn't understand.")
+            i -= 1
+
+    game.stepthru_game()
+    exit()
+
+
+
+#==================== BOT SELECTION ====================#
+
+
+# Add random bot
+saves = ['RANDOMBOT'] + save_files
+load_index = -1
+
+if mode == "play":
+    savestr = ""
+    for i in range(len(saves)):
+        savestr += f"[{i}] {saves[i]}\n"
+    res = input(f"\nThere are some saved bots:\n{savestr}\n\nIf you want to load them, enter either a number.  Otherwise, enter anything else: ")
     try:
-        i = int(res)
-        if i >= 0 and i < len(saves):
-            load_index = int(res)        
-            print(f"Loaded {saves[int(res)]}\n")
+        res = int(res)
+        if res >= 0 and res < len(saves):
+            load_index = res        
+            print(f"Loaded {saves[res]}\n")
     except:
         print("No bot loaded.")
 
-
-# Load the AI; special case is index = 0 which is random AI
-if load_index == 0:
-    game.null_q()
-elif load_index != -1:
-    game.load_q(f'bots/{shortname}/' + saves[load_index])
-
+    # Load the AI; special case is index = 0 which is random AI
+    if load_index == 0:
+        game.null_q()
+    elif load_index != -1:
+        game.load_q(f'bots/{shortname}/' + saves[load_index])
 
 
+    
 #==================== BENCHMARK AGAINST RANDOM ====================#
 
-if sys.argv[2] == "benchmark":   
-    sims = int(input("How many iterations against random bot? "))
-    replay = True if input("Enter 'y' to replay losses: ").lower() == 'y' else False
+if mode == "benchmark":
 
-    results = game.simulate_against_random(sims, replay_loss=replay, verbose=True)
-    
-    for i in range(mdp.num_players):
-        print(f"As player {i}, {results[i][0]} wins, {results[i][1]} losses, {results[i][2]} ties, {results[i][3]} invalid moves, and {results[i][4]} unknown results.")
+    do_all = False
+    savestr = ""
+    for i in range(len(saves)):
+        savestr += f"[{i}] {saves[i]}\n"
+    res = input(f"\nSaved bots:\n{savestr}\n\nEnter number to load or anything else to benchmark them all: ")
+    try:
+        load_index = int(res)
+        if load_index == 0:
+            game.null_q()
+        elif load_index > 0:
+            game.load_q(f'bots/{shortname}/' + saves[load_index])
+        else:
+            raise Exception
+        print(f"Loaded {saves[load_index]}\n")
+    except:
+        print(f"Benchmarking all.")
+        do_all = True
+
+    # Load the AI; special case is index = 0 which is random AI
+
+
+    sims = int(input("How many iterations against random bot? "))
+    if do_all == False:
+        replay = True if input("Enter 'y' to replay losses: ").lower() == 'y' else False
+        game.simulate_against_random(sims, replay_loss=replay, verbose=True)
+    else:
+        logtext = f"Simulating {name} random bot for {sims} simulations.\n\n"
+        for i in range(1, len(saves)):
+            game.load_q(f'bots/{shortname}/' + saves[i])
+            result = game.simulate_against_random(sims, replay_loss=False, verbose=True)
+            logtext += f"\n"
+            for j in range(len(result)):
+                logtext += f"Bot {saves[i]} as player {j}: {result[j][0]} wins, {result[j][1]} losses, {result[j][2]} ties, {result[j][3]} invalid moves, {result[j][4]} unknown results.\n"
+
+        with open(f"logs/benchmark.{shortname}.{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.log", "w") as f:
+            f.write(logtext)
+
     exit()
     
 
@@ -199,29 +315,18 @@ if sys.argv[2] == "benchmark":
 
 #==================== PLAY THE GAME ====================#
 
-if simulate:
-    game.stepthru_game()
-    exit()
-
-# TODO Load two computers vs two humans?
-
-bot_list = [False for i in range(mdp.num_players)]
-
-
-
 while True:
-    if load_index >= 0:
-        res = input(f"Which player to play as?  An integer from 1 to {mdp.num_players}, or 'q' to quit. ")
-        if res == 'q':
-            exit()
-        try:
-            player_index = int(res) - 1
-            if player_index < 0 or player_index >= mdp.num_players:
-                raise Exception()
-        except:
-            print("Unrecognized response.")
-            continue
-        
+    res = input(f"Which player to play as?  An integer from 1 to {mdp.num_players}, or 'q' to quit. ")
+    if res == 'q':
+        exit()
+    try:
+        player_index = int(res) - 1
+        if player_index < 0 or player_index >= mdp.num_players:
+            raise Exception()
+    except:
+        print("Unrecognized response.")
+        continue
+    
     
     s = game.mdp.get_initial_state()
     while item(game.mdp.is_terminal(s), mdp) == False:
