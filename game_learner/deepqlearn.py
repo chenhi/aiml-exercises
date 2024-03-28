@@ -160,7 +160,7 @@ class NNQFunction(QFunction):
 
     # Does a Q-update based on some observed set of data
     # TransitionData entries are tensors
-    def update(self, data: TransitionData, learn_rate, stagger_target=False):
+    def update(self, data: TransitionData, learn_rate):
         if not isinstance(self.q, nn.Module):
             Exception("NNQFunction needs to have a class extending nn.Module.")
 
@@ -171,7 +171,7 @@ class NNQFunction(QFunction):
         self.target_q.eval()
         opt = self.optimizer(self.q.parameters(), lr=learn_rate)
         pred = self.get(data.s, data.a)
-        y = data.r + self.val(data.t, target=stagger_target)
+        y = data.r + self.val(data.t, target=True)
         loss = self.loss_fn(pred, y)
 
         # Optimize
@@ -342,19 +342,20 @@ class DQN():
         expl_start, expl_end = 1. - greed_start, 1. - greed_end
         verbose = verbose or debug
 
-        stagger_target = False if copy_interval_eps == 1 else True
+        do_logging = True if verbose or save_path != None else False
 
         if train_batch < 2:
             Exception("Training batch size must be greater than 1 for sampling.")
 
         logtext = ""
-        if verbose or save_path != None:
+        if do_logging:
             logtext += log(f"Device: {self.device}", verbose)
             logtext += log(f"MDP:\n{self.mdp}", verbose)
             logtext += log(f"Model:\n{self.qs[0].q}", verbose)
             logtext += log(f"Loss function:\n{self.qs[0].loss_fn}", verbose)
             logtext += log(f"Optimizer:\n{self.qs[0].optimizer}", verbose)
             logtext += log(f"Learn rate: {lr}, episodes: {dq_episodes}, start and end exploration: [{expl_start}, {expl_end}], ramp: [{ramp_start}, {ramp_end}], training delay: {training_delay}, episode length: {episode_length}, batch size: {sim_batch}, training batch size: {train_batch}, copy frequency: {copy_interval_eps}, memory capacity: {self.memory_capacity}.", verbose)
+            
             wins = [0] * self.mdp.num_players
             penalties = [0] * self.mdp.num_players
             episode_losses = [[] for i in range(self.mdp.num_players)]
@@ -366,19 +367,18 @@ class DQN():
             logtext += log(f"Starting training at {start_time}\n", verbose)
                         
 
+        # Initially, the target network should be the same as the policy network
+        for i in range(self.mdp.num_players):
+            self.qs[i].copy_policy_to_target()
+        
 
-        frame = 0
         for ep_num in range(dq_episodes):
             # Set greed
             greed_cur = min(max(((expl_end - expl_start) * ep_num + (ramp_end * expl_start - ramp_start * expl_end))/(ramp_end - ramp_start), expl_end), expl_start)
             if verbose or save_path != None:
                 losses = [0.] * self.mdp.num_players
-                updates = 0
+                num_updates = [0] * self.mdp.num_players
 
-            # Make sure the target network is the same as the policy network
-            for i in range(self.mdp.num_players):
-                self.qs[i].copy_policy_to_target()
-            
             
             if verbose or save_path != None:
                 memorylen = [self.memories[i].size() for i in range(self.mdp.num_players)]
@@ -389,7 +389,6 @@ class DQN():
             player_record = [None for i in range(self.mdp.num_players)]
             
             for k in range(episode_length):
-                frame += 1
 
                 if debug:
                     boards = ""
@@ -427,7 +426,7 @@ class DQN():
 
 
                 # Tracking wins and penalities TODO more robust
-                if verbose or save_path != None:
+                if do_logging:
                     for pi in range(self.mdp.num_players):
                         wins[pi] += torch.sum(r[:,pi] > 0).item()
                         penalties[pi] += torch.sum(r[:,pi] <= self.mdp.penalty).item()
@@ -445,49 +444,49 @@ class DQN():
                 # Train the policy on a random sample in memory (once the memory bank is big enough)
                 for i in range(self.mdp.num_players):
                     if len(self.memories[i]) >= train_batch and ep_num >= training_delay:
-                        losses[i] += self.qs[i].update(self.memories[i].sample(train_batch), lr, stagger_target=stagger_target)
-                        updates += train_batch
+                        losses[i] += self.qs[i].update(self.memories[i].sample(train_batch), lr)
+                        num_updates[i] += train_batch
 
-                # Restart terminal states TODO for now, just check if the whole thing is done and end the episode to hasten things up
-                # if torch.prod(self.mdp.is_terminal(s)).item() == 1:
-                #     break
-
-                # Don't forget to set the state to the next state
+                # Set the state to the next state
                 s = t
-            
-            # Record statistics at end of episode
-            if (verbose or save_path != None):
-                if updates > 0:
-                    for i in range(len(losses)):
-                        losses[i] = losses[i]/updates
-                        episode_losses[i].append(losses[i])
-                    logtext += log(f"Episode {ep_num+1} average loss: {losses}", verbose)
-                test_results = self.mdp.tests(self.qs)
-                for j in range(len(test_results)):
-                    tests[j].append(test_results[j])
 
             
-            # Copy the target network to the policy network if it is time, if we have a stagger at all
-            if stagger_target and (ep_num+1) % copy_interval_eps == 0:
+            # Copy the target network to the policy network if it is time
+            if ep_num > training_delay and (ep_num+1) % copy_interval_eps == 0:
                 for i in range(self.mdp.num_players):
                     self.qs[i].copy_policy_to_target()
                 logtext += log("Copied policy to target networks for all players.", verbose)
 
             # Save a copy of the model if time
             if save_path != None and (ep_num+1) % save_interval == 0:
-                self.save_q(f"{save_path}.{ep_num}")
-                logtext += log(f"Saved {ep_num}-iteration model to {save_path}.{ep_num}") 
+                self.save_q(f"{save_path}.{ep_num+1}")
+                logtext += log(f"Saved {ep_num+1}-iteration model to {save_path}.{ep_num+1}") 
 
-        if verbose or save_path != None:
+            
+            # Record statistics at end of episode
+            if do_logging:
+                for i in range(len(losses)):
+                    if num_updates[i] > 0:
+                        losses[i] = losses[i]/num_updates[i]
+                        episode_losses[i].append(losses[i])
+                    else:
+                        losses[i] = float('NaN')
+                logtext += log(f"Episode {ep_num+1} average loss: {losses}", verbose)
+                test_results = self.mdp.tests(self.qs)
+                for j in range(len(test_results)):
+                    tests[j].append(test_results[j])
+
+            
+
+
+        if do_logging:
             end_time = datetime.datetime.now()
             logtext += log(f"\nTraining finished at {end_time}")
             logtext += log(f"Total time: {end_time - start_time}")
 
-        simulation_results = self.simulate_against_random(self.mdp.num_simulations)
-        for i in range(self.mdp.num_players):
-            logtext += log(f"In {self.mdp.num_simulations} simulations by player {i}, {simulation_results[i][0]} wins, {simulation_results[i][1]} losses, {simulation_results[i][2]} ties, {simulation_results[i][3]} invalid moves, {simulation_results[i][4]} unknown results.")
-
-
+            simulation_results = self.simulate_against_random(self.mdp.num_simulations)
+            for i in range(self.mdp.num_players):
+                logtext += log(f"In {self.mdp.num_simulations} simulations by player {i}, {simulation_results[i][0]} wins, {simulation_results[i][1]} losses, {simulation_results[i][2]} ties, {simulation_results[i][3]} invalid moves, {simulation_results[i][4]} unknown results.")
 
         if save_path != None:
             # Save final model

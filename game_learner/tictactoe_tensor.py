@@ -86,20 +86,7 @@ class TTTTensorMDP(TensorMDP):
             'train_batch': 256,
             'copy_interval_eps': 5
             }
-        optimal = {
-            'lr': 0.00025, 
-            'greed_start': 0.0, 
-            'greed_end': 0.60, 
-            'dq_episodes': 3000, 
-            'ramp_start': 100,
-            'ramp_end': 2800,
-            'training_delay': 100,
-            'episode_length': 15, 
-            'sim_batch': 32, 
-            'train_batch': 256,
-            'copy_interval_eps': 1
-            }
-        super().__init__(state_shape=(2,3,3), action_shape=(3,3), discount=1, num_players=2, batched=True, default_hyperparameters=optimal, \
+        super().__init__(state_shape=(2,3,3), action_shape=(3,3), discount=1, num_players=2, batched=True, default_hyperparameters=defaults6, \
                          symb = {0: "X", 1: "O", None: "-"}, input_str = "Input position to play, e.g. '1, 3' for the 1st row and 3rd column: ", penalty=-1)
         self.device = device
         
