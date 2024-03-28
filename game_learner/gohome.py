@@ -40,7 +40,10 @@ class GoHomeMDP(MDP):
 
     def get_actions(self, s):
         return self.actions
-        
+    
+    def get_player(self, s):
+        return 0
+
     def is_terminal(self, s):
         return True if s == self.home else False
 

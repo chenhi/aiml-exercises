@@ -336,7 +336,7 @@ class DQN():
     # Handling multiplayer: each player keeps their own "record", separate from memory
     # When any entry in the record has source = target, then the player "banks" it in their memory
     # The next time an action is taken, if the source = target, then it gets overwritten
-    def deep_learn(self, lr: float, dq_episodes: int, episode_length: int, ramp_start: int, ramp_end: int, greed_start: float, greed_end: float, training_delay: int, sim_batch: int, train_batch: int, copy_interval_eps: int, save_interval=500, save_path=None, verbose=False, graph_smoothing=10, debug=False):
+    def deep_learn(self, lr: float, dq_episodes: int, episode_length: int, ramp_start: int, ramp_end: int, greed_start: float, greed_end: float, training_delay: int, sim_batch: int, train_batch: int, copy_interval_eps=1, save_interval=500, save_path=None, verbose=False, graph_smoothing=10, debug=False):
 
         dq_episodes, episode_length, ramp_start, ramp_end, sim_batch, train_batch, copy_interval_eps, training_delay = int(dq_episodes), int(episode_length), int(ramp_start), int(ramp_end), int(sim_batch), int(train_batch), max(1, int(copy_interval_eps)), int(training_delay)
         expl_start, expl_end = 1. - greed_start, 1. - greed_end
@@ -356,8 +356,6 @@ class DQN():
             logtext += log(f"Optimizer:\n{self.qs[0].optimizer}", verbose)
             logtext += log(f"Learn rate: {lr}, episodes: {dq_episodes}, start and end exploration: [{expl_start}, {expl_end}], ramp: [{ramp_start}, {ramp_end}], training delay: {training_delay}, episode length: {episode_length}, batch size: {sim_batch}, training batch size: {train_batch}, copy frequency: {copy_interval_eps}, memory capacity: {self.memory_capacity}.", verbose)
             
-            wins = [0] * self.mdp.num_players
-            penalties = [0] * self.mdp.num_players
             episode_losses = [[] for i in range(self.mdp.num_players)]
             tests = []                                          # Format: tests[i][j] is the jth iteration of the ith test
             initial_test = self.mdp.tests(self.qs)
@@ -373,8 +371,8 @@ class DQN():
         
 
         for ep_num in range(dq_episodes):
-            # Set greed
-            greed_cur = min(max(((expl_end - expl_start) * ep_num + (ramp_end * expl_start - ramp_start * expl_end))/(ramp_end - ramp_start), expl_end), expl_start)
+            # Set exploration value
+            expl_cur = min(max(((expl_end - expl_start) * ep_num + (ramp_end * expl_start - ramp_start * expl_end))/(ramp_end - ramp_start), expl_end), expl_start)
             if verbose or save_path != None:
                 losses = [0.] * self.mdp.num_players
                 num_updates = [0] * self.mdp.num_players
@@ -382,7 +380,7 @@ class DQN():
             
             if verbose or save_path != None:
                 memorylen = [self.memories[i].size() for i in range(self.mdp.num_players)]
-                logtext += log(f"Initializing episode {ep_num+1}. Greed {1-greed_cur:>0.5f}. Memory {memorylen}. Player wins {wins}, penalties {penalties}.", verbose)
+                logtext += log(f"Initializing episode {ep_num+1}. Greed {1-expl_cur:>0.5f}. Memory {memorylen}.", verbose)
             
             s = self.mdp.get_initial_state(sim_batch)
             # "Records" for each player
@@ -405,11 +403,8 @@ class DQN():
                 for pi in range(self.mdp.num_players):
                     # Get the indices corresponding to this player's turn
                     indices = torch.arange(sim_batch, device=self.device)[p.flatten() == pi]
-                    a[indices] = greedy_tensor(self.qs[pi], s[indices], greed_cur)
-                    
-                    #indices = torch.arange(sim_batch, device=self.device)[p.flatten() == pi].tolist()
-                    #player_actions = torch.cat([greedy_tensor(self.qs[pi], s[l:l+1], greed_cur) if l in indices else torch.zeros((1, ) + self.mdp.action_shape, device=self.device) for l in range(sim_batch)], 0)
-                    #a += player_actions
+                    a[indices] = greedy_tensor(self.qs[pi], s[indices], expl_cur)
+
 
                 if debug:
                     input(f"Chosen actions:\n{a}")
@@ -424,12 +419,6 @@ class DQN():
                         boards += f"Board {i}:\n{self.mdp.board_str(t)[i]}\nReward: {r[i]}"
                     input(f"New boards:\n{boards}")
 
-
-                # Tracking wins and penalities TODO more robust
-                if do_logging:
-                    for pi in range(self.mdp.num_players):
-                        wins[pi] += torch.sum(r[:,pi] > 0).item()
-                        penalties[pi] += torch.sum(r[:,pi] <= self.mdp.penalty).item()
 
                 # Update player records and memory
                 for pi in range(self.mdp.num_players):

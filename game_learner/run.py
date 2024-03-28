@@ -2,6 +2,7 @@ import connectfour as c4
 import tictactoe as ttt
 import connectfour_tensor as c4t
 import tictactoe_tensor as dttt
+import gohome as gh
 from qlearn import *
 from deepqlearn import *
 import os, datetime, re, sys, torch
@@ -50,13 +51,14 @@ tttmdp = ttt.TTTMDP()
 c4mdp = c4.C4MDP()
 c4tmdp = c4t.C4TensorMDP()
 dtttmdp = dttt.TTTTensorMDP(device=device)
+ghmdp = gh.GoHomeMDP((6,6), (0,0), (3,3), 0.9)
 
-names = ["Tic-Tac-Toe", "Connect Four", "Deep Tic-Tac-Toe", "Deep Connect Four"]
-shortnames = ["ttt", "c4", "dttt", "dc4"]
-mdps = [tttmdp, c4mdp, dtttmdp, c4tmdp]
-games = [QLearn(tttmdp), QLearn(c4mdp), DQN(dtttmdp, dttt.TTTNN, torch.nn.HuberLoss(), torch.optim.Adam, 100000, device=device), DQN(c4tmdp, c4t.C4NN, torch.nn.HuberLoss(), torch.optim.Adam, 1000000, device=device)]
-file_exts = ['.ttt.pkl', '.c4.pkl', '.dttt.pt', '.dc4.pt']
-types = ["qlearn", "qlearn", "dqn", "dqn"]
+names = ["Tic-Tac-Toe", "Connect Four", "Deep Tic-Tac-Toe", "Deep Connect Four", "Robot Go Home"]
+shortnames = ["ttt", "c4", "dttt", "dc4", "home"]
+mdps = [tttmdp, c4mdp, dtttmdp, c4tmdp, ghmdp]
+games = [QLearn(tttmdp), QLearn(c4mdp), DQN(dtttmdp, dttt.TTTNN, torch.nn.HuberLoss(), torch.optim.Adam, 100000, device=device), DQN(c4tmdp, c4t.C4NN, torch.nn.HuberLoss(), torch.optim.Adam, 1000000, device=device), QLearn(ghmdp)]
+file_exts = ['.ttt.pkl', '.c4.pkl', '.dttt.pt', '.dc4.pt', '.home.pkl']
+types = ["qlearn", "qlearn", "dqn", "dqn", 'qlearn']
 
 
 # If the game was specified, choose it
@@ -89,6 +91,13 @@ except:
 
 print(f"\nPlaying {name}.\n")
 
+#==================== LOAD SAVES ====================#
+
+
+save_files = [each for each in os.listdir(f'bots/{shortname}/') if each.endswith(file_ext)]
+save_files.sort()
+
+
 #==================== BOT TRAINING ====================#
 
 debug = True if 'debug' in sys.argv else False
@@ -113,7 +122,26 @@ prompts = {
 
 # Train AI
 
-if mode == "train":    
+if mode == "train":
+
+    res = input("Load existing model (Y/n)? ")
+    if res.lower() == 'y':
+        saves = save_files
+        load_indices = []
+        savestr = ""
+        for i in range(len(saves)):
+            savestr += f"[{i}] {saves[i]}\n"
+        print(f"\nSaved bots:\n{savestr}\n")
+        res = input(f"Select initial bot: ")
+        try:
+            res = int(res)
+            if res >= 0 and res < len(saves):
+                game.load_q(f'bots/{shortname}/' + saves[res])
+                print(f"Loaded {saves[int(res)]}\n")
+        except:
+            print("Didn't understand.")
+
+    
     hpar = mdp.default_hyperparameters
 
     res = input("Name of file (alphanumeric only, max length 64, w/o extension): ")
@@ -138,11 +166,6 @@ if mode == "train":
         game.deep_learn(**hpar, verbose=True, debug=debug, save_path=fname)
 
 
-#==================== LOAD SAVES ====================#
-
-
-save_files = [each for each in os.listdir(f'bots/{shortname}/') if each.endswith(file_ext)]
-save_files.sort()
 
 #==================== BOT TOURNAMENT OR SIMULATION ====================#
     
