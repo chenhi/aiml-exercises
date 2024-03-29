@@ -217,7 +217,6 @@ class TTTTensorMDP(TensorMDP):
 
     def tests(self, qs: list[PrototypeQFunction]):
         
-
         # Test 0: the AI is playing as player 0 (first player, X).  We are interested in the 8 boards in the orbit of the first board:
         # XO.    +O.    +OO
         # +X.    XXO    -X-

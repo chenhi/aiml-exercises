@@ -2,6 +2,7 @@ from connectfour import C4MDP
 from tictactoe import TTTMDP
 from connectfour_tensor import C4TensorMDP, C4NN
 from tictactoe_tensor import TTTTensorMDP, TTTNN
+from nothanks_tensor import NoThanksTensorMDP, NoThanksNN
 from gohome import GoHomeMDP, show_heatmap
 from qlearn import *
 from deepqlearn import *
@@ -87,13 +88,14 @@ c4mdp = C4MDP()
 c4tmdp = C4TensorMDP()
 dtttmdp = TTTTensorMDP(device=device)
 ghmdp = GoHomeMDP((6,6), (0,0), (3,3), 0.9)
+ntmdp = NoThanksTensorMDP(num_players=5)
 
-names = ["Tic-Tac-Toe", "Connect Four", "Deep Tic-Tac-Toe", "Deep Connect Four", "Robot Go Home"]
-shortnames = ["ttt", "c4", "dttt", "dc4", "home"]
-mdps = [tttmdp, c4mdp, dtttmdp, c4tmdp, ghmdp]
-games = [QLearn(tttmdp), QLearn(c4mdp), DQN(dtttmdp, TTTNN, torch.nn.HuberLoss(), torch.optim.Adam, 100000, device=device), DQN(c4tmdp, C4NN, torch.nn.HuberLoss(), torch.optim.Adam, 1000000, device=device), QLearn(ghmdp)]
-file_exts = ['.ttt.pkl', '.c4.pkl', '.dttt.pt', '.dc4.pt', '.home.pkl']
-types = ["qlearn", "qlearn", "dqn", "dqn", 'qlearn']
+names = ["Tic-Tac-Toe", "Connect Four", "Deep Tic-Tac-Toe", "Deep Connect Four", "No Thanks!", "Robot Go Home"]
+shortnames = ["ttt", "c4", "dttt", "dc4", "nothanks", "home"]
+mdps = [tttmdp, c4mdp, dtttmdp, c4tmdp, ntmdp, ghmdp]
+games = [QLearn(tttmdp), QLearn(c4mdp), DQN(dtttmdp, TTTNN, torch.nn.HuberLoss(), torch.optim.Adam, 100000, device=device), DQN(c4tmdp, C4NN, torch.nn.HuberLoss(), torch.optim.Adam, 1000000, device=device), DQN(ntmdp, NoThanksNN, torch.nn.HuberLoss(), torch.optim.Adam, 0, device=device), QLearn(ghmdp)]
+file_exts = ['.ttt.pkl', '.c4.pkl', '.dttt.pt', '.dc4.pt', 'nt.pt', '.home.pkl']
+types = ["qlearn", "qlearn", "dqn", "dqn", 'dqn', 'qlearn']
 
 
 # If the game was specified, choose it
@@ -302,24 +304,27 @@ if mode == "benchmark":
 #==================== PLAY THE GAME ====================#
 
 while True:
-    res = input(f"Which player to play as?  An integer from 1 to {mdp.num_players}, empty to watch the bots play, and 'q' to quit. ")
+    players = []
+    res = input(f"Which players are human?  A comma-separated list of numbers from 1 to {mdp.num_players}, empty to watch the bots play, and 'q' to quit. ").split(',')
     if res == 'q':
         exit()
-    try:
-        player_index = int(res) - 1
-        if player_index < 0 or player_index >= mdp.num_players:
-            raise Exception()
-    except:
-        print("Letting the bots play.")
-        player_index = -1
-    
+    for r in res:
+        try:
+            player_index = int(r) - 1
+            if player_index < 0 or player_index >= mdp.num_players:
+                raise Exception()
+            else:
+                players.append(player_index)
+        except:
+            print(f"Didn't recognize {res.strip()}.  Using bot.")
     
     s = game.mdp.get_initial_state()
+    total_rewards = torch.zeros(1, mdp.num_players)
     while item(game.mdp.is_terminal(s), mdp) == False:
         p = int(item(game.mdp.get_player(s), mdp))
         print(f"\n{item(game.mdp.board_str(s), mdp, is_list=True)}")
 
-        if p == player_index:
+        if p in players:
             res = input(mdp.input_str)
             a = mdp.str_to_action(res)
             if a == None:
@@ -338,6 +343,8 @@ while True:
                 a = game.mdp.get_random_action(s)
                 print(f"Randomly chosen action: \n{item(a, mdp)}.\n")
                 s, r = game.mdp.transition(s, a)
+        total_rewards += r
+        print(f"Rewards: {r.tolist()[0]}.")
     if item(r, mdp)[p] == 1.:
         winnerstr = f"Player {p + 1} ({game.mdp.symb[p]}), {'a person' if p == player_index else 'a bot'}, won."
     elif item(r, mdp)[p] == 0.:
@@ -345,4 +352,4 @@ while True:
     else:
         winnerstr = "Somehow I'm not sure who won."
     
-    print(f"\n{item(game.mdp.board_str(s), mdp, is_list=True)}\n\n{winnerstr}\n\n")
+    print(f"\n{item(game.mdp.board_str(s), mdp, is_list=True)}\n\n{winnerstr}\nTotal rewards: {total_rewards.tolist()[0]}.\n\n")
