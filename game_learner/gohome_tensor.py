@@ -18,7 +18,7 @@ def validate_int_pair(x, lower: int, upper: int) -> bool:
 
 # Simple test game of a robot trying to go home on an (n, n) grid.  The edges are cliffs and falling off is a negative reward and terminal state.
 # States: shape (n, n) tensor, with a 1 at the robot's position.
-# Actions: (4, ) tensor.  Convention: +x, -x, +y, -y
+# Actions: (, ) tensor.  Convention: +x, -x, +y, -y
 class GoHomeTensorMDP(MDP):
     def __init__(self, size: list, start = None, home = None, discount=1):
         if validate_int_pair(size, (1,1), None):

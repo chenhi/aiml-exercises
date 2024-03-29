@@ -37,10 +37,28 @@ class GoHomeMDP(MDP):
         actions = [(1,0), (-1, 0), (0, 1), (0, -1)]
         states = [(i, j) for i in range(self.size[0]) for j in range(self.size[1])]
         super().__init__(states, actions, discount)
+        self.batched = False
+        self.symb = {0: ''}
 
     def get_actions(self, s):
         return self.actions
     
+    def board_str(self, s):
+        return str(s)
+    
+    def str_to_action(self, a):
+        a = a.lower()
+        if a == 'n':
+            return (0,1)
+        elif a == 's':
+            return (0,-1)
+        elif a == 'e':
+            return (1,0)
+        elif a == 'w':
+            return (-1,0)
+        else:
+            return (0,0)
+
     def get_player(self, s):
         return 0
 
@@ -55,11 +73,28 @@ class GoHomeMDP(MDP):
         # If invalid move
         if t[0] < 0 or t[1] < 0 or t[0] >= self.size[0] or t[1] >= self.size[1]:
             return s, 0
-        return t, 1 if self.is_terminal(t) else 0
+        return t, (1,) if self.is_terminal(t) else (0,)
     
     def get_initial_state(self):
         return self.start
 
+
+def show_heatmap(q: ValueFunction, title=""):
+    output = [[0. for j in range(0, mdp.size[1])] for i in range(0, mdp.size[0])]
+    for i in range(0, mdp.size[0]):
+        for j in range(0, mdp.size[1]):
+            output[i][j] = q.val((i, j))
+    
+    heat = np.round(np.array(output), 3)
+    
+    fig, ax = plt.subplots()
+    im = ax.imshow(heat)
+    for i in range(mdp.size[0]):
+        for j in range(mdp.size[1]):
+            text = ax.text(j, i, heat[i, j],
+                        ha="center", va="center", color="w")
+    ax.set_title(title)
+    plt.show()
 
     
 # get command line options
@@ -70,7 +105,7 @@ mdp = GoHomeMDP((6,6), (0,0), home, 0.9)
 
 
 # Test: play the MDP
-if 'play' in options:
+if 'go' in options:
     s = mdp.get_initial_state()
     reward = 0
     history = [s]
@@ -102,23 +137,7 @@ if 'update' in options:
     lr = 0.5
     iter = 100000
     q.learn(get_greedy(q, exp), lr, iter)
-    output = [[0. for j in range(0, mdp.size[1])] for i in range(0, mdp.size[0])]
-    for i in range(0, mdp.size[0]):
-        for j in range(0, mdp.size[1]):
-            output[i][j] = q.val((i, j))
-    print(q.q)
-    
-    heat = np.round(np.array(output), 3)
-    print(heat)
-
-    fig, ax = plt.subplots()
-    im = ax.imshow(heat)
-    for i in range(mdp.size[0]):
-        for j in range(mdp.size[1]):
-            text = ax.text(j, i, heat[i, j],
-                        ha="center", va="center", color="w")
-    ax.set_title(f"Learning rate {lr}, Explore {exp}, Iterations {iter}")
-    plt.show()
+    show_heatmap(q, f"Learning rate {lr}, Explore {exp}, Iterations {iter}")
 
 #Test batch update, policy
 if 'batch' in options:
@@ -128,23 +147,7 @@ if 'batch' in options:
     eps = 10
     eplen = 15
     q.batch_learn(get_greedy(q, exp), lr, iter, eps, eplen)
-    output = [[0. for j in range(0, mdp.size[1])] for i in range(0, mdp.size[0])]
-    for i in range(0, mdp.size[0]):
-        for j in range(0, mdp.size[1]):
-            output[i][j] = q.val((i, j))
-    print(q.q)
-    
-    heat = np.round(np.array(output), 3)
-    print(heat)
-
-    fig, ax = plt.subplots()
-    im = ax.imshow(heat)
-    for i in range(mdp.size[0]):
-        for j in range(mdp.size[1]):
-            text = ax.text(j, i, heat[i, j],
-                        ha="center", va="center", color="w")
-    ax.set_title(f"lr {lr}, expl {exp}, its {iter}, eps {eps}, eplen {eplen}")
-    plt.show()
+    show_heatmap(q, f"lr {lr}, expl {exp}, its {iter}, eps {eps}, eplen {eplen}")
 
     pol = [[0. for j in range(0, mdp.size[1])] for i in range(0, mdp.size[0])]
     dumpol = [[0. for j in range(0, mdp.size[1])] for i in range(0, mdp.size[0])]
