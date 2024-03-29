@@ -7,3 +7,11 @@ writeups/*
 !bots/dttt
 bots/dttt/*
 !bots/dttt/20240324030517_4000its.dttt.pt
+
+!bots/ttt
+bots/ttt/*
+!/bots/ttt/20240329141412_try_optimal.ttt.pkl
+
+!bots/c4
+bots/c4/*
+!bots/c4/badbot-20240311232857.c4.pkl
