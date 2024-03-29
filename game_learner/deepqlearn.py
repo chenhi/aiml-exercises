@@ -336,7 +336,7 @@ class DQN():
     # Handling multiplayer: each player keeps their own "record", separate from memory
     # When any entry in the record has source = target, then the player "banks" it in their memory
     # The next time an action is taken, if the source = target, then it gets overwritten
-    def deep_learn(self, lr: float, dq_episodes: int, episode_length: int, ramp_start: int, ramp_end: int, greed_start: float, greed_end: float, training_delay: int, sim_batch: int, train_batch: int, copy_interval_eps=1, save_interval=500, save_path=None, verbose=False, graph_smoothing=10, debug=False):
+    def deep_learn(self, lr: float, dq_episodes: int, episode_length: int, ramp_start: int, ramp_end: int, greed_start: float, greed_end: float, training_delay: int, sim_batch: int, train_batch: int, copy_interval_eps=1, save_interval=500, save_path=None, verbose=False, graph_smoothing=10, debug=False, initial_log=""):
 
         dq_episodes, episode_length, ramp_start, ramp_end, sim_batch, train_batch, copy_interval_eps, training_delay = int(dq_episodes), int(episode_length), int(ramp_start), int(ramp_end), int(sim_batch), int(train_batch), max(1, int(copy_interval_eps)), int(training_delay)
         expl_start, expl_end = 1. - greed_start, 1. - greed_end
@@ -347,7 +347,7 @@ class DQN():
         if train_batch < 2:
             Exception("Training batch size must be greater than 1 for sampling.")
 
-        logtext = ""
+        logtext = initial_log
         if do_logging:
             logtext += log(f"Device: {self.device}", verbose)
             logtext += log(f"MDP:\n{self.mdp}", verbose)

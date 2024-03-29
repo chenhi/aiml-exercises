@@ -33,28 +33,26 @@ class GoHomeTensorMDP(MDP):
         #self.right = torch.eye(2)[0,None,None] * self.lower + torch.eye(2)[1,None,None] * self.upper
 
     def get_player(self, state: torch.Tensor) -> torch.Tensor:
-        return torch.ones(state.size(0))[:, None, None, None]
+        return torch.ones(state.size(0))[:, None, None]
     
     def get_player_vector(self, state: torch.Tensor) -> torch.Tensor:
         return self.get_player(self, state)
 
     def get_random_action(self, state):
         indices = (torch.rand(state.size(0)) * 4).int()
-        return torch.eye(4, dtype=int)[None].expand(state.size(0), -1, -1)[torch.arange(state.size(0)), indices]
+        return torch.eye(4)[None].expand(state.size(0), -1, -1)[torch.arange(state.size(0)), indices]
     
     def get_initial_state(self, batch_size=1) -> torch.Tensor:
         return self.initial_state
 
     def is_valid_action(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
-        if state.shape[0] != action.shape[0]:
-            raise Exception("Batch sizes must agree.")
-        return torch.zeros(state.shape, dtype=int) == 0
+        return (torch.zeros(state.size(0)) == 0)[: ,None, None]
     
     def transition(self, state: torch.Tensor, action: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         pass #TODO!!!
 
     def is_terminal(self, s):
-        return (s == self.home_state) | (s == torch.zeros(self.size, dtype=int))
+        return (s == self.home_state) | (s == torch.zeros(self.size))
 
     def transition(self, s, a):
         if self.is_terminal(s):

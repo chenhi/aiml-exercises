@@ -36,7 +36,8 @@ def item(obj, mdp: MDP, is_list=False):
             return obj[0].tolist()
     return obj
 
-def load_bots(qgame, saves):
+def load_bots(qgame, saves) -> str:
+    logtext = ""
     savestr = ""
     for i in range(len(saves)):
         savestr += f"[{i}] {saves[i]}\n"
@@ -47,27 +48,29 @@ def load_bots(qgame, saves):
             index = int(res[0])
             if index >= 0 and index < len(saves):
                 qgame.load_q(f'bots/{shortname}/' + saves[index])
-                print(f"Loaded {saves[index]} for all players.")
+                logtext += log(f"Loaded {saves[index]} for all players.")
             else:
                 raise Exception
         except:
             qgame.null_q()
-            print("Loaded RANDOMBOT for all players.")
+            logtext += log("Loaded RANDOMBOT for all players.")
     else:
         qgame.null_q()
         for i in range(min(len(res), game.mdp.num_players)):
             try:
                 index = int(res[i])
                 if index < 0 or index >= len(saves):
-                    print(f"{i} is not a bot on the list.  Loading RANDOMBOT as player {i}.")
+                    logtext += log(f"{i} is not a bot on the list.  Loading RANDOMBOT as player {i}.")
                 else:
                     game.load_q(f'bots/{shortname}/' + saves[index], [i])
             except:
-                print(f"Didn't understand {s}.  Loading RANDOMBOT as player {i}.")
+                logtext += log(f"Didn't understand {s}.  Loading RANDOMBOT as player {i}.")
         if len(res) > game.mdp.num_players:
-            print(f"Extra bots in the list in excess of number of players ignored.")
+            logtext += log(f"Extra bots in the list in excess of number of players ignored.")
         elif len(res) < game.mdp.num_players:
-            print(f"Loaded RANDOMBOT for unspecified bots.")
+            logtext += log(f"Loaded RANDOMBOT for unspecified bots.")
+
+    return logtext
 
 
 #==================== GAMEMODE LOGIC ====================#
@@ -155,9 +158,10 @@ prompts = {
 
 if mode == "train":
 
+    logtext = ""
     res = input("Load existing model (y/n)? ")
     if res.lower() == 'y':
-        load_bots(game, save_files)
+        logtext += load_bots(game, save_files)
     
     hpar = mdp.default_hyperparameters
 
@@ -178,7 +182,7 @@ if mode == "train":
         game.save_q(fname)
 
     if type == "dqn":
-        game.deep_learn(**hpar, verbose=True, debug=debug, save_path=fname)
+        game.deep_learn(**hpar, verbose=True, debug=debug, save_path=fname, initial_log = logtext)
 
     # Some extra stuff
     if shortname == "home":
