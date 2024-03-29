@@ -93,7 +93,7 @@ ntmdp = NoThanksTensorMDP(num_players=5)
 names = ["Tic-Tac-Toe", "Connect Four", "Deep Tic-Tac-Toe", "Deep Connect Four", "No Thanks!", "Robot Go Home"]
 shortnames = ["ttt", "c4", "dttt", "dc4", "nothanks", "home"]
 mdps = [tttmdp, c4mdp, dtttmdp, c4tmdp, ntmdp, ghmdp]
-games = [QLearn(tttmdp), QLearn(c4mdp), DQN(dtttmdp, TTTNN, torch.nn.HuberLoss(), torch.optim.Adam, 100000, device=device), DQN(c4tmdp, C4NN, torch.nn.HuberLoss(), torch.optim.Adam, 1000000, device=device), DQN(ntmdp, NoThanksNN, torch.nn.HuberLoss(), torch.optim.Adam, 0, device=device), QLearn(ghmdp)]
+games = [QLearn(tttmdp), QLearn(c4mdp), DQN(dtttmdp, TTTNN, torch.nn.HuberLoss(), torch.optim.Adam, 100000, device=device), DQN(c4tmdp, C4NN, torch.nn.HuberLoss(), torch.optim.Adam, 500000, device=device), DQN(ntmdp, NoThanksNN, torch.nn.HuberLoss(), torch.optim.Adam, 100000, device=device), QLearn(ghmdp)]
 file_exts = ['.ttt.pkl', '.c4.pkl', '.dttt.pt', '.dc4.pt', 'nt.pt', '.home.pkl']
 types = ["qlearn", "qlearn", "dqn", "dqn", 'dqn', 'qlearn']
 
@@ -306,7 +306,7 @@ if mode == "benchmark":
 while True:
     players = []
     res = input(f"Which players are human?  A comma-separated list of numbers from 1 to {mdp.num_players}, empty to watch the bots play, and 'q' to quit. ").split(',')
-    if res == 'q':
+    if res[0].lower() == 'q':
         exit()
     for r in res:
         try:
@@ -316,7 +316,7 @@ while True:
             else:
                 players.append(player_index)
         except:
-            print(f"Didn't recognize {res.strip()}.  Using bot.")
+            print(f"Didn't recognize {r.strip()}.  Using bot.")
     
     s = game.mdp.get_initial_state()
     total_rewards = torch.zeros(1, mdp.num_players)
@@ -346,7 +346,7 @@ while True:
         total_rewards += r
         print(f"Rewards: {r.tolist()[0]}.")
     if item(r, mdp)[p] == 1.:
-        winnerstr = f"Player {p + 1} ({game.mdp.symb[p]}), {'a person' if p == player_index else 'a bot'}, won."
+        winnerstr = f"Player {p + 1} ({game.mdp.symb[p]}), {'a person' if p in players else 'a bot'}, won."
     elif item(r, mdp)[p] == 0.:
         winnerstr = 'The game is a tie.'
     else:

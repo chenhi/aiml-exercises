@@ -48,9 +48,11 @@ class ExperienceReplay():
 
 
 class TensorMDP(MDP):
-    def __init__(self, state_shape, action_shape, discount=1, num_players=1, penalty = -2, num_simulations=1000, default_hyperparameters={}, symb = {}, input_str = "", batched=False):
+    def __init__(self, state_shape, action_shape, discount=1, num_players=1, penalty = -2, num_simulations=1000, default_hyperparameters={}, symb = {}, input_str = "", batched=False, nn_args={}):
         
         super().__init__(None, None, discount, num_players, penalty, symb, input_str, default_hyperparameters, batched)
+
+        self.nn_args = nn_args
 
         # Whether we filter out illegal moves in training or not
         #self.filter_illegal = filter_illegal
@@ -103,7 +105,7 @@ class NNQFunction(QFunction):
     def __init__(self, mdp: TensorMDP, q_model, loss_fn, optimizer_class: torch.optim.Optimizer, device="cpu"):
         if mdp.state_shape == None or mdp.action_shape == None:
             raise Exception("The input MDP must handle tensors.")
-        self.q, self.target_q = q_model().to(device), q_model().to(device)
+        self.q, self.target_q = q_model(**mdp.nn_args).to(device), q_model(**mdp.nn_args).to(device)
         self.q.eval()
         self.target_q.eval()
 

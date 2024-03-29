@@ -12,16 +12,29 @@ class NoThanksTensorMDP(TensorMDP):
     # First factor: -1 is "middle", others are the players
     # Second factor: 0 is current player, 1 is number of chips, and 2-34 are the cards 3-35
     # Action: no = 0, take = 1, shape (2, )
-    def __init__(self, num_players: int, device="cpu"):
+    def __init__(self, num_players: int, num_cards = 33, smallest_card = 3, num_played_cards = 24, device="cpu"):
         num_players = min(max(num_players, 3), 7)
-        self.num_cards = 33
-        self.smallest_card = 3
-        self.num_played_cards = 24
 
-        defaults = {}
-        super().__init__(state_shape=(num_players + 1, self.num_cards + 2), action_shape=(2,), discount=1, num_players=num_players, batched=True, default_hyperparameters=defaults, \
-                         symb = {0: "X", 1: "O", None: "-"}, input_str = "Type 'no' to reject the card and 'ok' to accept it. ", penalty=-1)
+        defaults = {
+            'lr': 0.00025, 
+            'greed_start': 0.0, 
+            'greed_end': 0.50, 
+            'dq_episodes': 100, 
+            'ramp_start': 25,
+            'ramp_end': 100,
+            'training_delay': 25,
+            'episode_length': 50, 
+            'sim_batch': 16, 
+            'train_batch': 64,
+            }
+        super().__init__(state_shape=(num_players + 1, num_cards + 2), action_shape=(2,), discount=1, num_players=num_players, batched=True, default_hyperparameters=defaults, \
+                         symb = {0: "X", 1: "O", None: "-"}, input_str = "Type 'no' to reject the card and 'ok' to accept it. ", penalty=-1, nn_args={'num_players': num_players, 'num_cards': num_cards})
         self.device = device
+
+
+        self.num_cards = num_cards
+        self.smallest_card = smallest_card
+        self.num_played_cards = num_played_cards
 
         self.start_chips = NoThanksTensorMDP.start_chips_table[num_players]
 
@@ -117,7 +130,7 @@ class NoThanksTensorMDP(TensorMDP):
         filter = (state.sum(1) == 0.).float()
         while (filter.count_nonzero(dim=1) <= 1).prod().item() != 1:                             # Almost always terminates after one step
             temp = torch.rand((state.size(0), self.num_cards + 2), device=self.device) * filter
-            filter = (temp == temp.max(1).values).float()
+            filter = (temp == temp.max(1).values[:,None]).float()
             max_tries -= 1
             if max_tries == 0:
                 break
@@ -141,9 +154,9 @@ class NoThanksTensorMDP(TensorMDP):
     # Here, players only gain rewards on their turns
     def transition(self, state, action):
         # Zero out actions for terminal states
-        action *= (self.is_terminal(state) == False)
-
+        action *= (self.is_terminal(state) == False)[:,:,0]
         reward = torch.zeros((state.size(0), self.num_players))
+
         # Those who say no thanks, remove a token (only people with tokens can take actions)
         state[:,0:-1,1] -= (action[:,0] == 1.)[:,None] * (state[:,0:-1,0] == 1.).float()
         # Put a token in the middle
@@ -174,63 +187,52 @@ class NoThanksTensorMDP(TensorMDP):
         # Advance to the next player (doesn't matter if the state is terminal)
         state = self.next_player(state)
 
+        # Take the players with no chips and give them the "take" action
+        tail_action = self.has_no_chips(state)[:,0] * torch.tensor([0.,1.])
+        if torch.sum(tail_action[:,1]).item() != 0:
+            state, extra_reward = self.transition(state, tail_action)
+            reward += extra_reward
+
         return state, reward
     
     # Output shape (batch, 1, 1)
-    def has_tokens(self, state):
+    def has_no_chips(self, state):
         return (state[torch.arange(state.size(0)), self.get_player(state)[:,0,0].int(), 1] == 0)[:,None,None]
 
     def num_cards_out(self, state):
         return state[:,:,2:].sum((1,2))[:,None,None]
-
-    def is_winner(self, state, player):
-        s = state[torch.arange(state.size(0), device=self.device), player[:,0,0,0]]
-        return ((s.sum(1) == 3).sum(1) + (s.sum(2) == 3).sum(1) + (s[:,0,0] + s[:,1,1] + s[:,2,2] == 3) + (s[:,0,2] + s[:,1,1] + s[:,2,0] == 3) > 0)[:,None,None,None]
 
     def get_random_state(self):
         return self.get_initial_state()
 
     # Indicate a terminal state by having no card in the center
     def is_terminal(self, state: torch.Tensor) -> torch.Tensor:
-        return state.sum(2)[:,-1] == 0.
+        return state.sum(2)[:,-1:,None] == 0.
 
 
 
 
 # Input shape (batch, )
 class NoThanksNN(nn.Module):
-    def __init__(self):
+    def __init__(self, num_players: int, num_cards: int):
         super().__init__()
+        self.num_players = num_players
+        self.num_cards = num_cards
         self.stack = nn.Sequential(
-            nn.Conv2d(2, 32, (5,5), padding='same'),
+            nn.Conv1d(num_players + 1, num_players * 16, 3, padding='same'),
             nn.LeakyReLU(),
-            nn.BatchNorm2d(32),
-            nn.Conv2d(32, 32, (3,3), padding='same'),
-            nn.LeakyReLU(),
-            nn.BatchNorm2d(32),
-            nn.Conv2d(32, 16, (3,3), padding='same'),
-            nn.LeakyReLU(),
-            nn.BatchNorm2d(16),
-            nn.Conv2d(16, 16, (3,3), padding='same'),
-            nn.LeakyReLU(),
-            nn.BatchNorm2d(16),
+            nn.BatchNorm1d(num_players * 16),
             nn.Flatten(),
-            nn.Linear(16*7*6, 8*7*6),
+            nn.Linear(num_players * 16 * (num_cards + 2), num_players * 16 * (num_cards + 2)),
             nn.LeakyReLU(),
-            nn.BatchNorm1d(8*7*6),
-            nn.Linear(8*7*6, 4*7*6),
+            nn.BatchNorm1d(num_players * 16 * (num_cards + 2)),
+            nn.Linear(num_players * 16 * (num_cards + 2), num_players * 4 * (num_cards + 2)),
             nn.LeakyReLU(),
-            nn.BatchNorm1d(4*7*6),
-            nn.Linear(4*7*6, 2*7*6),
+            nn.BatchNorm1d(num_players * 4 * (num_cards + 2)),
+            nn.Linear(num_players * 4 * (num_cards + 2), num_players * (num_cards + 2)),
             nn.LeakyReLU(),
-            nn.BatchNorm1d(2*7*6),
-            nn.Linear(2*7*6, 7*6),
-            nn.LeakyReLU(),
-            nn.BatchNorm1d(7*6),
-            nn.Linear(7*6, 7*3),
-            nn.LeakyReLU(),
-            nn.BatchNorm1d(7*3),
-            nn.Linear(7*3, 2)
+            nn.BatchNorm1d(num_players * (num_cards + 2)),
+            nn.Linear(num_players * (num_cards + 2), 2)
         )
 
     def forward(self, x):
@@ -267,6 +269,9 @@ if "test" in options:
     print(s)
     print(mdp.get_current_player_cards(s))
     print(torch.tensordot(mdp.get_current_player_cards(s), mdp.down_card, ([1],[0])))
+
+    s = mdp.get_initial_state(2)
+    print(s)
 
     # state = s
     # action = mdp.str_to_action('n')
