@@ -19,6 +19,13 @@ def validate_int_pair(x, lower: int, upper: int) -> bool:
 
 class GoHomeMDP(MDP):
     def __init__(self, size: list, start = None, home = None, discount=1):
+        hyperpar = {
+            'lr': 0.1,
+            'expl': 0.5,
+            'iterations': 100,
+            'q_episodes': 64,
+            'episode_length': 1000
+        }
         if validate_int_pair(size, (1,1), None):
             self.size = size
         else:
@@ -36,9 +43,7 @@ class GoHomeMDP(MDP):
 
         actions = [(1,0), (-1, 0), (0, 1), (0, -1)]
         states = [(i, j) for i in range(self.size[0]) for j in range(self.size[1])]
-        super().__init__(states, actions, discount)
-        self.batched = False
-        self.symb = {0: ''}
+        super().__init__(states, actions, discount, num_players=1, default_hyperparameters=hyperpar, symb = {0: ''}, input_str="Input cardinal direction NESW: ")
 
     def get_actions(self, s):
         return self.actions
@@ -72,7 +77,7 @@ class GoHomeMDP(MDP):
         t = (s[0] + a[0], s[1] + a[1])
         # If invalid move
         if t[0] < 0 or t[1] < 0 or t[0] >= self.size[0] or t[1] >= self.size[1]:
-            return s, 0
+            return s, (0,)
         return t, (1,) if self.is_terminal(t) else (0,)
     
     def get_initial_state(self):

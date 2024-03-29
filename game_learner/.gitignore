@@ -3,3 +3,7 @@ bots/*
 temp*
 logs/*
 writeups/*
+
+!bots/dttt
+bots/dttt/*
+!bots/dttt/20240324030517_4000its.dttt.pt

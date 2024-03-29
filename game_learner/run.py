@@ -2,7 +2,7 @@ from connectfour import C4MDP
 from tictactoe import TTTMDP
 from connectfour_tensor import C4TensorMDP, C4NN
 from tictactoe_tensor import TTTTensorMDP, TTTNN
-from gohome import GoHomeMDP
+from gohome import GoHomeMDP, show_heatmap
 from qlearn import *
 from deepqlearn import *
 import os, datetime, re, sys, torch
@@ -179,6 +179,10 @@ if mode == "train":
 
     if type == "dqn":
         game.deep_learn(**hpar, verbose=True, debug=debug, save_path=fname)
+
+    # Some extra stuff
+    if shortname == "home":
+        show_heatmap(game.qs[0], "")
 
 
 
