@@ -15,3 +15,7 @@ bots/ttt/*
 !bots/c4
 bots/c4/*
 !bots/c4/badbot-20240311232857.c4.pkl
+
+!bots/dc4
+bots/dc4/*
+!/bots/dc4/20240329000901_continue_mll.dc4.pt
