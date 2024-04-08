@@ -1,7 +1,7 @@
 from connectfour import C4MDP
 from tictactoe import TTTMDP
-from connectfour_tensor import C4TensorMDP, C4NN
-from tictactoe_tensor import TTTTensorMDP, TTTNN
+from connectfour_tensor import C4TensorMDP, C4NN, C4ResNN
+from tictactoe_tensor import TTTTensorMDP, TTTNN, TTTResNN
 from nothanks_tensor import NoThanksTensorMDP, NoThanksNN
 from gohome import GoHomeMDP, show_heatmap
 from qlearn import *
@@ -85,17 +85,18 @@ if len(sys.argv) > 2:
 
 tttmdp = TTTMDP()
 c4mdp = C4MDP()
-c4tmdp = C4TensorMDP()
+c4tmdp = C4TensorMDP(device=device)
 dtttmdp = TTTTensorMDP(device=device)
 ghmdp = GoHomeMDP((6,6), (0,0), (3,3), 0.9)
-ntmdp = NoThanksTensorMDP(num_players=5)
+ntmdp = NoThanksTensorMDP(num_players=5, device=device)
 
 names = ["Tic-Tac-Toe", "Connect Four", "Deep Tic-Tac-Toe", "Deep Connect Four", "No Thanks!", "Robot Go Home"]
 shortnames = ["ttt", "c4", "dttt", "dc4", "nothanks", "home"]
 mdps = [tttmdp, c4mdp, dtttmdp, c4tmdp, ntmdp, ghmdp]
-games = [QLearn(tttmdp), QLearn(c4mdp), DQN(dtttmdp, TTTNN, torch.nn.HuberLoss(), torch.optim.Adam, 100000, device=device), DQN(c4tmdp, C4NN, torch.nn.HuberLoss(), torch.optim.Adam, 500000, device=device), DQN(ntmdp, NoThanksNN, torch.nn.HuberLoss(), torch.optim.Adam, 100000, device=device), QLearn(ghmdp)]
 file_exts = ['.ttt.pkl', '.c4.pkl', '.dttt.pt', '.dc4.pt', 'nt.pt', '.home.pkl']
 types = ["qlearn", "qlearn", "dqn", "dqn", 'dqn', 'qlearn']
+nnarchss = [None, None, [TTTNN, TTTResNN], [C4NN, C4ResNN], [NoThanksNN], None]
+nnargss = [None, None, [{}, {'num_hiddens': 3, 'hidden_depth': 2, 'hidden_width': 32}], [{}, {'num_hidden_conv': 5, 'hidden_conv_depth': 2, 'hidden_conv_layers': 32, 'num_hidden_linear': 3, 'hidden_linear_depth': 2, 'hidden_linear_width': 16}], [{}], None]
 
 
 # If the game was specified, choose it
@@ -113,10 +114,11 @@ try:
     game_index = int(res)
     name = names[game_index]
     mdp = mdps[game_index]
-    game = games[game_index]
     file_ext = file_exts[game_index]
     shortname = shortnames[game_index]
     type = types[game_index]
+    nnarchs = nnarchss[game_index]
+    nnargs = nnargss[game_index]
 except:
     games_str = ""
     for i in range(len(names)):
@@ -137,7 +139,6 @@ save_files.sort()
 
 #==================== BOT TRAINING ====================#
 
-debug = True if 'debug' in sys.argv else False
 
 prompts = {
     'lr': 'Learn rate in [0, 1]',
@@ -153,24 +154,78 @@ prompts = {
     'sim_batch': 'The size of each simulation batch',
     'train_batch': 'The size of each training batch',
     'copy_interval_eps': 'Interval between copying policy to target in episodes',
-    'training_delay': 'What episode to start training'
-}
+    'training_delay': 'What episode to start training',
+    'num_hiddens': 'Number of residual layers', 
+    'hidden_depth': 'Linear layers per residual layer', 
+    'hidden_width': 'Dimension of each residual layer divided by 18',
+    'num_hidden_conv': 'Number of hidden convolutional residual layers',
+    'hidden_conv_depth': 'Number of convolutional layers in each residual layer',
+    'hidden_conv_layers': 'Number of layers in each convolutional layer',
+    'num_hidden_linear': 'Number of hidden linear residual layers',
+    'hidden_linear_depth': 'Number of linear layers in each residual layer',
+    'hidden_linear_width': 'Width of each linear layer',
+    }
 
 # Train AI
 
 if mode == "train":
 
     logtext = ""
-    res = input("Load existing model (y/n)? ")
-    if res.lower() == 'y':
-        logtext += load_bots(game, save_files)
-    
-    hpar = mdp.default_hyperparameters
 
     res = input("Name of file (alphanumeric only, max length 64, w/o extension): ")
     fname_end = f"{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}_" + re.sub(r'\W+', '', res)[0:64] + f"{file_ext}"
     fname = f'bots/{shortname}/' + fname_end
+
+    print(f"Will save model to {fname}\n")
+
+    if type == "dqn":
+        res = input(f"Replay memory size (default: {mdp.default_memory}): ")
+        try:
+            memory = int(res)
+            if memory < 0:
+                raise Exception
+            print(f"Set replay memory to {memory}.")
+        except:
+            memory = mdp.default_memory
+            print(f"Did not understand.  Setting replay memory to default {memory}.")
+
+
+        res = input("Load existing model (y/n)? ")
+        if res.lower() == 'y':
+            game = DQN(mdp, nn.Module, torch.nn.HuberLoss(), torch.optim.Adam, memory, device=device)
+            logtext += load_bots(game, save_files)
+        else:
+            print("No model pre-loaded.")
+            if len(nnarchs) == 0:
+                print("No available neural network architectures to train on.  Aborting.")
+                exit()
+            print("Available neural network architectures:")
+            for i in range(len(nnarchs)):
+                print(f"[{i}] {nnarchs[i]}")
+            res = input("Select archtecture (default is [0]): ")
+            try:
+                arch_index = int(res)
+                print(f"Choosing {nnarchs[arch_index]}.")
+                model = nnarchs[arch_index]
+            except:
+                print(f"Didn't understand, choosing default {nnarchs[0]}.")
+                arch_index = 0
+                model = nnarchs[arch_index]
+            model_args = nnargs[arch_index]
+                
+            for k, v in nnargs[arch_index].items():
+                res = input(f"{prompts[k] if k in prompts else k} (default {v}): ")
+                try:
+                    model_args[k] = int(res)
+                except:
+                    print(f"Not a valid value.  Setting {k} to {v}.")
+
+            game = DQN(mdp, model, torch.nn.HuberLoss(), torch.optim.Adam, memory_capacity=memory, model_args=model_args, device=device)
+    else:
+        game = QLearn(mdp)
     
+
+    hpar = mdp.default_hyperparameters
     for k, v in hpar.items():
         res = input(f"{prompts[k] if k in prompts else k} (default {v}): ")
         try:
@@ -184,7 +239,7 @@ if mode == "train":
         game.save_q(fname)
 
     if type == "dqn":
-        game.deep_learn(**hpar, verbose=True, debug=debug, save_path=fname, initial_log = logtext)
+        game.deep_q(**hpar, verbose=True, save_path=fname, initial_log = logtext)
 
     # Some extra stuff
     if shortname == "home":
@@ -265,6 +320,7 @@ if mode == "tournament":
 #==================== BOT SELECTION ====================#
 
 if mode == "play":
+    game = DQN(mdp, nn.Module, torch.nn.HuberLoss(), torch.optim.Adam, 0, device=device)
     load_bots(game, save_files)
     
 #==================== BENCHMARK AGAINST RANDOM ====================#
@@ -279,6 +335,7 @@ if mode == "benchmark":
         do_all = False
 
     if do_all == False:
+        game = DQN(mdp, nn.Module, torch.nn.HuberLoss(), torch.optim.Adam, 0, device=device)
         load_bots(game, save_files)
         replay = True if input("Enter 'y' to replay losses: ").lower() == 'y' else False
         game.simulate_against_random(sims, replay_loss=replay, verbose=True)
@@ -345,6 +402,7 @@ while True:
                 s, r = game.mdp.transition(s, a)
         total_rewards += r
         print(f"Rewards: {r.tolist()[0]}.")
+        print(f"Aggregate rewards: {total_rewards.tolist()[0]}.")
     if item(r, mdp)[p] == 1.:
         winnerstr = f"Player {p + 1} ({game.mdp.symb[p]}), {'a person' if p in players else 'a bot'}, won."
     elif item(r, mdp)[p] == 0.:

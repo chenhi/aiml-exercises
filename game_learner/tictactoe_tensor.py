@@ -90,16 +90,16 @@ class TTTTensorMDP(TensorMDP):
             'lr': 0.00025, 
             'greed_start': 0.0, 
             'greed_end': 0.60, 
-            'dq_episodes': 1000, 
-            'ramp_start': 25,
-            'ramp_end': 650,
-            'training_delay': 25,
+            'dq_episodes': 800, 
+            'ramp_start': 20,
+            'ramp_end': 500,
+            'training_delay': 20,
             'episode_length': 15, 
             'sim_batch': 128, 
-            'train_batch': 1024,
+            'train_batch': 256,
             }
-        super().__init__(state_shape=(2,3,3), action_shape=(3,3), discount=1, num_players=2, batched=True, default_hyperparameters=defaults6, \
-                         symb = {0: "X", 1: "O", None: "-"}, input_str = "Input position to play, e.g. '1, 3' for the 1st row and 3rd column: ", penalty=-1)
+        super().__init__(state_shape=(2,3,3), action_shape=(3,3), default_memory=100000, discount=1, num_players=2, batched=True, default_hyperparameters=defaults7, \
+                         symb = {0: "X", 1: "O", None: "-"}, input_str = "Input position to play, e.g. '1, 3' for the 1st row and 3rd column: ", penalty=-1, num_simulations=10000)
         self.device = device
         
     def __str__(self):
@@ -208,7 +208,6 @@ class TTTTensorMDP(TensorMDP):
     def is_full(self, state: torch.Tensor) -> torch.Tensor:
         return (abs(state.sum((1,2,3))) == 9)[:, None, None, None]
     
-
     ##### TESTING FUNCTIONS #####
 
     def orbit(self, y: torch.Tensor) -> torch.Tensor:
@@ -217,6 +216,10 @@ class TTTTensorMDP(TensorMDP):
 
     def tests(self, qs: list[PrototypeQFunction]):
         
+        # Vs. random test
+        
+
+
         # Test 0: the AI is playing as player 0 (first player, X).  We are interested in the 8 boards in the orbit of the first board:
         # XO.    +O.    +OO
         # +X.    XXO    -X-
@@ -282,11 +285,11 @@ class TTTTensorMDP(TensorMDP):
 class TTTNN(nn.Module):
 
 
-    def __init__(self):
+    def __init__(self, layers=32, num_hidden=3):
         super().__init__()
         self.stack = {}
 
-        # self.verybig = nn.Sequential(
+        # self.stack = nn.Sequential(
         #     nn.Conv2d(2, 32, (3,3), padding='same'),
         #     nn.LeakyReLU(),
         #     nn.Conv2d(32, 64, (3,3), padding='same'),
@@ -299,7 +302,7 @@ class TTTNN(nn.Module):
         # )
 
 
-        # self.medium= nn.Sequential(
+        # self.stack= nn.Sequential(
         #     nn.Conv2d(2, 32, (3,3), padding='same'),
         #     nn.LeakyReLU(),
         #     nn.Conv2d(32, 64, (3,3), padding='same'),
@@ -312,29 +315,91 @@ class TTTNN(nn.Module):
         # )
 
         # Narrow
-        self.stack = nn.Sequential(
-            nn.Conv2d(2, 32, (3,3), padding='same'),
-            nn.LeakyReLU(),
-            nn.BatchNorm2d(32),
-            nn.Conv2d(32, 32, (3,3), padding='same'),
-            nn.LeakyReLU(),
-            nn.BatchNorm2d(32),
-            nn.Conv2d(32, 32, (3,3), padding='same'),
-            nn.LeakyReLU(),
-            nn.BatchNorm2d(32),
-            nn.Conv2d(32, 8, (3,3), padding='same'),
-            nn.LeakyReLU(),
-            nn.BatchNorm2d(8),
-            nn.Conv2d(8, 1, (3,3), padding='same'),
-        )
+        # self.stack = nn.Sequential(
+        #     nn.Conv2d(2, 32, (3,3), padding='same'),
+        #     nn.LeakyReLU(),
+        #     nn.BatchNorm2d(32),
+        #     nn.Conv2d(32, 32, (3,3), padding='same'),
+        #     nn.LeakyReLU(),
+        #     nn.BatchNorm2d(32),
+        #     nn.Conv2d(32, 32, (3,3), padding='same'),
+        #     nn.LeakyReLU(),
+        #     nn.BatchNorm2d(32),
+        #     nn.Conv2d(32, 8, (3,3), padding='same'),
+        #     nn.LeakyReLU(),
+        #     nn.BatchNorm2d(8),
+        #     nn.Conv2d(8, 1, (3,3), padding='same'),
+        # )
 
-
-
+        # Deeper
+        # self.stack = nn.Sequential(
+        #     nn.Conv2d(2, 32, (3,3), padding='same'),
+        #     nn.LeakyReLU(),
+        #     nn.BatchNorm2d(32),
+        #     nn.Conv2d(32, 32, (3,3), padding='same'),
+        #     nn.LeakyReLU(),
+        #     nn.BatchNorm2d(32),
+        #     nn.Conv2d(32, 32, (3,3), padding='same'),
+        #     nn.LeakyReLU(),
+        #     nn.BatchNorm2d(32),
+        #     nn.Conv2d(32, 32, (3,3), padding='same'),
+        #     nn.LeakyReLU(),
+        #     nn.BatchNorm2d(32),
+        #     nn.Conv2d(32, 32, (3,3), padding='same'),
+        #     nn.LeakyReLU(),
+        #     nn.BatchNorm2d(32),
+        #     nn.Conv2d(32, 8, (3,3), padding='same'),
+        #     nn.LeakyReLU(),
+        #     nn.BatchNorm2d(8),
+        #     nn.Conv2d(8, 1, (3,3), padding='same'),
+        # )
     
+
+        # Tests
+        self.stack = nn.Sequential(
+            nn.Conv2d(2, layers, (3,3), padding='same'),
+            nn.LeakyReLU(),
+            nn.BatchNorm2d(layers),
+            )
+        for i in range(num_hidden):
+            self.stack.append(nn.Conv2d(layers, layers, (3,3), padding='same'))
+            self.stack.append(nn.LeakyReLU())
+            self.stack.append(nn.BatchNorm2d(layers))
+        self.stack.append(nn.Conv2d(layers, 1, (3,3), padding='same'))
+
+
     # Output of the stack is shape (batch, 1, 3, 3), so we do a simple reshaping.
     def forward(self, x):
         return self.stack(x)[:,0]
 
+
+class TTTResNN(nn.Module):
+    def __init__(self, num_hiddens = 3, hidden_depth=2, hidden_width = 32):
+        super().__init__()
+        self.head_stack = nn.Sequential(
+            nn.Conv2d(2, hidden_width, (3,3), padding='same'),
+            nn.BatchNorm2d(hidden_width),
+            nn.ReLU(),
+        )
+        hlays = []
+        for i in range(num_hiddens):
+            lay = nn.Sequential(nn.Conv2d(hidden_width, hidden_width, (3,3), padding='same'))
+            for j in range(hidden_depth-1):
+                lay.append(nn.BatchNorm2d(hidden_width))
+                lay.append(nn.ReLU())
+                lay.append(nn.Conv2d(hidden_width, hidden_width, (3,3), padding='same'))
+            lay.append(nn.BatchNorm2d(hidden_width))
+            hlays.append(lay)
+        
+        self.hidden_layers = nn.ModuleList(hlays)
+        self.tail = nn.Conv2d(hidden_width, 1, (3,3), padding='same')
+        self.relu = nn.ReLU()                                               # This is necessary for saving?
+
+    def forward(self, x):
+        x = self.head_stack(x)
+        for h in self.hidden_layers:
+            x = self.relu(h(x) + x)
+        return self.tail(x)[:,0]
 
 
 

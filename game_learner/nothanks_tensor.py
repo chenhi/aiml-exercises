@@ -27,8 +27,8 @@ class NoThanksTensorMDP(TensorMDP):
             'sim_batch': 16, 
             'train_batch': 64,
             }
-        super().__init__(state_shape=(num_players + 1, num_cards + 2), action_shape=(2,), discount=1, num_players=num_players, batched=True, default_hyperparameters=defaults, \
-                         symb = {0: "X", 1: "O", None: "-"}, input_str = "Type 'no' to reject the card and 'ok' to accept it. ", penalty=-1, nn_args={'num_players': num_players, 'num_cards': num_cards})
+        super().__init__(state_shape=(num_players + 1, num_cards + 2), action_shape=(2,), default_memory=1000000, discount=1, num_players=num_players, batched=True, default_hyperparameters=defaults, \
+                         symb = {0: "X", 1: "O", None: "-"}, input_str = "Type 'no' to reject the card and 'ok' to accept it. ", penalty=-1, nn_args={'num_players': num_players, 'num_cards': num_cards}, num_simulations=100)
         self.device = device
 
 

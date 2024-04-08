@@ -6,7 +6,7 @@ writeups/*
 
 !bots/dttt
 bots/dttt/*
-!bots/dttt/20240324030517_4000its.dttt.pt
+!bots/dttt/20240330180235_standard_defaults6_penalty1.dttt.pt
 
 !bots/ttt
 bots/ttt/*

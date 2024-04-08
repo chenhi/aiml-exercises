@@ -24,10 +24,10 @@ def shift(x: torch.Tensor, shift: int, axis: int, device="cpu") -> torch.Tensor:
     zero_shape = list(x.shape)
     if shift > 0:
         zero_shape[axis] = shift
-        return torch.cat((torch.zeros(zero_shape, device=device), torch.index_select(x, axis, torch.arange(0, x.shape[axis] - shift))), axis)
+        return torch.cat((torch.zeros(zero_shape, device=device), torch.index_select(x, axis, torch.arange(0, x.shape[axis] - shift, device=device))), axis)
     else:
         zero_shape[axis] = -shift
-        return torch.cat((torch.index_select(x, axis, torch.arange(-shift, x.shape[axis])), torch.zeros(zero_shape, device=device)), axis)
+        return torch.cat((torch.index_select(x, axis, torch.arange(-shift, x.shape[axis], device=device)), torch.zeros(zero_shape, device=device)), axis)
 
 
 
@@ -39,19 +39,19 @@ class C4TensorMDP(TensorMDP):
 
     def __init__(self, device="cpu"):
         hyperpar = {
-            'lr': 0.000005, 
+            'lr': 0.00025, 
             'greed_start': 0.0, 
             'greed_end': 0.6,
             'dq_episodes': 3000, 
-            'ramp_start': 500,
-            'ramp_end': 2900,
-            'training_delay': 500,
+            'ramp_start': 100,
+            'ramp_end': 1900,
+            'training_delay': 100,
             'episode_length': 50, 
-            'sim_batch': 32, 
+            'sim_batch': 128, 
             'train_batch': 256, 
-            'copy_interval_eps': 1
+            'copy_interval_eps': 5
             }
-        super().__init__(state_shape=(2,6,7), action_shape=(7,), discount=1, num_players=2, batched=True, default_hyperparameters=hyperpar, \
+        super().__init__(state_shape=(2,6,7), action_shape=(7,), discount=1, num_players=2, batched=True, default_memory = 1000000, default_hyperparameters=hyperpar, \
                          symb = {0: "O", 1: "X", None: "-"}, input_str = "Input column to play (1-7). ", penalty=-2)
         self.device=device
         
@@ -302,6 +302,58 @@ class C4TensorMDP(TensorMDP):
 
 
     
+
+class C4ResNN(nn.Module):
+    def __init__(self, num_hidden_conv = 5, hidden_conv_depth=2, hidden_conv_layers = 32, num_hidden_linear = 3, hidden_linear_depth=2, hidden_linear_width=16):
+        super().__init__()
+        self.head_stack = nn.Sequential(
+            nn.Conv2d(2, hidden_conv_layers, (3,3), padding='same'),
+            nn.BatchNorm2d(hidden_conv_layers),
+            nn.ReLU(),
+        )
+        hlays = []
+        for i in range(num_hidden_conv - 1):
+            lay = nn.Sequential(nn.Conv2d(hidden_conv_layers, hidden_conv_layers, (5,5), padding='same'))
+            for j in range(hidden_conv_depth):
+                lay.append(nn.BatchNorm2d(hidden_conv_layers))
+                lay.append(nn.ReLU())
+                lay.append(nn.Conv2d(hidden_conv_layers, hidden_conv_layers, (5,5), padding='same'))
+            lay.append(nn.BatchNorm2d(hidden_conv_layers))
+            hlays.append(lay)
+        
+        self.hidden_conv_layers = nn.ModuleList(hlays)
+
+        self.conv_to_linear = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(hidden_conv_layers * 7 * 6, hidden_linear_width * 7 * 6)
+        )
+
+        hlays = []
+        for i in range(num_hidden_linear):
+            lay = nn.Sequential(nn.Linear(hidden_linear_width * 42, hidden_linear_width * 42))
+            for j in range(hidden_linear_depth - 1):
+                lay.append(nn.BatchNorm1d(hidden_linear_width*42))
+                lay.append(nn.ReLU())
+                lay.append(nn.Linear(hidden_linear_width * 42, hidden_linear_width * 42))
+            lay.append(nn.BatchNorm1d(hidden_linear_width * 42))
+            hlays.append(lay)
+        
+        self.hidden_linear_layers = nn.ModuleList(hlays)
+
+
+        self.tail = nn.Sequential(
+                nn.Linear(hidden_linear_width * 42, 7)    
+        )
+        self.relu = nn.ReLU()                                               # This is necessary for saving?
+
+    def forward(self, x):
+        x = self.head_stack(x)
+        for h in self.hidden_conv_layers:
+            x = self.relu(h(x) + x)
+        x = self.conv_to_linear(x)
+        for h in self.hidden_linear_layers:
+            x = self.relu(h(x) + x)
+        return self.tail(x)
     
 
 

@@ -1,4 +1,4 @@
-import zipfile, os, random, warnings, datetime
+import zipfile, os, random, warnings, datetime, copy, math
 import torch
 from torch import nn
 from collections import namedtuple, deque
@@ -48,11 +48,11 @@ class ExperienceReplay():
 
 
 class TensorMDP(MDP):
-    def __init__(self, state_shape, action_shape, discount=1, num_players=1, penalty = -2, num_simulations=1000, default_hyperparameters={}, symb = {}, input_str = "", batched=False, nn_args={}):
+    def __init__(self, state_shape, action_shape, default_memory: int, discount=1, num_players=1, penalty = -2, num_simulations=1000, default_hyperparameters={}, symb = {}, nn_args={}, input_str = "", batched=False):
         
         super().__init__(None, None, discount, num_players, penalty, symb, input_str, default_hyperparameters, batched)
-
         self.nn_args = nn_args
+        self.default_memory = default_memory
 
         # Whether we filter out illegal moves in training or not
         #self.filter_illegal = filter_illegal
@@ -79,10 +79,11 @@ class TensorMDP(MDP):
         raise NotImplementedError
     
     def get_random_action(self, state, max_tries=100) -> torch.Tensor:
-        filter = self.valid_action_filter(state).float()
+        return self.get_random_action_from_filter(self.valid_action_filter(state).float())
+    
+    def get_random_action_from_filter(self, filter, max_tries=100) -> torch.Tensor:
         while (filter.flatten(1,-1).count_nonzero(dim=1) <= 1).prod().item() != 1:                             # Almost always terminates after one step
-            temp = torch.rand((state.size(0),) + self.action_shape, device=self.device) * filter
-            #filter = temp == temp.max()
+            temp = torch.rand((filter.size(0),) + self.action_shape, device=self.device) * filter
             filter = (temp == temp.flatten(1,-1).max(1).values.reshape((-1,) + self.action_projshape)).float()
             max_tries -= 1
             if max_tries == 0:
@@ -93,34 +94,39 @@ class TensorMDP(MDP):
     def is_valid_action(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
         return (self.valid_action_filter(state) * action).flatten(1,-1).sum(1, keepdim=True).reshape((-1,) + self.state_projshape) == 1.
 
-    
-
-
     def tests(self, qs: list[PrototypeQFunction]):
         return []
         
+    # Not batched
+    def state_to_hashable(self, state: torch.Tensor):
+        return tuple(state.flatten().tolist())
+    
+    def hashable_to_state(self, state):
+        return torch.tensor(state).reshape(self.state_shape)
+    
+    def action_to_hashable(self, action: torch.Tensor):
+        return tuple(action.flatten().tolist())
+    
+    def hashable_to_action(self, action):
+        return torch.tensor(action).reshape(self.action_shape)
+    
+
+
 
 # A Q-function where the inputs and outputs are all tensors
 class NNQFunction(QFunction):
-    def __init__(self, mdp: TensorMDP, q_model, loss_fn, optimizer_class: torch.optim.Optimizer, device="cpu"):
+    def __init__(self, mdp: TensorMDP, q_model, model_args={}, device="cpu"):
         if mdp.state_shape == None or mdp.action_shape == None:
             raise Exception("The input MDP must handle tensors.")
-        self.q, self.target_q = q_model(**mdp.nn_args).to(device), q_model(**mdp.nn_args).to(device)
+        self.q = q_model(**model_args, **mdp.nn_args).to(device)
         self.q.eval()
-        self.target_q.eval()
-
+        
         self.mdp = mdp
-        self.loss_fn = loss_fn
-        self.optimizer = optimizer_class
         self.device=device
 
     # Make the Q function perform randomly.
     def lobotomize(self):
         self.q = None
-
-    # Copy the weights of one NN to another
-    def copy_policy_to_target(self):
-        self.target_q.load_state_dict(self.q.state_dict())
 
     # If input action = None, then return the entire vector of action values of shape (batch, ) + action_shape
     # Otherwise, output shape (batch, )
@@ -130,6 +136,7 @@ class NNQFunction(QFunction):
         else:
             self.q.eval()
             pred = self.q(state)
+        
         if action == None:
             return pred
         else:
@@ -138,11 +145,11 @@ class NNQFunction(QFunction):
 
     # Input is a tensor of shape (batches, ) + state.shape
     # Output is a tensor of shape (batches, )
-    def val(self, state, target=False) -> torch.Tensor:
-        q = self.target_q if target else self.q
-        if q == None:
+    def val(self, state) -> torch.Tensor:
+        if self.q == None:
             return torch.zeros(state.size(0))
-        return q(state).flatten(1, -1).max(1).values * ~torch.flatten(self.mdp.is_terminal(state))
+        self.q.eval()
+        return self.q(state).flatten(1, -1).max(1).values * ~torch.flatten(self.mdp.is_terminal(state))
     
     # Input is a batch of state vectors
     # Returns the value of an optimal policy at a given state, shape (batches, ) + action_shape
@@ -162,19 +169,22 @@ class NNQFunction(QFunction):
 
     # Does a Q-update based on some observed set of data
     # TransitionData entries are tensors
-    def update(self, data: TransitionData, learn_rate):
+    def update(self, data: TransitionData, learn_rate, optimizer_class: torch.optim.Optimizer, loss_fn, target_q=None, ):
         if not isinstance(self.q, nn.Module):
             Exception("NNQFunction needs to have a class extending nn.Module.")
 
         if self.q == None:
             return
 
+        if target_q == None:
+            target_q = self
+
         self.q.train()
-        self.target_q.eval()
-        opt = self.optimizer(self.q.parameters(), lr=learn_rate)
+        opt = optimizer_class(self.q.parameters(), lr=learn_rate)
         pred = self.get(data.s, data.a)
-        y = data.r + self.val(data.t, target=True)
-        loss = self.loss_fn(pred, y)
+        y = data.r + target_q.val(data.t)
+        self.q.train()
+        loss = loss_fn(pred, y)
 
         # Optimize
         loss.backward()
@@ -196,16 +206,124 @@ def greedy_tensor(q: NNQFunction, state, eps = 0.):
     return q.mdp.get_random_action(state) if random.random() < eps else q.policy(state)
 
 
+
+
+
+
+
+
+
+class DeepRL():
+    def __init__(self, mdp: TensorMDP, model: nn.Module, loss_fn, optimizer, model_args = {}, device="cpu"):
+        # An mdp that encodes the rules of the game.  The current player is part of the state, which is of the form (current player, actual state)
+        self.mdp = mdp
+        self.device = device
+        self.loss_fn = loss_fn
+        self.optimizer = optimizer
+        
+    def save(self, fname):
+        raise NotImplementedError     
+
+    def load(self, fname, indices=None):
+        raise NotImplementedError
+    
+    def null(self, indices = None):
+        raise NotImplementedError
+
+    
+    def stepthru_game(self):
+        s = self.mdp.get_initial_state()
+        print(f"Initial state:\n{self.mdp.board_str(s)[0]}")
+        turn = 0
+        while self.mdp.is_terminal(s) == False:
+            turn += 1
+            p = int(self.mdp.get_player(s)[0].item())
+            print(f"Turn {turn}, player {p+1} ({self.mdp.symb[p]})")
+            a = self.qs[p].policy(s)
+            print(f"Chosen action: {self.mdp.action_str(a)[0]}")
+            s, r = self.mdp.transition(s, a)
+            print(f"Next state:\n{self.mdp.board_str(s)[0]}")
+            print(f"Rewards for players: {r[0].tolist()}")
+            input("Enter to continue.\n")
+        input("Terminal state reached.  Enter to end. ")
+
+
+    def simulate(self):
+        s = self.mdp.get_initial_state()
+        while self.mdp.is_terminal(s) == False:
+            p = int(self.mdp.get_player(s)[0].item())
+            a = self.qs[p].policy(s)
+            if self.mdp.is_valid_action(s, a):
+                s, r = self.mdp.transition(s, a)
+            else:
+                a = self.mdp.get_random_action(s)
+                s, r = self.mdp.transition(s, a)
+        return r
+
+    def simulate_against_random(self, num_simulations: int, replay_loss = False, verbose = False):
+        output = []
+        for i in range(self.mdp.num_players):
+            if verbose:
+                print(f"Simulating player {i} against random bot for {num_simulations} simulations.")
+            wins, losses, ties, invalids, unknowns  = 0, 0, 0, 0, 0
+            for j in range(num_simulations):
+                s = self.mdp.get_initial_state()
+                if replay_loss:
+                    history = [s]
+                while self.mdp.is_terminal(s).item() == False:
+                    p = int(self.mdp.get_player(s).item())
+                    if p == i:
+                        a = self.qs[i].policy(s)
+                        if self.mdp.is_valid_action(s, a).item():
+                            s, r = self.mdp.transition(s, a)
+                        else:
+                            invalids += 1
+                            a = self.mdp.get_random_action(s)
+                            s, r = self.mdp.transition(s, a)
+                    else:
+                        a = self.mdp.get_random_action(s)
+                        s, r = self.mdp.transition(s, a)
+                    if replay_loss:
+                        history.append(s)
+                if r[0,i].item() == 1.:
+                    wins += 1
+                elif r[0, i].item() == -1.:
+                    losses += 1
+                    if replay_loss:
+                        for s in history:
+                            print(self.mdp.board_str(s)[0])
+                            input()
+                elif r[0, i].item() == 0.:
+                    ties += 1
+                else:
+                    unknowns += 1
+            output.append((wins, losses, ties, invalids, unknowns))
+            if verbose:
+                print(f"Player {i} {wins} wins, {losses} losses, {ties} ties, {invalids} invalid moves, {unknowns} unknown results.")
+        return output
+            
+ 
+
+
+
 # For now, for simplicity, fix a single strategy
 # Note that qs is policy_qs
 class DQN():
-    def __init__(self, mdp: TensorMDP, q_model: nn.Module, loss_fn, optimizer, memory_capacity: int, device="cpu"):
+    def __init__(self, mdp: TensorMDP, model: nn.Module, loss_fn, optimizer, memory_capacity: int, model_args = {}, device="cpu"):
         # An mdp that encodes the rules of the game.  The current player is part of the state, which is of the form (current player, actual state)
         self.mdp = mdp
-        self.qs = [NNQFunction(mdp, q_model, loss_fn, optimizer, device=device) for i in range(mdp.num_players)]
+        self.device = device
+
+
+        # For deep Q learning
+        self.qs = [NNQFunction(mdp, model, model_args=model_args, device=device) for i in range(mdp.num_players)]
         self.memories = [ExperienceReplay(memory_capacity) for i in range(mdp.num_players)]
         self.memory_capacity = memory_capacity
-        self.device = device
+        self.loss_fn = loss_fn
+        self.optimizer = optimizer
+
+        # For classical Q learning
+        self.q_dict = {}
 
     def save_q(self, fname):
         zf = zipfile.ZipFile(fname, mode="w")
@@ -224,7 +342,6 @@ class DQN():
             if indices == None or i in indices:
                 zf.extract(f"player.{i}", "temp/")
                 self.qs[i].q = torch.jit.load(f"temp/player.{i}")
-                self.qs[i].target_q = torch.jit.load(f"temp/player.{i}")
                 os.remove(f"temp/player.{i}")
         zf.close()
 
@@ -334,28 +451,47 @@ class DQN():
         return output
             
         
+    def minmax(self, state = None):
+        if state == None:
+            state = self.mdp.get_initial_state()
+
+        actions = self.mdp.valid_action_filter(state)
+        while len(torch.nonzero(actions).tolist()) > 0:
+            a = self.mdp.get_random_action_from_filter(actions)
+            t, r = self.mdp.transition(state, a)
+            if self.mdp.is_terminal(t).item():
+                self.q_dict[(self.mdp.state_to_hashable(state[0]), self.mdp.action_to_hashable(a[0]))] = r[0].tolist()
+            else:
+                vals = []
+                val = self.minmax(self, t)
+                vals.append(val)
+                self.q_dict[(self.mdp.state_to_hashable(state[0]), self.mdp.action_to_hashable(a[0]))] = val
+
+        p = self.mdp.get_player(state).int()[0]
+        val = max(vals, key=lambda y: y[p])
+        return val
 
     # Handling multiplayer: each player keeps their own "record", separate from memory
     # When any entry in the record has source = target, then the player "banks" it in their memory
     # The next time an action is taken, if the source = target, then it gets overwritten
-    def deep_learn(self, lr: float, dq_episodes: int, episode_length: int, ramp_start: int, ramp_end: int, greed_start: float, greed_end: float, training_delay: int, sim_batch: int, train_batch: int, copy_interval_eps=1, save_interval=500, save_path=None, verbose=False, graph_smoothing=10, debug=False, initial_log=""):
+    def deep_q(self, lr: float, dq_episodes: int, episode_length: int, ramp_start: int, ramp_end: int, greed_start: float, greed_end: float, training_delay: int, sim_batch: int, train_batch: int, copy_interval_eps=1, save_interval=100, save_path=None, verbose=False, graph_smoothing=10, initial_log=""):
 
         dq_episodes, episode_length, ramp_start, ramp_end, sim_batch, train_batch, copy_interval_eps, training_delay = int(dq_episodes), int(episode_length), int(ramp_start), int(ramp_end), int(sim_batch), int(train_batch), max(1, int(copy_interval_eps)), int(training_delay)
         expl_start, expl_end = 1. - greed_start, 1. - greed_end
-        verbose = verbose or debug
 
         do_logging = True if verbose or save_path != None else False
 
         if train_batch < 2:
             Exception("Training batch size must be greater than 1 for sampling.")
 
+        # Logging
         logtext = initial_log
         if do_logging:
             logtext += log(f"Device: {self.device}", verbose)
             logtext += log(f"MDP:\n{self.mdp}", verbose)
             logtext += log(f"Model:\n{self.qs[0].q}", verbose)
-            logtext += log(f"Loss function:\n{self.qs[0].loss_fn}", verbose)
-            logtext += log(f"Optimizer:\n{self.qs[0].optimizer}", verbose)
+            logtext += log(f"Loss function:\n{self.loss_fn}", verbose)
+            logtext += log(f"Optimizer:\n{self.optimizer}", verbose)
             logtext += log(f"Learn rate: {lr}, episodes: {dq_episodes}, start and end exploration: [{expl_start}, {expl_end}], ramp: [{ramp_start}, {ramp_end}], training delay: {training_delay}, episode length: {episode_length}, batch size: {sim_batch}, training batch size: {train_batch}, copy frequency: {copy_interval_eps}, memory capacity: {self.memory_capacity}.", verbose)
             
             episode_losses = [[] for i in range(self.mdp.num_players)]
@@ -366,39 +502,33 @@ class DQN():
             start_time = datetime.datetime.now()
             logtext += log(f"Starting training at {start_time}\n", verbose)
                         
-
-        # Initially, the target network should be the same as the policy network
+        # Initialize target network
+        target_qs = [copy.deepcopy(self.qs[i]) for i in range(self.mdp.num_players)]
         for i in range(self.mdp.num_players):
-            self.qs[i].copy_policy_to_target()
+            target_qs[i].q.eval()
         
-
+        # Begin training
         for ep_num in range(dq_episodes):
             # Set exploration value
             expl_cur = min(max(((expl_end - expl_start) * ep_num + (ramp_end * expl_start - ramp_start * expl_end))/(ramp_end - ramp_start), expl_end), expl_start)
+
+            # Track losses and memory if we are logging
             if verbose or save_path != None:
                 losses = [0.] * self.mdp.num_players
                 num_updates = [0] * self.mdp.num_players
-
-            
-            if verbose or save_path != None:
                 memorylen = [self.memories[i].size() for i in range(self.mdp.num_players)]
                 logtext += log(f"Initializing episode {ep_num+1}. Greed {1-expl_cur:>0.5f}. Memory {memorylen}.", verbose)
             
+            # Get initial state
             s = self.mdp.get_initial_state(sim_batch)
-            # "Records" for each player
+            # Initialize "records" for each player
             player_record = [None for i in range(self.mdp.num_players)]
             
             for k in range(episode_length):
 
-                if debug:
-                    boards = ""
-                    for i in range(sim_batch):
-                        boards += f"Board {i}:\n{self.mdp.board_str(s)[i]}\n"
-                    input(f"Current boards:\n{boards}")
-
                 # Execute the transition on the "actual" state
                 # To do this, we need to iterate over players, because each has a different q function for determining the strategy
-                p = self.mdp.get_player(s)                                  # p.shape = (batch, )       s.shape = (batch, 2, 6, 7)
+                p = self.mdp.get_player(s)
 
                 # Get the actions using each player's policy #TODO can make this more efficient
                 a = torch.zeros((sim_batch, ) + self.mdp.action_shape, device=self.device)
@@ -408,20 +538,9 @@ class DQN():
                     a[indices] = greedy_tensor(self.qs[pi], s[indices], expl_cur)
 
 
-                if debug:
-                    input(f"Chosen actions:\n{a}")
-
-                
                 # Do the transition 
                 t, r = self.mdp.transition(s, a)
                 
-                if debug:
-                    boards = ""
-                    for i in range(sim_batch):
-                        boards += f"Board {i}:\n{self.mdp.board_str(t)[i]}\nReward: {r[i]}"
-                    input(f"New boards:\n{boards}")
-
-
                 # Update player records and memory
                 for pi in range(self.mdp.num_players):
                     # If it's the first move, just put the record in.  Note we only care about the recorder's reward.
@@ -435,7 +554,7 @@ class DQN():
                 # Train the policy on a random sample in memory (once the memory bank is big enough)
                 for i in range(self.mdp.num_players):
                     if len(self.memories[i]) >= train_batch and ep_num >= training_delay:
-                        losses[i] += self.qs[i].update(self.memories[i].sample(train_batch), lr)
+                        losses[i] += self.qs[i].update(self.memories[i].sample(train_batch), lr, optimizer_class=self.optimizer, loss_fn=self.loss_fn, target_q=target_qs[i])
                         num_updates[i] += train_batch
 
                 # Set the state to the next state
@@ -445,7 +564,7 @@ class DQN():
             # Copy the target network to the policy network if it is time
             if ep_num > training_delay and (ep_num+1) % copy_interval_eps == 0:
                 for i in range(self.mdp.num_players):
-                    self.qs[i].copy_policy_to_target()
+                    target_qs[i].q.load_state_dict(self.qs[i].q.state_dict())
                 logtext += log("Copied policy to target networks for all players.", verbose)
 
             # Save a copy of the model if time
@@ -514,3 +633,77 @@ class DQN():
             with open(logpath, "w") as f:
                 logtext += log(f"Saved logs to {logpath}", verbose)
                 f.write(logtext)
+
+
+
+
+class DMCTS(DeepRL):
+
+    def __init__(self, mdp: TensorMDP, model: nn.Module, loss_fn, optimizer, model_args = {}, device="cpu"):
+        super().__init__(mdp, model, loss_fn, optimizer, model_args, device)
+        
+        self.pv = model()
+        self.q = {}
+        self.n = {}         # Keys: hashable states.  Values: tensor with shape of actions
+        self.w = {}
+        self.p = {}
+
+
+
+    # Unbatched
+    def ucb(self, state, param: float):
+        statehash = self.mdp.state_to_hashable(state)
+        if statehash not in self.q:
+            return 0
+        return self.q[statehash] + param * math.sqrt(torch.sum(self.n[statehash])) / (1 + self.n[statehash])
+
+    # Unbatched
+    def search(self, state, ucb_parameter: int, p, num: int):
+        history = [state]
+
+        # Go down tree
+        while self.mdp.state_to_hashable(state) in self.q:
+            ucb = self.ucb(state, ucb_parameter)
+            action = (ucb == ucb.max()).float()
+            state, r = self.mdp.transition(state, action)
+            history.append(state)
+        
+        # Once we reach a leaf
+        self.q[self.mdp.state_to_hashable(state)] = torch.zeros(self.mdp.action_shape)
+        self.n[self.mdp.state_to_hashable(state)] = torch.zeros(self.mdp.action_shape)
+        self.w[self.mdp.state_to_hashable(state)] = torch.zeros(self.mdp.action_shape)
+        self.p[self.mdp.state_to_hashable(state)] = p(state)
+        while self.mdp.terminal(state) == False:
+            state, r = self.mdp.transition(state, p(state))
+            history.append(state)
+
+        # Back-update
+        while len(history) > 0:
+            state = history.pop()
+            self.n[self.mdp.state_to_hashable(state)] += 1
+            self.w[self.mdp.state_to_hashable(state)] += r[self.mdp.get_player(state)]
+            self.q[self.mdp.state_to_hashable(state)] = self.w[self.mdp.state_to_hashable(state)] / self.n[self.mdp.state_to_hashable(state)]
+            
+
+    # Unbatched
+    def choose_action(self, prob_vector):
+        prob_vector.flatten()
+        pass    
+
+
+
+
+    def mcts(self, lr: float, num_iterations: int, num_selfplay: int, num_searches: int, max_steps: int, ucb_parameter: float, sim_batch: int, train_batch: int, copy_interval_eps=1, save_interval=100, save_path=None, verbose=False, graph_smoothing=10, initial_log=""):
+        prior_p = copy.deepcopy(self.pv)
+        for i in range(num_iterations):
+            s = self.mdp.get_initial_state(num_selfplay)
+            for step in range(max_steps):
+                a = torch.tensor([])
+                for play in range(num_selfplay):
+                    self.search(s[play], ucb_parameter, num=num_searches)
+                    a = torch.cat([a, self.choose_action(self.n[self.mdp.state_to_hashable(s)])])
+                s, r = self.mdp.transition(s, a)
+
+                
+
+            
