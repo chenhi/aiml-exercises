@@ -48,22 +48,22 @@ def load_bots(qgame, saves) -> str:
         try:
             index = int(res[0])
             if index >= 0 and index < len(saves):
-                qgame.load_q(f'bots/{shortname}/' + saves[index])
+                qgame.load(f'bots/{shortname}/' + saves[index])
                 logtext += log(f"Loaded {saves[index]} for all players.")
             else:
                 raise Exception
         except:
-            qgame.null_q()
+            qgame.null()
             logtext += log("Loaded RANDOMBOT for all players.")
     else:
-        qgame.null_q()
+        qgame.null()
         for i in range(min(len(res), game.mdp.num_players)):
             try:
                 index = int(res[i])
                 if index < 0 or index >= len(saves):
                     logtext += log(f"{i} is not a bot on the list.  Loading RANDOMBOT as player {i}.")
                 else:
-                    game.load_q(f'bots/{shortname}/' + saves[index], [i])
+                    game.load(f'bots/{shortname}/' + saves[index], [i])
             except:
                 logtext += log(f"Didn't understand {s}.  Loading RANDOMBOT as player {i}.")
         if len(res) > game.mdp.num_players:
@@ -236,7 +236,7 @@ if mode == "train":
     if type == "qlearn":
         #game.set_greed(expl)
         game.batch_learn(**hpar, verbose=True, savefile=fname + ".exp")
-        game.save_q(fname)
+        game.save(fname)
 
     if type == "dqn":
         game.deep_q(**hpar, verbose=True, save_path=fname, initial_log = logtext)
@@ -277,7 +277,7 @@ if mode == "tournament":
 
     for match in matches:
         for i in range(n):
-            game.load_q(f'bots/{shortname}/' + saves[match[i]], [i])
+            game.load(f'bots/{shortname}/' + saves[match[i]], [i])
         r = game.simulate()
         logtext += log(f"Result of match {match}: {r[0].int().tolist()}")
         for i in range(n):
@@ -343,7 +343,7 @@ if mode == "benchmark":
         logtext = ""
         logtext += log(f"Simulating {name} against RANDOMBOT for {sims} simulations.")
         for i in range(1, len(save_files)):
-            game.load_q(f'bots/{shortname}/' + save_files[i])
+            game.load(f'bots/{shortname}/' + save_files[i])
             result = game.simulate_against_random(sims, replay_loss=False, verbose=False)
             logtext += log(f"")
             for j in range(len(result)):

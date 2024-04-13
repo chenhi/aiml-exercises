@@ -81,6 +81,9 @@ class TensorMDP(MDP):
     def get_random_action(self, state, max_tries=100) -> torch.Tensor:
         return self.get_random_action_from_filter(self.valid_action_filter(state).float())
     
+    def get_random_action_from_values(self, values, max_tries=100) -> torch.Tensor:
+        return self.get_random_action_from_filter(values == values.flatten(1,-1).max(1).values.reshape((-1,) + self.action_projshape).float(), max_tries=max_tries)
+    
     def get_random_action_from_filter(self, filter, max_tries=100) -> torch.Tensor:
         while (filter.flatten(1,-1).count_nonzero(dim=1) <= 1).prod().item() != 1:                             # Almost always terminates after one step
             temp = torch.rand((filter.size(0),) + self.action_shape, device=self.device) * filter
@@ -149,7 +152,7 @@ class NNQFunction(QFunction):
         if self.q == None:
             return torch.zeros(state.size(0))
         self.q.eval()
-        return self.q(state).flatten(1, -1).max(1).values * ~torch.flatten(self.mdp.is_terminal(state))
+        return (torch.sigmoid(self.q(state)) * self.mdp.valid_action_filter(state)).flatten(1, -1).max(1).values * ~torch.flatten(self.mdp.is_terminal(state))
     
     # Input is a batch of state vectors
     # Returns the value of an optimal policy at a given state, shape (batches, ) + action_shape
@@ -157,7 +160,8 @@ class NNQFunction(QFunction):
         if self.q == None:
             return self.mdp.get_random_action(state)
         
-        filter = self.q(state).flatten(1, -1)
+        self.q.eval()
+        filter = (torch.sigmoid(self.q(state)) * self.mdp.valid_action_filter(state)).flatten(1, -1)           # TODO what if they're all 0?
         filter = (filter == filter.max(1).values[:,None])
         while (filter.count_nonzero(dim=1) <= 1).prod().item() != 1:                            # Almost always terminates after one step
             filter = torch.rand(filter.shape, device=self.device) * filter
@@ -308,12 +312,11 @@ class DeepRL():
 
 # For now, for simplicity, fix a single strategy
 # Note that qs is policy_qs
-class DQN():
+class DQN(DeepRL):
     def __init__(self, mdp: TensorMDP, model: nn.Module, loss_fn, optimizer, memory_capacity: int, model_args = {}, device="cpu"):
         # An mdp that encodes the rules of the game.  The current player is part of the state, which is of the form (current player, actual state)
         self.mdp = mdp
         self.device = device
-
 
         # For deep Q learning
         self.qs = [NNQFunction(mdp, model, model_args=model_args, device=device) for i in range(mdp.num_players)]
@@ -325,7 +328,7 @@ class DQN():
         # For classical Q learning
         self.q_dict = {}
 
-    def save_q(self, fname):
+    def save(self, fname):
         zf = zipfile.ZipFile(fname, mode="w")
         for i in range(self.mdp.num_players):
             model_scripted = torch.jit.script(self.qs[i].q)
@@ -336,7 +339,7 @@ class DQN():
 
             
 
-    def load_q(self, fname, indices=None):
+    def load(self, fname, indices=None):
         zf = zipfile.ZipFile(fname, mode="r")
         for i in range(self.mdp.num_players):
             if indices == None or i in indices:
@@ -346,38 +349,38 @@ class DQN():
         zf.close()
 
 
-    def null_q(self, indices = None):
+    def null(self, indices = None):
         for i in range(self.mdp.num_players):
             if indices == None or i in indices:
                 self.qs[i].lobotomize()
                 
-    def stepthru_game(self):
-        s = self.mdp.get_initial_state()
-        print(f"Initial state:\n{self.mdp.board_str(s)[0]}")
-        turn = 0
-        while self.mdp.is_terminal(s) == False:
-            turn += 1
-            p = int(self.mdp.get_player(s)[0].item())
-            print(f"Turn {turn}, player {p+1} ({self.mdp.symb[p]})")
-            a = self.qs[p].policy(s)
-            print(f"Chosen action: {self.mdp.action_str(a)[0]}")
-            s, r = self.mdp.transition(s, a)
-            print(f"Next state:\n{self.mdp.board_str(s)[0]}")
-            print(f"Rewards for players: {r[0].tolist()}")
-            input("Enter to continue.\n")
-        input("Terminal state reached.  Enter to end. ")
+    # def stepthru_game(self):
+    #     s = self.mdp.get_initial_state()
+    #     print(f"Initial state:\n{self.mdp.board_str(s)[0]}")
+    #     turn = 0
+    #     while self.mdp.is_terminal(s) == False:
+    #         turn += 1
+    #         p = int(self.mdp.get_player(s)[0].item())
+    #         print(f"Turn {turn}, player {p+1} ({self.mdp.symb[p]})")
+    #         a = self.qs[p].policy(s)
+    #         print(f"Chosen action: {self.mdp.action_str(a)[0]}")
+    #         s, r = self.mdp.transition(s, a)
+    #         print(f"Next state:\n{self.mdp.board_str(s)[0]}")
+    #         print(f"Rewards for players: {r[0].tolist()}")
+    #         input("Enter to continue.\n")
+    #     input("Terminal state reached.  Enter to end. ")
 
-    def simulate(self):
-        s = self.mdp.get_initial_state()
-        while self.mdp.is_terminal(s) == False:
-            p = int(self.mdp.get_player(s)[0].item())
-            a = self.qs[p].policy(s)
-            if self.mdp.is_valid_action(s, a):
-                s, r = self.mdp.transition(s, a)
-            else:
-                a = self.mdp.get_random_action(s)
-                s, r = self.mdp.transition(s, a)
-        return r
+    # def simulate(self):
+    #     s = self.mdp.get_initial_state()
+    #     while self.mdp.is_terminal(s) == False:
+    #         p = int(self.mdp.get_player(s)[0].item())
+    #         a = self.qs[p].policy(s)
+    #         if self.mdp.is_valid_action(s, a):
+    #             s, r = self.mdp.transition(s, a)
+    #         else:
+    #             a = self.mdp.get_random_action(s)
+    #             s, r = self.mdp.transition(s, a)
+    #     return r
 
 
     # Keeps the first action; the assumption is the later actions are "passive" (i.e. not performed by the given player)
@@ -408,47 +411,47 @@ class DQN():
         return (TransitionData(new_s, new_a, new_t, new_r), TransitionData(new_s[filter], new_a[filter], new_t[filter], new_r[filter]))
 
 
-    def simulate_against_random(self, num_simulations: int, replay_loss = False, verbose = False):
-        output = []
-        for i in range(self.mdp.num_players):
-            if verbose:
-                print(f"Simulating player {i} against random bot for {num_simulations} simulations.")
-            wins, losses, ties, invalids, unknowns  = 0, 0, 0, 0, 0
-            for j in range(num_simulations):
-                s = self.mdp.get_initial_state()
-                if replay_loss:
-                    history = [s]
-                while self.mdp.is_terminal(s).item() == False:
-                    p = int(self.mdp.get_player(s).item())
-                    if p == i:
-                        a = self.qs[i].policy(s)
-                        if self.mdp.is_valid_action(s, a).item():
-                            s, r = self.mdp.transition(s, a)
-                        else:
-                            invalids += 1
-                            a = self.mdp.get_random_action(s)
-                            s, r = self.mdp.transition(s, a)
-                    else:
-                        a = self.mdp.get_random_action(s)
-                        s, r = self.mdp.transition(s, a)
-                    if replay_loss:
-                        history.append(s)
-                if r[0,i].item() == 1.:
-                    wins += 1
-                elif r[0, i].item() == -1.:
-                    losses += 1
-                    if replay_loss:
-                        for s in history:
-                            print(self.mdp.board_str(s)[0])
-                            input()
-                elif r[0, i].item() == 0.:
-                    ties += 1
-                else:
-                    unknowns += 1
-            output.append((wins, losses, ties, invalids, unknowns))
-            if verbose:
-                print(f"Player {i} {wins} wins, {losses} losses, {ties} ties, {invalids} invalid moves, {unknowns} unknown results.")
-        return output
+    # def simulate_against_random(self, num_simulations: int, replay_loss = False, verbose = False):
+    #     output = []
+    #     for i in range(self.mdp.num_players):
+    #         if verbose:
+    #             print(f"Simulating player {i} against random bot for {num_simulations} simulations.")
+    #         wins, losses, ties, invalids, unknowns  = 0, 0, 0, 0, 0
+    #         for j in range(num_simulations):
+    #             s = self.mdp.get_initial_state()
+    #             if replay_loss:
+    #                 history = [s]
+    #             while self.mdp.is_terminal(s).item() == False:
+    #                 p = int(self.mdp.get_player(s).item())
+    #                 if p == i:
+    #                     a = self.qs[i].policy(s)
+    #                     if self.mdp.is_valid_action(s, a).item():
+    #                         s, r = self.mdp.transition(s, a)
+    #                     else:
+    #                         invalids += 1
+    #                         a = self.mdp.get_random_action(s)
+    #                         s, r = self.mdp.transition(s, a)
+    #                 else:
+    #                     a = self.mdp.get_random_action(s)
+    #                     s, r = self.mdp.transition(s, a)
+    #                 if replay_loss:
+    #                     history.append(s)
+    #             if r[0,i].item() == 1.:
+    #                 wins += 1
+    #             elif r[0, i].item() == -1.:
+    #                 losses += 1
+    #                 if replay_loss:
+    #                     for s in history:
+    #                         print(self.mdp.board_str(s)[0])
+    #                         input()
+    #             elif r[0, i].item() == 0.:
+    #                 ties += 1
+    #             else:
+    #                 unknowns += 1
+    #         output.append((wins, losses, ties, invalids, unknowns))
+    #         if verbose:
+    #             print(f"Player {i} {wins} wins, {losses} losses, {ties} ties, {invalids} invalid moves, {unknowns} unknown results.")
+    #     return output
             
         
     def minmax(self, state = None):
@@ -569,7 +572,7 @@ class DQN():
 
             # Save a copy of the model if time
             if save_path != None and (ep_num+1) % save_interval == 0:
-                self.save_q(f"{save_path}.{ep_num+1}")
+                self.save(f"{save_path}.{ep_num+1}")
                 logtext += log(f"Saved {ep_num+1}-iteration model to {save_path}.{ep_num+1}") 
 
             
@@ -600,7 +603,7 @@ class DQN():
 
         if save_path != None:
             # Save final model
-            self.save_q(save_path)
+            self.save(save_path)
             logtext += log(f"Saved final model to {save_path}")
             
             # Plot losses
@@ -633,77 +636,3 @@ class DQN():
             with open(logpath, "w") as f:
                 logtext += log(f"Saved logs to {logpath}", verbose)
                 f.write(logtext)
-
-
-
-
-class DMCTS(DeepRL):
-
-    def __init__(self, mdp: TensorMDP, model: nn.Module, loss_fn, optimizer, model_args = {}, device="cpu"):
-        super().__init__(mdp, model, loss_fn, optimizer, model_args, device)
-        
-        self.pv = model()
-        self.q = {}
-        self.n = {}         # Keys: hashable states.  Values: tensor with shape of actions
-        self.w = {}
-        self.p = {}
-
-
-
-    # Unbatched
-    def ucb(self, state, param: float):
-        statehash = self.mdp.state_to_hashable(state)
-        if statehash not in self.q:
-            return 0
-        return self.q[statehash] + param * math.sqrt(torch.sum(self.n[statehash])) / (1 + self.n[statehash])
-
-    # Unbatched
-    def search(self, state, ucb_parameter: int, p, num: int):
-        history = [state]
-
-        # Go down tree
-        while self.mdp.state_to_hashable(state) in self.q:
-            ucb = self.ucb(state, ucb_parameter)
-            action = (ucb == ucb.max()).float()
-            state, r = self.mdp.transition(state, action)
-            history.append(state)
-        
-        # Once we reach a leaf
-        self.q[self.mdp.state_to_hashable(state)] = torch.zeros(self.mdp.action_shape)
-        self.n[self.mdp.state_to_hashable(state)] = torch.zeros(self.mdp.action_shape)
-        self.w[self.mdp.state_to_hashable(state)] = torch.zeros(self.mdp.action_shape)
-        self.p[self.mdp.state_to_hashable(state)] = p(state)
-        while self.mdp.terminal(state) == False:
-            state, r = self.mdp.transition(state, p(state))
-            history.append(state)
-
-        # Back-update
-        while len(history) > 0:
-            state = history.pop()
-            self.n[self.mdp.state_to_hashable(state)] += 1
-            self.w[self.mdp.state_to_hashable(state)] += r[self.mdp.get_player(state)]
-            self.q[self.mdp.state_to_hashable(state)] = self.w[self.mdp.state_to_hashable(state)] / self.n[self.mdp.state_to_hashable(state)]
-            
-
-    # Unbatched
-    def choose_action(self, prob_vector):
-        prob_vector.flatten()
-        pass    
-
-
-
-
-    def mcts(self, lr: float, num_iterations: int, num_selfplay: int, num_searches: int, max_steps: int, ucb_parameter: float, sim_batch: int, train_batch: int, copy_interval_eps=1, save_interval=100, save_path=None, verbose=False, graph_smoothing=10, initial_log=""):
-        prior_p = copy.deepcopy(self.pv)
-        for i in range(num_iterations):
-            s = self.mdp.get_initial_state(num_selfplay)
-            for step in range(max_steps):
-                a = torch.tensor([])
-                for play in range(num_selfplay):
-                    self.search(s[play], ucb_parameter, num=num_searches)
-                    a = torch.cat([a, self.choose_action(self.n[self.mdp.state_to_hashable(s)])])
-                s, r = self.mdp.transition(s, a)
-
-                
-
-            
