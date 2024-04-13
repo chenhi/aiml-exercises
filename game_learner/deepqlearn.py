@@ -78,10 +78,13 @@ class TensorMDP(MDP):
     def valid_action_filter(self, state: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError
     
+    def neginf_kill_actions(self, state: torch.Tensor) -> torch.Tensor:
+        return (-torch.inf * (1 - self.valid_action_filter(state).float())).nan_to_num(0)
+    
     def get_random_action(self, state, max_tries=100) -> torch.Tensor:
         return self.get_random_action_from_filter(self.valid_action_filter(state).float())
     
-    def get_random_action_from_values(self, values, max_tries=100) -> torch.Tensor:
+    def get_random_action_from_values(self, values, max_tries=100) -> torch.Tensor:         # TODO what if all values are 0
         return self.get_random_action_from_filter(values == values.flatten(1,-1).max(1).values.reshape((-1,) + self.action_projshape).float(), max_tries=max_tries)
     
     def get_random_action_from_filter(self, filter, max_tries=100) -> torch.Tensor:
@@ -143,37 +146,28 @@ class NNQFunction(QFunction):
         if action == None:
             return pred
         else:
-            # A little inefficient because we only take the diagonals, 
-            return torch.tensordot(pred.flatten(start_dim=1), action.flatten(start_dim=1), dims=([1],[1])).diagonal()
+            return (pred * action).sum(tuple(range(1,pred.dim())))
 
     # Input is a tensor of shape (batches, ) + state.shape
     # Output is a tensor of shape (batches, )
-    def val(self, state) -> torch.Tensor:
+    def val(self, state, valid_filter=True) -> torch.Tensor:
         if self.q == None:
             return torch.zeros(state.size(0))
         self.q.eval()
-        return (torch.sigmoid(self.q(state)) * self.mdp.valid_action_filter(state)).flatten(1, -1).max(1).values * ~torch.flatten(self.mdp.is_terminal(state))
+        return (self.q(state) + valid_filter * self.mdp.neginf_kill_actions(state)).flatten(1, -1).max(1).values * ~torch.flatten(self.mdp.is_terminal(state))
     
     # Input is a batch of state vectors
     # Returns the value of an optimal policy at a given state, shape (batches, ) + action_shape
-    def policy(self, state, max_tries=100) -> torch.Tensor:
+    def policy(self, state, max_tries=100, valid_filter=True) -> torch.Tensor:
         if self.q == None:
             return self.mdp.get_random_action(state)
-        
         self.q.eval()
-        filter = (torch.sigmoid(self.q(state)) * self.mdp.valid_action_filter(state)).flatten(1, -1)           # TODO what if they're all 0?
-        filter = (filter == filter.max(1).values[:,None])
-        while (filter.count_nonzero(dim=1) <= 1).prod().item() != 1:                            # Almost always terminates after one step
-            filter = torch.rand(filter.shape, device=self.device) * filter
-            filter = (filter == filter.max(1).values[:,None])
-            max_tries -= 1
-            if max_tries == 0:
-                break
-        return filter.unflatten(1, self.mdp.action_shape) * 1.
+        return self.mdp.get_random_action_from_values(self.q(state) + valid_filter * self.mdp.neginf_kill_actions(state), max_tries=max_tries)
+
 
     # Does a Q-update based on some observed set of data
     # TransitionData entries are tensors
-    def update(self, data: TransitionData, learn_rate, optimizer_class: torch.optim.Optimizer, loss_fn, target_q=None, ):
+    def update(self, data: TransitionData, learn_rate, optimizer_class: torch.optim.Optimizer, loss_fn, target_q=None, valid_filter=True):
         if not isinstance(self.q, nn.Module):
             Exception("NNQFunction needs to have a class extending nn.Module.")
 
@@ -186,7 +180,7 @@ class NNQFunction(QFunction):
         self.q.train()
         opt = optimizer_class(self.q.parameters(), lr=learn_rate)
         pred = self.get(data.s, data.a)
-        y = data.r + target_q.val(data.t)
+        y = data.r + target_q.val(data.t, valid_filter=valid_filter)
         self.q.train()
         loss = loss_fn(pred, y)
 
@@ -206,8 +200,8 @@ class NNQFunction(QFunction):
 
 # Input shape (batch_size, ) + state_tensor
 # We implement a random tensor of 0's and 1's generating a random tensor of floats in [0, 1), then converting it to a bool, then back to a float.
-def greedy_tensor(q: NNQFunction, state, eps = 0.):
-    return q.mdp.get_random_action(state) if random.random() < eps else q.policy(state)
+def greedy_tensor(q: NNQFunction, state, eps = 0., valid_filter=True):
+    return q.mdp.get_random_action(state) if random.random() < eps else q.policy(state, valid_filter=valid_filter)
 
 
 
@@ -264,7 +258,7 @@ class DeepRL():
                 s, r = self.mdp.transition(s, a)
         return r
 
-    def simulate_against_random(self, num_simulations: int, replay_loss = False, verbose = False):
+    def simulate_against_random(self, num_simulations: int, valid_filter=True, replay_loss = False, verbose = False):
         output = []
         for i in range(self.mdp.num_players):
             if verbose:
@@ -277,7 +271,7 @@ class DeepRL():
                 while self.mdp.is_terminal(s).item() == False:
                     p = int(self.mdp.get_player(s).item())
                     if p == i:
-                        a = self.qs[i].policy(s)
+                        a = self.qs[i].policy(s, valid_filter=valid_filter)
                         if self.mdp.is_valid_action(s, a).item():
                             s, r = self.mdp.transition(s, a)
                         else:
@@ -477,7 +471,7 @@ class DQN(DeepRL):
     # Handling multiplayer: each player keeps their own "record", separate from memory
     # When any entry in the record has source = target, then the player "banks" it in their memory
     # The next time an action is taken, if the source = target, then it gets overwritten
-    def deep_q(self, lr: float, dq_episodes: int, episode_length: int, ramp_start: int, ramp_end: int, greed_start: float, greed_end: float, training_delay: int, sim_batch: int, train_batch: int, copy_interval_eps=1, save_interval=100, save_path=None, verbose=False, graph_smoothing=10, initial_log=""):
+    def deep_q(self, lr: float, dq_episodes: int, episode_length: int, ramp_start: int, ramp_end: int, greed_start: float, greed_end: float, training_delay: int, sim_batch: int, train_batch: int, copy_interval_eps=1, valid_filter=True, save_interval=100, save_path=None, verbose=False, graph_smoothing=10, initial_log=""):
 
         dq_episodes, episode_length, ramp_start, ramp_end, sim_batch, train_batch, copy_interval_eps, training_delay = int(dq_episodes), int(episode_length), int(ramp_start), int(ramp_end), int(sim_batch), int(train_batch), max(1, int(copy_interval_eps)), int(training_delay)
         expl_start, expl_end = 1. - greed_start, 1. - greed_end
@@ -495,6 +489,7 @@ class DQN(DeepRL):
             logtext += log(f"Model:\n{self.qs[0].q}", verbose)
             logtext += log(f"Loss function:\n{self.loss_fn}", verbose)
             logtext += log(f"Optimizer:\n{self.optimizer}", verbose)
+            logtext += log(f"Zeroing out invalid moves" if valid_filter else f"Penalizing invalid moves")
             logtext += log(f"Learn rate: {lr}, episodes: {dq_episodes}, start and end exploration: [{expl_start}, {expl_end}], ramp: [{ramp_start}, {ramp_end}], training delay: {training_delay}, episode length: {episode_length}, batch size: {sim_batch}, training batch size: {train_batch}, copy frequency: {copy_interval_eps}, memory capacity: {self.memory_capacity}.", verbose)
             
             episode_losses = [[] for i in range(self.mdp.num_players)]
@@ -538,7 +533,7 @@ class DQN(DeepRL):
                 for pi in range(self.mdp.num_players):
                     # Get the indices corresponding to this player's turn
                     indices = torch.arange(sim_batch, device=self.device)[p.flatten() == pi]
-                    a[indices] = greedy_tensor(self.qs[pi], s[indices], expl_cur)
+                    a[indices] = greedy_tensor(self.qs[pi], s[indices], expl_cur, valid_filter=valid_filter)
 
 
                 # Do the transition 
@@ -557,7 +552,7 @@ class DQN(DeepRL):
                 # Train the policy on a random sample in memory (once the memory bank is big enough)
                 for i in range(self.mdp.num_players):
                     if len(self.memories[i]) >= train_batch and ep_num >= training_delay:
-                        losses[i] += self.qs[i].update(self.memories[i].sample(train_batch), lr, optimizer_class=self.optimizer, loss_fn=self.loss_fn, target_q=target_qs[i])
+                        losses[i] += self.qs[i].update(self.memories[i].sample(train_batch), lr, optimizer_class=self.optimizer, loss_fn=self.loss_fn, target_q=target_qs[i], valid_filter=valid_filter)
                         num_updates[i] += train_batch
 
                 # Set the state to the next state

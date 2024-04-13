@@ -224,6 +224,13 @@ if mode == "train":
     else:
         game = QLearn(mdp)
     
+    res = input("Penalize or prohibit invalid moves? (pen/pro)")
+    if res.lower() == "pen":
+        valid_filter = False
+        print("Chose penalty mode.")
+    else:
+        valid_filter = True
+        print("Chose prohibition mode.")
 
     hpar = mdp.default_hyperparameters
     for k, v in hpar.items():
@@ -239,7 +246,7 @@ if mode == "train":
         game.save(fname)
 
     if type == "dqn":
-        game.deep_q(**hpar, verbose=True, save_path=fname, initial_log = logtext)
+        game.deep_q(**hpar, valid_filter=valid_filter, verbose=True, save_path=fname, initial_log = logtext)
 
     # Some extra stuff
     if shortname == "home":

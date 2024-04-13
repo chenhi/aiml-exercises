@@ -36,17 +36,19 @@ class DMCTS(DeepRL):
     # Unbatched
     def search(self, state, ucb_parameter: int, p: nn.Module, num: int):
         for i in range(num):
+            print(f"Iteration {i+1}")
             history = []
             s = state
 
+            print("Going down tree")
             # Go down tree, using upper confidence bound and dictionary q values to play
             while self.mdp.state_to_hashable(s) in self.q and self.mdp.is_terminal(s).item() == False:
                 ucb = self.ucb(s, ucb_parameter)
-                action = self.mdp.get_random_action_from_values(ucb * self.mdp.valid_action_filter(s))
+                action = self.mdp.get_random_action_from_values(torch.sigmoid(ucb) * self.mdp.valid_action_filter(s))
                 history.append((s, action))
                 s, r = self.mdp.transition(s, action)
                 
-            
+            print("Expanding tree")
             # Once we reach a leaf, use p to simulate play
             if self.mdp.is_terminal(s).item() == False:
                 self.q[self.mdp.state_to_hashable(s)] = torch.zeros(self.mdp.action_shape)
@@ -58,6 +60,7 @@ class DMCTS(DeepRL):
                 history.append((s, action))
                 s, r = self.mdp.transition(s, action)
             
+            print("Back update")
             # Back-update
             while len(history) > 0:
                 s, action = history.pop()
@@ -77,7 +80,7 @@ class DMCTS(DeepRL):
         training_data = []
         for i in range(num_iterations):
             iteration_data = []
-            s = self.mdp.get_initial_state(num_selfplay)
+            s = self.mdp.get_initial_state(num_selfplay)        # TODO not suppose to parallelize the self plays?
             for step in range(max_steps):
                 a = torch.tensor([])
                 for play in range(num_selfplay):
