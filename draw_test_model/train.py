@@ -22,9 +22,9 @@ trainList = [
 #    {'data': 'digits', 'model': ptm.Dense2, 'opt': 'adam', 'epochs': 1, 'rate': 1e-3, 'save': True},
 #     {'data': 'digits', 'model': ptm.Conv2, 'opt': 'adam', 'epochs': 50, 'rate': 1e-2, 'save': True},
 #    {'data': 'digits', 'model': ptm.Conv3, 'opt': 'adam', 'epochs': 50, 'rate': 1e-2, 'save': True},
+    {'data': 'digits', 'model': ptm.ConvSkip, 'opt': 'adam', 'epochs': 50, 'rate': 1e-3, 'save': True},
 #    {'data': 'fashion', 'model': ptm.Dense2, 'opt': 'adam', 'epochs': 5, 'save': True},
 #    {'data': 'fashion', 'model': tfm.Conv2, 'opt': 'adam', 'epochs': 2, 'save': True},
-    
     ]
 
 
