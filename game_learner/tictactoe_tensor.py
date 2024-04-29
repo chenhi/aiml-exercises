@@ -7,7 +7,7 @@ options = sys.argv[1:]
 
 class TTTTensorMDP(TensorMDP):
 
-    def __init__(self, device = "cpu"):
+    def __init__(self, discount=1, device = "cpu"):
         defaults1 = {
             'lr': 0.00025, 
             'greed_start': 0.0, 
@@ -97,8 +97,9 @@ class TTTTensorMDP(TensorMDP):
             'episode_length': 15, 
             'sim_batch': 128, 
             'train_batch': 256,
+            'copy_interval_eps': 1,
             }
-        super().__init__(state_shape=(2,3,3), action_shape=(3,3), default_memory=100000, discount=1, num_players=2, batched=True, default_hyperparameters=defaults7, \
+        super().__init__(state_shape=(2,3,3), action_shape=(3,3), default_memory=100000, discount=discount, num_players=2, batched=True, default_hyperparameters=defaults7, \
                          symb = {0: "X", 1: "O", None: "-"}, input_str = "Input position to play, e.g. '1, 3' for the 1st row and 3rd column: ", penalty=-1, num_simulations=10000)
         self.device = device
         
@@ -285,7 +286,7 @@ class TTTTensorMDP(TensorMDP):
 class TTTNN(nn.Module):
 
 
-    def __init__(self, layers=32, num_hidden=3):
+    def __init__(self, channels=32, num_hiddens=3):
         super().__init__()
         self.stack = {}
 
@@ -357,15 +358,15 @@ class TTTNN(nn.Module):
 
         # Tests
         self.stack = nn.Sequential(
-            nn.Conv2d(2, layers, (3,3), padding='same'),
+            nn.Conv2d(2, channels, (3,3), padding='same'),
             nn.LeakyReLU(),
-            nn.BatchNorm2d(layers),
+            nn.BatchNorm2d(channels),
             )
-        for i in range(num_hidden):
-            self.stack.append(nn.Conv2d(layers, layers, (3,3), padding='same'))
+        for i in range(num_hiddens):
+            self.stack.append(nn.Conv2d(channels, channels, (3,3), padding='same'))
             self.stack.append(nn.LeakyReLU())
-            self.stack.append(nn.BatchNorm2d(layers))
-        self.stack.append(nn.Conv2d(layers, 1, (3,3), padding='same'))
+            self.stack.append(nn.BatchNorm2d(channels))
+        self.stack.append(nn.Conv2d(channels, 1, (3,3), padding='same'))
 
 
     # Output of the stack is shape (batch, 1, 3, 3), so we do a simple reshaping.
@@ -401,6 +402,30 @@ class TTTResNN(nn.Module):
             x = self.relu(h(x) + x)
         return self.tail(x)[:,0]
 
+class TTTCatNN(nn.Module):
+    def __init__(self, num_hiddens = 3, hidden_width = 32):
+        super().__init__()
+        self.head_stack = nn.Sequential(
+            nn.Conv2d(2, hidden_width, (3,3), padding='same'),
+            nn.BatchNorm2d(hidden_width),
+            nn.ReLU(),
+        )
+        hlays = []
+        for i in range(num_hiddens):
+            lay = nn.Sequential(nn.Conv2d(hidden_width * (i+1) + 2, hidden_width, (3,3), padding='same'))
+            lay.append(nn.BatchNorm2d(hidden_width))
+            lay.append(nn.ReLU())
+            hlays.append(lay)
+        
+        self.hidden_layers = nn.ModuleList(hlays)
+        self.tail = nn.Conv2d(hidden_width, 1, (3,3), padding='same')
+        self.relu = nn.ReLU()                                               # This is necessary for saving?
+
+    def forward(self, x):
+        outputs = [x, self.head_stack(x)]
+        for h in self.hidden_layers:
+            outputs.append(h(torch.cat(outputs, dim=1)))
+        return self.tail(outputs[-1])[:,0]
 
 
 if "test" in options:

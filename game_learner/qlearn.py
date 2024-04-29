@@ -260,11 +260,11 @@ class QLearn():
         self.qs = [QFunction(self.mdp) for i in range(mdp.num_players)]
         self.state = None
 
-    def save_q(self, fname):
+    def save(self, fname):
         with open(fname, 'wb') as f:
             pickle.dump(self.qs, f)
         
-    def load_q(self, fname, indices=None):
+    def load(self, fname, indices=None):
         with open(fname, 'rb') as f:
             temp_qs = pickle.load(f)
         if indices == None:
@@ -273,7 +273,7 @@ class QLearn():
             for i in indices:
                 self.qs[i] = temp_qs[i]
 
-    def null_q(self, indices = None):
+    def null(self, indices = None):
         if indices == None:
             self.qs = [QFunction(self.mdp) for i in range(self.mdp.num_players)]
         else:
@@ -349,7 +349,7 @@ class QLearn():
         return output
 
     # Player data is (start state, action taken, all reward before next action, starting state for next action)
-    def batch_learn(self, lr: float, expl: float, iterations: int, q_episodes: int, episode_length: int, verbose=False, savefile=None, save_interval=-1):
+    def batch_learn(self, lr: float, expl: float, iterations: int, q_episodes: int, episode_length: int, memory: int, verbose=False, savefile=None, save_interval=-1):
         iterations, q_episodes, episode_length = int(iterations), int(q_episodes), int(episode_length)
         
         player_experiences = [[] for i in range(self.mdp.num_players)]
@@ -358,6 +358,7 @@ class QLearn():
         losses = [[] for i in range(self.mdp.num_players)]
 
         for i in range(iterations):
+            current_experiences = [[] for i in range(self.mdp.num_players)]
             for j in range(q_episodes):
                 #if verbose and j % 10 == 9:
                 #print(f"Training iteration {i+1}, episode {j+1}", end='\r')
@@ -370,9 +371,9 @@ class QLearn():
 
                     # For this player, bump the queue and add
                     if queue[p] != None:
-                        player_experiences[p].append(tuple(queue[p]) + (s,))
+                        current_experiences[p].append(tuple(queue[p]) + (s,))
                     if self.mdp.is_terminal(t):
-                        player_experiences[p].append((s,a,r[p],t))
+                        current_experiences[p].append((s,a,r[p],t))
                     else:
                         queue[p] = [s, a, r[p]]
                     
@@ -383,20 +384,28 @@ class QLearn():
                         if l != p and queue[l] != None:
                             queue[l][2] += r[l]
                             if self.mdp.is_terminal(t):
-                                player_experiences[l].append(tuple(queue[l]) + (t,))
+                                current_experiences[l].append(tuple(queue[l]) + (t,))
 
                     # If terminal state, then stop the episode.  Otherwise, update state and continue playing 
                     if self.mdp.is_terminal(t):
                         break
                     s = t
+                
+            # Add current experiences to the bank, and push out old ones if needed
+            for p in range(self.mdp.num_players):
+                player_experiences[p].append(current_experiences[p])
+                if memory > 0:
+                    player_experiences[p] = player_experiences[p][-memory:]
 
             # Do an update for each player, and record statistics
             for p in range(self.mdp.num_players):
-                deltas = self.qs[p].update(player_experiences[p], lr)
+                deltas = []
+                for l in range(len(player_experiences[p])):
+                    deltas += self.qs[p].update(player_experiences[p][l], lr)
 
                 # Record statistics
                 losses[p].append(sum(deltas)/len(deltas))
-                logtext += log(f"Iteration {i+1}: {losses[p][-1]/len(player_experiences[p])} loss for player {p+1} over {len(player_experiences[p])} training experiences.")
+                logtext += log(f"Iteration {i+1}: {losses[p][-1]} loss for player {p+1} over {len(deltas)} training experiences.")
 
         if verbose:
             total = 0

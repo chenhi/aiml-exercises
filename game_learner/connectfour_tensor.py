@@ -304,7 +304,7 @@ class C4TensorMDP(TensorMDP):
     
 
 class C4ResNN(nn.Module):
-    def __init__(self, num_hidden_conv = 5, hidden_conv_depth=2, hidden_conv_layers = 32, num_hidden_linear = 3, hidden_linear_depth=2, hidden_linear_width=16):
+    def __init__(self, num_hidden_conv = 5, hidden_conv_depth=1, hidden_conv_layers = 32, num_hidden_linear = 3, hidden_linear_depth=2, hidden_linear_width=16):
         super().__init__()
         self.head_stack = nn.Sequential(
             nn.Conv2d(2, hidden_conv_layers, (3,3), padding='same'),

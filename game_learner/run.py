@@ -1,7 +1,7 @@
 from connectfour import C4MDP
 from tictactoe import TTTMDP
 from connectfour_tensor import C4TensorMDP, C4NN, C4ResNN
-from tictactoe_tensor import TTTTensorMDP, TTTNN, TTTResNN
+from tictactoe_tensor import TTTTensorMDP, TTTNN, TTTResNN, TTTCatNN
 from nothanks_tensor import NoThanksTensorMDP, NoThanksNN
 from gohome import GoHomeMDP, show_heatmap
 from qlearn import *
@@ -95,8 +95,8 @@ shortnames = ["ttt", "c4", "dttt", "dc4", "nothanks", "home"]
 mdps = [tttmdp, c4mdp, dtttmdp, c4tmdp, ntmdp, ghmdp]
 file_exts = ['.ttt.pkl', '.c4.pkl', '.dttt.pt', '.dc4.pt', 'nt.pt', '.home.pkl']
 types = ["qlearn", "qlearn", "dqn", "dqn", 'dqn', 'qlearn']
-nnarchss = [None, None, [TTTNN, TTTResNN], [C4NN, C4ResNN], [NoThanksNN], None]
-nnargss = [None, None, [{}, {'num_hiddens': 3, 'hidden_depth': 2, 'hidden_width': 32}], [{}, {'num_hidden_conv': 5, 'hidden_conv_depth': 2, 'hidden_conv_layers': 32, 'num_hidden_linear': 3, 'hidden_linear_depth': 2, 'hidden_linear_width': 16}], [{}], None]
+nnarchss = [None, None, [TTTNN, TTTResNN, TTTCatNN], [C4NN, C4ResNN], [NoThanksNN], None]
+nnargss = [None, None, [{'num_hiddens': 3, 'channels': 32}, {'num_hiddens': 4, 'hidden_depth': 1, 'hidden_width': 32}, {'num_hiddens': 5, 'hidden_width': 16}], [{}, {'num_hidden_conv': 5, 'hidden_conv_depth': 2, 'hidden_conv_layers': 32, 'num_hidden_linear': 3, 'hidden_linear_depth': 2, 'hidden_linear_width': 16}], [{}], None]
 
 
 # If the game was specified, choose it
@@ -224,7 +224,7 @@ if mode == "train":
     else:
         game = QLearn(mdp)
     
-    res = input("Penalize or prohibit invalid moves? (pen/pro)")
+    res = input("Penalize (pen) or prohibit (pro) invalid moves? (defualt prohbit) ")
     if res.lower() == "pen":
         valid_filter = False
         print("Chose penalty mode.")
@@ -242,7 +242,7 @@ if mode == "train":
 
     if type == "qlearn":
         #game.set_greed(expl)
-        game.batch_learn(**hpar, verbose=True, savefile=fname + ".exp")
+        game.batch_learn(**hpar, memory=100, verbose=True, savefile=fname + ".exp")
         game.save(fname)
 
     if type == "dqn":
@@ -327,9 +327,12 @@ if mode == "tournament":
 #==================== BOT SELECTION ====================#
 
 if mode == "play":
-    game = DQN(mdp, nn.Module, torch.nn.HuberLoss(), torch.optim.Adam, 0, device=device)
+    if type == "dqn":
+        game = DQN(mdp, nn.Module, torch.nn.HuberLoss(), torch.optim.Adam, 0, device=device)
+    elif type == "qlearn":
+        game = QLearn(mdp)
     load_bots(game, save_files)
-    
+
 #==================== BENCHMARK AGAINST RANDOM ====================#
 
 if mode == "benchmark":
@@ -398,6 +401,7 @@ while True:
         else:
             print("Action values:")
             print(item(game.qs[p].get(s, None), mdp))
+            print(item(game.qs[p].get(s, None) + game.mdp.neginf_kill_actions(s), mdp))
             a = game.qs[p].policy(s)
             print(f"Chosen action: \n{item(a, mdp)}.\n")
             if mdp.is_valid_action(s, a):

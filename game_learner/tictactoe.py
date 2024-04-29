@@ -22,7 +22,7 @@ class TTTMDP(MDP):
             'expl': 0.5,
             'iterations': 500,
             'q_episodes': 64,
-            'episode_length': 1000
+            'episode_length': 1000,
         }
         super().__init__(None, ttt_actions, discount=1, num_players=2, default_hyperparameters=hyperpar, \
                          symb = {0: "X", 1: "O", -1: "-"}, input_str = "Input position to play, e.g. '1, 3' for the 1st row and 3rd column: ")
