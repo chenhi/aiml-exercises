@@ -229,11 +229,11 @@ class TTTTensorMDP(TensorMDP):
         # The other two board to the right are also possibilities.  We only track the first one.  Note that it is possible for the bot to select other branches, so
         # the pass score might be negative with a still-optimal AI.
 
-        s = torch.tensor([[[[1.,0.,0.],[0.,1.,0.],[0.,0.,0.]], [[0.,1.,0.],[0.,0.,0.],[0.,0.,1.]]]])                                         
+        s = torch.tensor([[[[1.,0.,0.],[0.,1.,0.],[0.,0.,0.]], [[0.,1.,0.],[0.,0.,0.],[0.,0.,1.]]]]).to(device=self.device)                                      
         win_s = torch.cat([s,s])
         tie_s = torch.cat([s,s,s])
-        win_a = torch.tensor([[[0.,0.,0.],[1.,0.,0.],[0.,0.,0.]],[[0.,0.,0.],[0.,0.,0.],[1.,0.,0.]]])                                      
-        tie_a = torch.tensor([[[0.,0.,0.],[0.,0.,0.],[0.,1.,0.]],[[0.,0.,1.],[0.,0.,0.],[0.,0.,0.]],[[0.,0.,0.],[0.,0.,1.],[0.,0.,0.]]]) 
+        win_a = torch.tensor([[[0.,0.,0.],[1.,0.,0.],[0.,0.,0.]],[[0.,0.,0.],[0.,0.,0.],[1.,0.,0.]]]).to(device=self.device)            
+        tie_a = torch.tensor([[[0.,0.,0.],[0.,0.,0.],[0.,1.,0.]],[[0.,0.,1.],[0.,0.,0.],[0.,0.,0.]],[[0.,0.,0.],[0.,0.,1.],[0.,0.,0.]]]) .to(device=self.device) 
         
         win_values = qs[0].get(self.orbit(win_s), self.orbit(win_a))
         tie_values = qs[0].get(self.orbit(tie_s), self.orbit(tie_a))
@@ -255,11 +255,11 @@ class TTTTensorMDP(TensorMDP):
         # .O.   .O.
         # -.X   X.-
         # We want to see clustering amongst the Q-values for playing on the sides vs. on the corners, with the sides being higher.
-        s = torch.tensor([[[[1.,0.,0.],[0.,0.,0.],[0.,0.,1.]],[[0.,0.,0.],[0.,1.,0.],[0.,0.,0.]]], [[[0.,0.,1.],[0.,0.,0.],[1.,0.,0.]],[[0.,0.,0.],[0.,1.,0.],[0.,0.,0.]]]])
-        side_a = torch.tensor([[[0.,1.,0.],[0.,0.,0.],[0.,0.,0.]], [[0.,0.,0.],[1.,0.,0.],[0.,0.,0.]], [[0.,0.,0.],[0.,0.,1.],[0.,0.,0.]], [[0.,0.,0.],[0.,0.,0.],[0.,1.,0.]]])
-        side_values = qs[1].get(s[[0,0,0,0,1,1,1,1]], side_a[[0,1,2,3,0,1,2,3]])
-        corner_a = torch.tensor([[[0.,0.,1.],[0.,0.,0.],[0.,0.,0.]], [[0.,0.,0.],[0.,0.,0.],[1.,0.,0.]],[[1.,0.,0.],[0.,0.,0.],[0.,0.,0.]], [[0.,0.,0.],[0.,0.,0.],[0.,0.,1.]]])
-        corner_values = qs[1].get(s[[0,0,1,1]], corner_a)
+        s = torch.tensor([[[[1.,0.,0.],[0.,0.,0.],[0.,0.,1.]],[[0.,0.,0.],[0.,1.,0.],[0.,0.,0.]]], [[[0.,0.,1.],[0.,0.,0.],[1.,0.,0.]],[[0.,0.,0.],[0.,1.,0.],[0.,0.,0.]]]]).to(device=self.device) 
+        side_a = torch.tensor([[[0.,1.,0.],[0.,0.,0.],[0.,0.,0.]], [[0.,0.,0.],[1.,0.,0.],[0.,0.,0.]], [[0.,0.,0.],[0.,0.,1.],[0.,0.,0.]], [[0.,0.,0.],[0.,0.,0.],[0.,1.,0.]]]).to(device=self.device) 
+        side_values = qs[1].get(s[[0,0,0,0,1,1,1,1]], side_a[[0,1,2,3,0,1,2,3]]).to(device=self.device) 
+        corner_a = torch.tensor([[[0.,0.,1.],[0.,0.,0.],[0.,0.,0.]], [[0.,0.,0.],[0.,0.,0.],[1.,0.,0.]],[[1.,0.,0.],[0.,0.,0.],[0.,0.,0.]], [[0.,0.,0.],[0.,0.,0.],[0.,0.,1.]]]).to(device=self.device) 
+        corner_values = qs[1].get(s[[0,0,1,1]], corner_a).to(device=self.device) 
 
         side_stdev = side_values.std().item()
         corner_stdev = corner_values.std().item()

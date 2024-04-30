@@ -47,9 +47,9 @@ class C4TensorMDP(TensorMDP):
             'ramp_end': 1900,
             'training_delay': 100,
             'episode_length': 50, 
-            'sim_batch': 128, 
-            'train_batch': 256, 
-            'copy_interval_eps': 5
+            'sim_batch': 64, 
+            'train_batch': 128, 
+            'copy_interval_eps': 3
             }
         super().__init__(state_shape=(2,6,7), action_shape=(7,), discount=1, num_players=2, batched=True, default_memory = 1000000, default_hyperparameters=hyperpar, \
                          symb = {0: "O", 1: "X", None: "-"}, input_str = "Input column to play (1-7). ", penalty=-2)
@@ -202,23 +202,6 @@ class C4TensorMDP(TensorMDP):
     # Return shape (batch, 7), boolean type
     def valid_action_filter(self, state: torch.Tensor) -> torch.Tensor:
         return state.sum((1,2)) < 6
-
-    # # Gets a random valid action; if none, returns zero
-    # def get_random_action(self, state, max_tries=100):
-    #     filter = self.valid_action_filter(state)
-    #     while (filter.count_nonzero(dim=1) <= 1).prod().item() != 1:                            # Almost always terminates after one step
-    #         filter = torch.rand(filter.shape) * filter
-    #         filter = (filter == filter.max(1).values[:,None])
-    #         max_tries -= 1
-    #         if max_tries == 0:
-    #             break
-    #     return filter.int()
-
-    # Sum the channels and columns, add the action, should be <= 6.  Then, do an "and" along the rows.
-    # Input shape (batch, 2, 6, 7) and (batch, 7), return shape (batch, 1)
-    # def is_valid_action(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
-    #     return torch.prod(state.sum((1,2)) + action <= 6, 1)
-
 
 
     ### STATES ###
@@ -427,6 +410,34 @@ class C4NN(nn.Module):
 
     def forward(self, x):
         return self.stack(x)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

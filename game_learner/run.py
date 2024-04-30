@@ -8,6 +8,10 @@ from qlearn import *
 from deepqlearn import *
 import os, datetime, re, sys, torch
 
+# Alter for colab
+base_path = ""
+# base_path = "/content/gdrive/My Drive/colab/"
+
 open_str = '\nCommand-line options: python play.py <game> <play/train/simulate/benchmark/tournament>\n\
     If play (default), play against a model, against other humans, or watch bots play each other.\n\
     If train, continue to play after training.\n\
@@ -48,7 +52,7 @@ def load_bots(qgame, saves) -> str:
         try:
             index = int(res[0])
             if index >= 0 and index < len(saves):
-                qgame.load(f'bots/{shortname}/' + saves[index])
+                qgame.load(base_path + f'bots/{shortname}/' + saves[index])
                 logtext += log(f"Loaded {saves[index]} for all players.")
             else:
                 raise Exception
@@ -63,7 +67,7 @@ def load_bots(qgame, saves) -> str:
                 if index < 0 or index >= len(saves):
                     logtext += log(f"{i} is not a bot on the list.  Loading RANDOMBOT as player {i}.")
                 else:
-                    game.load(f'bots/{shortname}/' + saves[index], [i])
+                    game.load(base_path + f'bots/{shortname}/' + saves[index], [i])
             except:
                 logtext += log(f"Didn't understand {s}.  Loading RANDOMBOT as player {i}.")
         if len(res) > game.mdp.num_players:
@@ -90,41 +94,85 @@ dtttmdp = TTTTensorMDP(device=device)
 ghmdp = GoHomeMDP((6,6), (0,0), (3,3), 0.9)
 ntmdp = NoThanksTensorMDP(num_players=5, device=device)
 
-names = ["Tic-Tac-Toe", "Connect Four", "Deep Tic-Tac-Toe", "Deep Connect Four", "No Thanks!", "Robot Go Home"]
-shortnames = ["ttt", "c4", "dttt", "dc4", "nothanks", "home"]
-mdps = [tttmdp, c4mdp, dtttmdp, c4tmdp, ntmdp, ghmdp]
-file_exts = ['.ttt.pkl', '.c4.pkl', '.dttt.pt', '.dc4.pt', 'nt.pt', '.home.pkl']
-types = ["qlearn", "qlearn", "dqn", "dqn", 'dqn', 'qlearn']
-nnarchss = [None, None, [TTTNN, TTTResNN, TTTCatNN], [C4NN, C4ResNN], [NoThanksNN], None]
-nnargss = [None, None, [{'num_hiddens': 3, 'channels': 32}, {'num_hiddens': 4, 'hidden_depth': 1, 'hidden_width': 32}, {'num_hiddens': 5, 'hidden_width': 16}], [{}, {'num_hidden_conv': 5, 'hidden_conv_depth': 2, 'hidden_conv_layers': 32, 'num_hidden_linear': 3, 'hidden_linear_depth': 2, 'hidden_linear_width': 16}], [{}], None]
+#names = ["Tic-Tac-Toe", "Connect Four", "Deep Tic-Tac-Toe", "Deep Connect Four", "No Thanks!", "Robot Go Home"]
+#shortnames = ["ttt", "c4", "dttt", "dc4", "nothanks", "home"]
+
+names = {
+    "ttt": "Tic-Tac-Toe",
+    "c4": "Connect Four",
+    "dttt": "Deep Tic-Tac-Toe",
+    "dc4": "Deep Connect Four",
+    "nothanks": "No Thanks!",
+    "home": "Robot Go Home",
+}
+
+mdps = {
+    'ttt': tttmdp,
+    'c4': c4mdp,
+    'dttt': dtttmdp,
+    'dc4': c4tmdp,
+    'nothanks': ntmdp,
+    'home': ghmdp,
+}
+
+file_exts = {
+    'ttt': '.ttt.pkl',
+    'c4': '.c4.pkl',
+    'dttt': '.dttt.pt', 
+    'dc4': '.dc4.pt', 
+    'nothanks': 'nt.pt', 
+    'home': '.home.pkl',
+}
+
+types = {
+    'ttt': "qlearn", 
+    'c4': "qlearn", 
+    'dttt': "dqn", 
+    'dc4': "dqn", 
+    'nothanks': 'dqn', 
+    'home': 'qlearn',
+}
+
+nnarchss = {
+    'ttt': None, 
+    'c4': None, 
+    'dttt': [TTTNN, TTTResNN, TTTCatNN], 
+    'dc4': [C4NN, C4ResNN], 
+    'nothanks': [NoThanksNN], 
+    'home': None,
+}
+
+nnargss = {
+    'ttt': None, 
+    'c4': None, 
+    'dttt': [{'num_hiddens': 3, 'channels': 32}, {'num_hiddens': 4, 'hidden_depth': 1, 'hidden_width': 32}, {'num_hiddens': 5, 'hidden_width': 16}], 
+    'dc4': [{}, {'num_hidden_conv': 7, 'hidden_conv_depth': 1, 'hidden_conv_layers': 32, 'num_hidden_linear': 3, 'hidden_linear_depth': 1, 'hidden_linear_width': 32}], 
+    'nothanks': [{}], 
+    'home': None,
+}
 
 
 # If the game was specified, choose it
+shortname = ""
 if len(sys.argv) > 1:
-    for i in range(len(shortnames)):
-        if sys.argv[1] == shortnames[i]:
-            res = i
+    if sys.argv[1] in names:
+        shortname = sys.argv[1]
+
 else:
     print("Games:")
-    for i in range(len(names)):
-        print(f"[{i}] {names[i]} ({shortnames[i]})")
-    res = input("\nSelect game from list (input number): ")
+    for shortname in names:
+        print(f"[{shortname}] {names[shortname]}")
+    shortname = input("\nSelect game from list (input short name): ").strip().lower()
 
 try:
-    game_index = int(res)
-    name = names[game_index]
-    mdp = mdps[game_index]
-    file_ext = file_exts[game_index]
-    shortname = shortnames[game_index]
-    type = types[game_index]
-    nnarchs = nnarchss[game_index]
-    nnargs = nnargss[game_index]
+    name = names[shortname]
+    mdp = mdps[shortname]
+    file_ext = file_exts[shortname]
+    type = types[shortname]
+    nnarchs = nnarchss[shortname]
+    nnargs = nnargss[shortname]
 except:
-    games_str = ""
-    for i in range(len(names)):
-        games_str += names[i] + ' (' + shortnames[i] + '), '
-    games_str = games_str[:-2]
-    print(f"Didn't recognize that game.  The games are {games_str}.  Exiting.")
+    print(f"Didn't recognize that game.  Exiting.")
     exit()
 
 
@@ -133,7 +181,7 @@ print(f"\nPlaying {name}.\n")
 #==================== LOAD SAVES ====================#
 
 
-save_files = [each for each in os.listdir(f'bots/{shortname}/') if each.endswith(file_ext)]
+save_files = [each for each in os.listdir(base_path + f'bots/{shortname}/') if each.endswith(file_ext)]
 save_files.sort()
 
 
@@ -174,7 +222,7 @@ if mode == "train":
 
     res = input("Name of file (alphanumeric only, max length 64, w/o extension): ")
     fname_end = f"{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}_" + re.sub(r'\W+', '', res)[0:64] + f"{file_ext}"
-    fname = f'bots/{shortname}/' + fname_end
+    fname = base_path + f'bots/{shortname}/' + fname_end
 
     print(f"Will save model to {fname}\n")
 
@@ -284,7 +332,7 @@ if mode == "tournament":
 
     for match in matches:
         for i in range(n):
-            game.load(f'bots/{shortname}/' + saves[match[i]], [i])
+            game.load(base_path + f'bots/{shortname}/' + saves[match[i]], [i])
         r = game.simulate()
         logtext += log(f"Result of match {match}: {r[0].int().tolist()}")
         for i in range(n):
@@ -318,7 +366,7 @@ if mode == "tournament":
     for i in range(k):
         logtext += log(f"{saves[by_score[i]]}: {records[by_score[i]]}")
 
-    with open(f"logs/tournament.{shortname}.{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.log", "w") as f:
+    with open(base_path + f"logs/tournament.{shortname}.{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.log", "w") as f:
         f.write(logtext)
     
     exit()
@@ -353,13 +401,13 @@ if mode == "benchmark":
         logtext = ""
         logtext += log(f"Simulating {name} against RANDOMBOT for {sims} simulations.")
         for i in range(1, len(save_files)):
-            game.load(f'bots/{shortname}/' + save_files[i])
+            game.load(base_path + f'bots/{shortname}/' + save_files[i])
             result = game.simulate_against_random(sims, replay_loss=False, verbose=False)
             logtext += log(f"")
             for j in range(len(result)):
                 logtext += log(f"Bot {save_files[i]} as player {j}: {result[j][0]} wins, {result[j][1]} losses, {result[j][2]} ties, {result[j][3]} invalid moves, {result[j][4]} unknown results.")
 
-        with open(f"logs/benchmark.{shortname}.{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.log", "w") as f:
+        with open(base_path + f"logs/benchmark.{shortname}.{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.log", "w") as f:
             f.write(logtext)
 
     exit()
