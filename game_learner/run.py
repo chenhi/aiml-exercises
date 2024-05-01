@@ -136,8 +136,8 @@ types = {
 nnarchss = {
     'ttt': None, 
     'c4': None, 
-    'dttt': [TTTNN, TTTResNN, TTTCatNN], 
-    'dc4': [C4NN, C4ResNN], 
+    'dttt': [TTTResNN, TTTNN, TTTCatNN], 
+    'dc4': [C4ResNN, C4NN], 
     'nothanks': [NoThanksNN], 
     'home': None,
 }
@@ -145,8 +145,8 @@ nnarchss = {
 nnargss = {
     'ttt': None, 
     'c4': None, 
-    'dttt': [{'num_hiddens': 3, 'channels': 32}, {'num_hiddens': 4, 'hidden_depth': 1, 'hidden_width': 32}, {'num_hiddens': 5, 'hidden_width': 16}], 
-    'dc4': [{}, {'num_hidden_conv': 7, 'hidden_conv_depth': 1, 'hidden_conv_layers': 32, 'num_hidden_linear': 3, 'hidden_linear_depth': 1, 'hidden_linear_width': 32}], 
+    'dttt': [{'num_hiddens': 4, 'hidden_depth': 1, 'hidden_width': 32}, {'num_hiddens': 3, 'channels': 32}, {'num_hiddens': 5, 'hidden_width': 16}], 
+    'dc4': [{'num_hidden_conv': 7, 'hidden_conv_depth': 1, 'hidden_conv_layers': 32, 'num_hidden_linear': 3, 'hidden_linear_depth': 1, 'hidden_linear_width': 32}, {}], 
     'nothanks': [{}], 
     'home': None,
 }
