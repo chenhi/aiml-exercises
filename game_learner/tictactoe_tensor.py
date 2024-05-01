@@ -290,72 +290,6 @@ class TTTNN(nn.Module):
         super().__init__()
         self.stack = {}
 
-        # self.stack = nn.Sequential(
-        #     nn.Conv2d(2, 32, (3,3), padding='same'),
-        #     nn.LeakyReLU(),
-        #     nn.Conv2d(32, 64, (3,3), padding='same'),
-        #     nn.LeakyReLU(),
-        #     nn.Conv2d(64, 128, (3,3), padding='same'),
-        #     nn.LeakyReLU(),
-        #     nn.Conv2d(128, 256, (3,3), padding='same'),
-        #     nn.LeakyReLU(),
-        #     nn.Conv2d(256, 1, (3,3), padding='same'),
-        # )
-
-
-        # self.stack= nn.Sequential(
-        #     nn.Conv2d(2, 32, (3,3), padding='same'),
-        #     nn.LeakyReLU(),
-        #     nn.Conv2d(32, 64, (3,3), padding='same'),
-        #     nn.LeakyReLU(),
-        #     nn.Conv2d(64, 32, (3,3), padding='same'),
-        #     nn.LeakyReLU(),
-        #     nn.Conv2d(32, 8, (3,3), padding='same'),
-        #     nn.LeakyReLU(),
-        #     nn.Conv2d(8, 1, (3,3), padding='same'),
-        # )
-
-        # Narrow
-        # self.stack = nn.Sequential(
-        #     nn.Conv2d(2, 32, (3,3), padding='same'),
-        #     nn.LeakyReLU(),
-        #     nn.BatchNorm2d(32),
-        #     nn.Conv2d(32, 32, (3,3), padding='same'),
-        #     nn.LeakyReLU(),
-        #     nn.BatchNorm2d(32),
-        #     nn.Conv2d(32, 32, (3,3), padding='same'),
-        #     nn.LeakyReLU(),
-        #     nn.BatchNorm2d(32),
-        #     nn.Conv2d(32, 8, (3,3), padding='same'),
-        #     nn.LeakyReLU(),
-        #     nn.BatchNorm2d(8),
-        #     nn.Conv2d(8, 1, (3,3), padding='same'),
-        # )
-
-        # Deeper
-        # self.stack = nn.Sequential(
-        #     nn.Conv2d(2, 32, (3,3), padding='same'),
-        #     nn.LeakyReLU(),
-        #     nn.BatchNorm2d(32),
-        #     nn.Conv2d(32, 32, (3,3), padding='same'),
-        #     nn.LeakyReLU(),
-        #     nn.BatchNorm2d(32),
-        #     nn.Conv2d(32, 32, (3,3), padding='same'),
-        #     nn.LeakyReLU(),
-        #     nn.BatchNorm2d(32),
-        #     nn.Conv2d(32, 32, (3,3), padding='same'),
-        #     nn.LeakyReLU(),
-        #     nn.BatchNorm2d(32),
-        #     nn.Conv2d(32, 32, (3,3), padding='same'),
-        #     nn.LeakyReLU(),
-        #     nn.BatchNorm2d(32),
-        #     nn.Conv2d(32, 8, (3,3), padding='same'),
-        #     nn.LeakyReLU(),
-        #     nn.BatchNorm2d(8),
-        #     nn.Conv2d(8, 1, (3,3), padding='same'),
-        # )
-    
-
         # Tests
         self.stack = nn.Sequential(
             nn.Conv2d(2, channels, (3,3), padding='same'),
@@ -426,30 +360,3 @@ class TTTCatNN(nn.Module):
         for h in self.hidden_layers:
             outputs.append(h(torch.cat(outputs, dim=1)))
         return self.tail(outputs[-1])[:,0]
-
-
-if "test" in options:
-    print("RUNNING TESTS:\n")
-
-    verbose = True if "verbose" in options else False
-
-    mdp = TTTTensorMDP()
-    s = mdp.get_initial_state(2)
-    print(mdp.board_str(s)[0])
-    print(mdp.board_str(s)[1])
-
-    print("Fixed action to check:")
-    b = mdp.get_random_action(s)
-    print(b)
-
-    for i in range(12):
-        print("play")
-        a = mdp.get_random_action(s)
-        print(a.tolist())
-        t, r = mdp.transition(s, a)
-        print(mdp.board_str(t)[0])
-        print(mdp.board_str(t)[1])
-        print(r.tolist())
-        s = t
-        print("is the original action still valid")
-        print(mdp.is_valid_action(s, b))
