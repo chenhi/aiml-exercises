@@ -239,7 +239,7 @@ class C4TensorMDP(TensorMDP):
         p = self.get_player(state)
         p_tensor = self.get_player_vector(state)
 
-        # Make the move!  Note this operation is safe: if the move is invalid, no move will be made.
+        # Make the move!  If the move is invalid, no move will be made.
         # First, get the position we want to add by summing the channels and columns: state.sum((1,2))
         # This has shape (batch, 7); we extend it by ones to shape (batch, 6, 7): torch.tensordot(state.sum((1,2)), torch.ones(6), 0)
         #coltotals = state.sum((1,2))[:,None,:].expand(-1,6,-1)
