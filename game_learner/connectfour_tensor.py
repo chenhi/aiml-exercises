@@ -21,11 +21,9 @@ def shift(x: torch.Tensor, shift: int, axis: int, device="cpu") -> torch.Tensor:
         return torch.cat((torch.index_select(x, axis, torch.arange(-shift, x.shape[axis], device=device)), torch.zeros(zero_shape, device=device)), axis)
 
 
-
-
-# State tensor shape (batches, player_channel = 2, h = 6, w = 7)
-# Action tensor (batches, w)
-# Reward tensor (batches, )
+# State tensor shape (b = batches, player_channel = 2, h = 6, w = 7)
+# Action tensor (b, w)
+# Reward tensor (b, )
 class C4TensorMDP(TensorMDP):
 
     def __init__(self, height=6, width=7, win_condition=4, device="cpu"):
@@ -51,7 +49,7 @@ class C4TensorMDP(TensorMDP):
         
         # Generate kernels for detecting winner
         # Shape: (hw, 4x, h, w)
-        # The first dimension corresponds to the flattened index of the center (i, j) <--> 7i + j
+        # The first dimension corresponds to the flattened index of the center (i, j) <--> wi + j
         stacks = []
 
         for i in range(self.height):
@@ -224,12 +222,9 @@ class C4TensorMDP(TensorMDP):
         # Then, we multiply it with action to isolate the right column, shape (batch, 6, 7)
         #newpos = action[:,None,:].expand(-1,6,-1)  * (coltotals == rowcounter)
         newpos = action[:,None,:].expand(-1, self.height,-1)  * (state.sum((1,2))[:,None,:].expand(-1, self.height, -1) == torch.arange(self.height, device=self.device)[:,None].expand(-1, self.width))
-        
-        # Then, we put the player channel back in to get a shape (batch, 2, 7, 6)
-        #newpiece = p_tensor * newpos[:,None,:,:].expand(-1,2,-1,-1)
-        # Then, we add it to the state
-        #newstate = state + newpiece
-        newstate = state + p_tensor * newpos[:,None,:,:].expand(-1,2,-1,-1)
+
+        # Restore channel and add, shape (b, 2, w, h)
+        newstate = state + p_tensor * newpos[:,None,:,:]
 
         # Check whether the current player is a winner after playing at position newpos
         winner = self.is_winner(newstate, p, newpos)

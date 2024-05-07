@@ -78,23 +78,37 @@ class TensorMDP(MDP):
     def valid_action_filter(self, state: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError
     
+    # Inserts negative infinity at invalid actions (logits version of multilication by masking filter)
+    # The reason this is needed is that the operation of zeroing out entries in filters corresponds, when taking maximums, to replacing those entries with negative infinity
+    # The return value of this function should be added to an action tensor
     def neginf_kill_actions(self, state: torch.Tensor) -> torch.Tensor:
         return (-torch.inf * (1 - self.valid_action_filter(state).float())).nan_to_num(0)
     
-    def get_random_action(self, state, max_tries=100) -> torch.Tensor:
-        return self.get_random_action_from_filter(self.valid_action_filter(state).float())
+    # Chooses a valid action unifoirmly at random
+    def get_random_action(self, state) -> torch.Tensor:
+        return self.get_random_action_weighted(self.valid_action_filter(state).float())
     
-    def get_random_action_from_values(self, values, max_tries=100) -> torch.Tensor:         # TODO what if all values are 0
-        return self.get_random_action_from_filter(values == values.flatten(1,-1).max(1).values.reshape((-1,) + self.action_projshape).float(), max_tries=max_tries)
+    # Chooses a action from the indices with maximum value (uniformly at random if more than one)
+    def get_max_action(self, values) -> torch.Tensor:         # TODO what if all values are 0
+        return self.get_random_action_weighted(values == values.flatten(1,-1).max(1).values.reshape((-1,) + self.action_projshape).float())
     
-    def get_random_action_from_filter(self, filter, max_tries=100) -> torch.Tensor:
-        while (filter.flatten(1,-1).count_nonzero(dim=1) <= 1).prod().item() != 1:                             # Almost always terminates after one step
-            temp = torch.rand((filter.size(0),) + self.action_shape, device=self.device) * filter
-            filter = (temp == temp.flatten(1,-1).max(1).values.reshape((-1,) + self.action_projshape)).float()
-            max_tries -= 1
-            if max_tries == 0:
-                break
-        return filter * 1.
+    # Return an action uniformly from non-zero entries
+    # Deprecated for get_random_action_weighted; more efficient
+    # def get_random_action_from_filter(self, filter, max_tries=100) -> torch.Tensor:
+    #     filter = filter != 0.
+    #     while (filter.flatten(1,-1).count_nonzero(dim=1) <= 1).prod().item() != 1:                             # Almost always terminates after one step
+    #         temp = torch.rand((filter.size(0),) + self.action_shape, device=self.device) * filter
+    #         filter = (temp == temp.flatten(1,-1).max(1).values.reshape((-1,) + self.action_projshape)).float()
+    #         max_tries -= 1
+    #         if max_tries == 0:
+    #             break
+    #     return filter * 1.
+    
+    # Input action shape, return an action with probability weighted by the entries
+    def get_random_action_weighted(self, weights) -> torch.Tensor:
+        # Eliminate negative entries and flatten
+        weights = ((weights > 0) * weights).flatten(1, -1)
+        return (torch.cumsum(weights / torch.sum(weights, 1), 1) > torch.rand(weights.size(0),)[:,None]).diff(dim=1, prepend=torch.zeros((weights.size(0),1))).reshape((-1,) + self.action_shape)
     
     # Output has state shape
     def is_valid_action(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
@@ -158,11 +172,11 @@ class NNQFunction(QFunction):
     
     # Input is a batch of state vectors
     # Returns the value of an optimal policy at a given state, shape (batches, ) + action_shape
-    def policy(self, state, max_tries=100, valid_filter=True) -> torch.Tensor:
+    def policy(self, state, valid_filter=True) -> torch.Tensor:
         if self.q == None:
             return self.mdp.get_random_action(state)
         self.q.eval()
-        return self.mdp.get_random_action_from_values(self.q(state) + valid_filter * self.mdp.neginf_kill_actions(state), max_tries=max_tries)
+        return self.mdp.get_max_action(self.q(state) + valid_filter * self.mdp.neginf_kill_actions(state))
 
 
     # Does a Q-update based on some observed set of data
@@ -454,7 +468,7 @@ class DQN(DeepRL):
 
         actions = self.mdp.valid_action_filter(state)
         while len(torch.nonzero(actions).tolist()) > 0:
-            a = self.mdp.get_random_action_from_filter(actions)
+            a = self.mdp.get_random_action_weighted(actions)
             t, r = self.mdp.transition(state, a)
             if self.mdp.is_terminal(t).item():
                 self.q_dict[(self.mdp.state_to_hashable(state[0]), self.mdp.action_to_hashable(a[0]))] = r[0].tolist()

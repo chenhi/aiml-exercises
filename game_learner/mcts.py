@@ -26,7 +26,7 @@ class DMCTS(DeepRL):
     #         return torch.zeros((1,) + self.mdp.action_shape)
     #     return self.q[statehash]
 
-    # Unbatched
+    # Unbatched, return action shape
     def ucb(self, state, param: float):
         statehash = self.mdp.state_to_hashable(state)
         if statehash not in self.q:
@@ -34,21 +34,24 @@ class DMCTS(DeepRL):
         return (self.q[statehash].nan_to_num(0) + param * math.sqrt(torch.sum(self.n[statehash])) / (1 + self.n[statehash]))[None]
 
     # Unbatched
-    def search(self, state, ucb_parameter: int, p: nn.Module, num: int):
+    # Starting at a given state, 
+    def search(self, state, ucb_parameter: int, p: nn.Module, num: int, max_depth=1000):
         for i in range(num):
-            print(f"Iteration {i+1}")
             history = []
             s = state
+            depth = 0
 
-            print("Going down tree")
             # Go down tree, using upper confidence bound and dictionary q values to play
             while self.mdp.state_to_hashable(s) in self.q and self.mdp.is_terminal(s).item() == False:
+                if depth >= max_depth:
+                    print("Max depth researched in selection.")
+                    break
                 ucb = self.ucb(s, ucb_parameter)
-                action = self.mdp.get_random_action_from_values(torch.sigmoid(ucb) * self.mdp.valid_action_filter(s))
+                action = self.mdp.get_random_action_weighted(torch.sigmoid(ucb) * self.mdp.valid_action_filter(s))
                 history.append((s, action))
                 s, r = self.mdp.transition(s, action)
+                depth += 1
                 
-            print("Expanding tree")
             # Once we reach a leaf, use p to simulate play
             if self.mdp.is_terminal(s).item() == False:
                 self.q[self.mdp.state_to_hashable(s)] = torch.zeros(self.mdp.action_shape)
@@ -56,12 +59,14 @@ class DMCTS(DeepRL):
                 self.w[self.mdp.state_to_hashable(s)] = torch.zeros(self.mdp.action_shape)
                 self.p[self.mdp.state_to_hashable(s)] = p(s)
             while self.mdp.is_terminal(s).item() == False:
+                if depth >= max_depth:
+                    print("Max depth researched in expansion.")
+                    break
                 action = self.choose_action(torch.sigmoid(p(s)) * self.mdp.valid_action_filter(s))
                 history.append((s, action))
                 s, r = self.mdp.transition(s, action)
+                depth += 1
             
-            print("Back update")
-            # Back-update
             while len(history) > 0:
                 s, action = history.pop()
                 if self.mdp.state_to_hashable(s) in self.p:
@@ -72,6 +77,7 @@ class DMCTS(DeepRL):
 
     # Batched
     # If divide by zero, get nan, then comparison gives False, so resulting vector is 0
+    # NOTE this has been implemented in TensorMDP
     def choose_action(self, prob_vector):
         return (torch.cumsum(prob_vector.flatten(1, -1) / torch.sum(prob_vector.flatten(1,-1), 1), 1) > torch.rand(prob_vector.size(0),)[:,None]).diff(dim=1, prepend=torch.zeros((prob_vector.size(0),1))).reshape((-1,) + self.mdp.action_shape)
 
