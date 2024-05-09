@@ -11,11 +11,13 @@ device = (
 )
 
 
+# TODO regularize using weight_decay=lr/10?
+
 mdp = TTTTensorMDP(device=device)
 game = DMCTS(mdp, TTTResNN, torch.nn.CrossEntropyLoss(), torch.optim.Adam, device=device)
 
 
-game.mcts(lr = 0.01, num_iterations=50, num_selfplay=10, num_searches=100, max_steps=100, ucb_parameter=2, temperature=1, train_batch=8, p_threshold_multiplier=10)
+#game.mcts(lr = 0.01, num_iterations=50, num_selfplay=10, num_searches=100, max_steps=100, ucb_parameter=2, temperature=1, train_batch=8, p_threshold_multiplier=10)
 
 
 
@@ -45,21 +47,14 @@ u[0,1,1,1] = 1.
 u[0,0,2,2] = 1.
 print(game.mdp.board_str(u)[0])
 
-b = 2
+b = 10
 
-# print(game.pv(u))
-# print(torch.sigmoid(game.pv(u)))
-# game.search(u, game.pv, 5000, ucb_parameter = b, temperature = 1)
-# print("Q", game.q[mdp.state_to_hashable(u)])
-# print("N", game.n[mdp.state_to_hashable(u)])
-# print("W", game.w[mdp.state_to_hashable(u)])
-# print("P", game.p[mdp.state_to_hashable(u)])
-# print("ucb", game.ucb(u, b))
-# print("???", (game.ucb(u, b)) * game.mdp.valid_action_filter(u))
-
-
-
+print(torch.softmax(game.pv(u).flatten(1, -1), dim=1))
+game.search(u, game.pv, 5000, ucb_parameter = b, temperature = 1)
 print("Q", game.q[mdp.state_to_hashable(u)])
 print("N", game.n[mdp.state_to_hashable(u)])
 print("W", game.w[mdp.state_to_hashable(u)])
 print("P", game.p[mdp.state_to_hashable(u)])
+print("ucb", game.ucb(u, b))
+print("???", (game.ucb(u, b)) * game.mdp.valid_action_filter(u))
+

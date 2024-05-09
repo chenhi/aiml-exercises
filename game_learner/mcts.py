@@ -28,6 +28,7 @@ class DMCTS(DeepRL):
     #         return torch.zeros((1,) + self.mdp.action_shape)
     #     return self.q[statehash]
 
+
     # Unbatched, return action shape
     def ucb(self, state, param: float):
         statehash = self.mdp.state_to_hashable(state)
@@ -40,7 +41,7 @@ class DMCTS(DeepRL):
     # Starting at a given state, conducts a fixed number of Monte-Carlo searches, using the Q function in visited states and the heuristic function in new states
     # Updates the Q, N, W, P functions
     # Returns probability vector with batched dimension added
-    def search(self, state, heuristic: nn.Module, num: int, ucb_parameter = 2.0, temperature=1.0, evaluation_batch_size = 8, p_threshold_multiplier = 10, max_depth=1000):
+    def search(self, state, heuristic: nn.Module, num: int, ucb_parameter = 10.0, temperature=1.0, evaluation_batch_size = 8, p_threshold_multiplier = 10, max_depth=1000):
         evaluation_queue = []
 
         # Do a certain number of searches from the initial state
@@ -78,16 +79,15 @@ class DMCTS(DeepRL):
 
                 # Sigmoid so that the values are in (0, 1)
                 # These prior probabilities are only assigned once; eventually, with enough visits the quality function will dominate the heuristic
-                self.p[self.mdp.state_to_hashable(s)] = torch.sigmoid(heuristic(s))
+                self.p[self.mdp.state_to_hashable(s)] = torch.softmax(heuristic(s).flatten(1, -1), dim=1).reshape((-1, ) + self.mdp.action_shape)
 
             while self.mdp.is_terminal(s).item() == False:
                 if depth >= max_depth:
                     print("Max depth researched in expansion.")
                     break
-                # TODO do we want to cache these values
-                action = self.mdp.get_random_action_weighted(torch.sigmoid(heuristic(s)) * self.mdp.valid_action_filter(s)) 
-                # We don't keep the simulation nodes for memory reasons
-                #history.append((s, action))
+                # Exponential means un-normalized softmax
+                action = self.mdp.get_random_action_weighted(torch.exp(heuristic(s)) * self.mdp.valid_action_filter(s)) 
+                # We don't keep the simulation nodes in history for memory reasons
                 s, r = self.mdp.transition(s, action)
                 depth += 1
             
@@ -98,13 +98,6 @@ class DMCTS(DeepRL):
                     self.n_tot[self.mdp.state_to_hashable(s)] += action[0].sum().item()
                     self.w[self.mdp.state_to_hashable(s)] += action[0] * r[0,self.mdp.get_player(s)[0]][0]
                     self.q[self.mdp.state_to_hashable(s)] = self.w[self.mdp.state_to_hashable(s)] / self.n[self.mdp.state_to_hashable(s)]
-                    # Update the prior probability if threshold passed      
-                    # TODO does it ever actually make sense to do this????  we don't train on it and maybe we want to keep the heuristic?
-                    # TODO but then when do we update P... confused
-                    # TODO commented this out because i think 
-                    # if self.n_tot[self.mdp.state_to_hashable(s)] > p_threshold_multiplier * self.mdp.valid_action_filter(s).sum().item():
-                    #     p_vector = self.n[self.mdp.state_to_hashable(s)] ** (1 / temperature)
-                    #     self.p[self.mdp.state_to_hashable(s)] = p_vector / p_vector.flatten().sum()
 
         # Return probability vector for initial state (even if it isn't updated)
         p_vector = self.n[self.mdp.state_to_hashable(state)] ** (1 / temperature)
@@ -156,7 +149,7 @@ class DMCTS(DeepRL):
                     # Do searches
                     p_vector = self.search(s[play:play+1], heuristic=prior_p, ucb_parameter=ucb_parameter, num=num_searches, temperature=temperature, p_threshold_multiplier=p_threshold_multiplier)
 
-                    # Add probability vector to record
+                    # Add probability vector to record TODO these don't need to be sorted by play
                     states[play] = torch.cat([states[play], s[play:play+1]], dim=0)
                     p_vectors[play] = torch.cat([p_vectors[play], p_vector], dim=0)
                     step_p = torch.cat([step_p, p_vector], dim=0)
@@ -170,7 +163,8 @@ class DMCTS(DeepRL):
                     if results[play] == None and self.mdp.is_terminal(s[play:play+1]).item():
                         results[play] = r[play]
 
-            # We do not actually need to bother with the results, since we do not have the bot concede            
+            # We do not actually need to bother with the results, since we do not have the bot concede    
+            # TODO having the bot concede might be efficient in training?  so it doesn't have to run the search all the way through all the time?        
             # For unresolved games, set rewards to zero
             # for play in range(num_selfplay):
             #     if results[play] == None:
@@ -191,7 +185,7 @@ class DMCTS(DeepRL):
                 x = training_inputs[-1][get_indices]
                 y = training_values[-1][get_indices]
 
-
+                # Before softmax
                 pred = self.pv(x)
 
                 loss = self.loss_fn(pred, y)
