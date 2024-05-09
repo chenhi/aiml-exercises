@@ -19,7 +19,7 @@ There is an immediate design choice that needs to be made: how to handle illegal
 + **Penalty:** teach the bot to avoid illegal moves by assigning a penalty to illegal moves.
 Randomness appeared to me strictly inferior to prohibition, so I didn't experiment with it.  Below are the loss curves comparing prohibition and penalty for a residual neural network and a straightforward linear neural network.
 <center>
-<img src="20240413213956_zeroout2.dttt.pt.losses.png" width="25%"><img src="20240413220118_zerooutrnn.dttt.pt.losses.png" width="25%"><img src="20240413212415_penalty2.dttt.pt.losses.png" width="25%"><img src="20240413222418_resnnpenalty.dttt.pt.losses.png" width="25%">
+<img src="20240413213956_zeroout2.dttt.pt.losses.png" width="24%"><img src="20240413220118_zerooutrnn.dttt.pt.losses.png" width="24%"><img src="20240413212415_penalty2.dttt.pt.losses.png" width="24%"><img src="20240413222418_resnnpenalty.dttt.pt.losses.png" width="24%">
 Prohibition (left two) vs. penalty (right two) loss curves.
 </center>
 
