@@ -42,9 +42,7 @@ I implemented penalty first since it was more straightforward, but later switche
 
 ### Magnitude of penalty
 
-The magnitude of the penalty has an effect on neural network training where it does not in classical Q-learning.  For classical Q-learning, the function is an arbitrary function on a discrete set of states.  For deep Q-learning, the function is ``built from'' linear functions defined on a vector space continuum (but only evaluated on a discrete subset).  In particular, for deep Q-learning, large values can skew the weights during training.  In the beginning, I had set the penalty to -1000, which worked classically but was deterimental to training neural networks.
-
-To see this, I ran an experiment comparing a penalty of -2 vs. a penalty of -1000.  With a large penalty the model much longer to begin to converge.  A large penalty negatively impacts the performance of the bot measured in losses as well as, perhaps counterintuitively, its ability to avoid illegal moves.  In the long term, the bot appears to be able to adjust its weights to account for the large penalty, but in general it seems best to avoid it.
+The magnitude of the penalty has an effect on neural network training where it does not in classical Q-learning.  For classical Q-learning, the function is an arbitrary function on a discrete set of states.  For deep Q-learning, the function is ``built from'' linear functions defined on a vector space continuum (but only evaluated on a discrete subset).  In particular, for deep Q-learning, large values can skew the weights during training.  In the beginning, I had set the penalty to -1000, which worked classically but caused divergence when training neural networks.  I tested this in an experiment comparing penalties of -2 vs. -1000.  I also tested a penalty of -1, which was not significantly different from a penalty of -2.
 
 <p align="center">
 <img src="graphs/20240325030438_badpenalty.dttt.pt.log.losses.png" width="40%"><img src="graphs/20240324030517_4000its.dttt.pt.log.losses.png" width="40%">
@@ -53,14 +51,14 @@ To see this, I ran an experiment comparing a penalty of -2 vs. a penalty of -100
 
 <table align="center">
 <tr><td>iterations</td><td colspan="2">1000</td><td colspan="2">1500</td><td colspan="2">4000</td></tr>
-<tr><td>penalty</td><td>2</td><td>1000</td><td>2</td><td>1000</td><td>2</td><td>1000</td></tr>
+<tr><td>penalty</td><td>2</td><td>-1000</td><td>-2</td><td>-1000</td><td>2</td><td>-1000</td></tr>
 <tr><td>player 1 losses</td><td>0.00%</td><td>0.00%</td><td>0.00%</td><td>0.00%</td><td>0.00%</td><td>0.00%</td></tr>
 <tr><td>player 2 losses</td><td>1.27%</td><td>1.25%</td><td>1.60%</td><td>2.81%</td><td>0.00%</td><td>0.10%</td></tr>
 <tr><td>player 1 invalid moves</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
 <tr><td>player 2 invalid moves</td><td>6</td><td>63</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
 </table>
 
-
+With a large penalty the model much longer to begin to converge.  A large penalty negatively impacts the performance of the bot measured in losses as well as, perhaps counterintuitively, its ability to avoid illegal moves.  In the long term, the bot appears to be able to adjust its weights to account for the large penalty, but in general it seems best to avoid it.
 
 ### TODO
 
