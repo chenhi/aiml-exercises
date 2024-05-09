@@ -32,6 +32,7 @@ The prohibition curves appear more noisy, likely since it is common for the bot 
 <img src="graphs/20240413203510_test_zeroout.dttt.pt.test1.png" width="24%"><img src="graphs/20240413213956_zeroout2.dttt.pt.test1.png" width="24%"><img src="graphs/20240413210030_test_penalty.dttt.pt.test1.png" width="24%"><img src="graphs/20240413212415_penalty2.dttt.pt.test1.png" width="24%">
 Performance metrics for prohibition (left two) vs. penalty (right two).
 </p>
+
 In particular, for Test 1, we see that we tend to see much more separation between the green curve and the blue/orange curves using prohibition, an indication that the bot is learning to distinguish a particular group of losing moves vs. tying moves.
 
 I implemented penalty first since it was more straightforward, but later switched to prohibition.  Many experiments in the remainder of the document use penalty; one unintended benefit of this is that the number of illegal moves attempted by the bot can be used as a metric for how well the bot has learned the basic rules of the game.
