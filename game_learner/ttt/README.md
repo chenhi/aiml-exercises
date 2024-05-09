@@ -22,7 +22,8 @@ There is an immediate design choice that needs to be made: how to handle illegal
 
 Randomness appeared to me strictly inferior to prohibition, so I didn't experiment with it.  Below are the loss curves comparing prohibition and penalty.
 <p align="center">
-<img src="graphs/20240413213956_zeroout2.dttt.pt.losses.png" width="24%"><img src="graphs/20240413220118_zerooutrnn.dttt.pt.losses.png" width="24%"><img src="graphs/20240413212415_penalty2.dttt.pt.losses.png" width="24%"><img src="graphs/20240413222418_resnnpenalty.dttt.pt.losses.png" width="24%">
+<img src="graphs/20240413213956_zeroout2.dttt.pt.losses.png" width="24%"><img src="graphs/20240413220118_zerooutrnn.dttt.pt.losses.png" width="24%"><img src="graphs/20240413212415_penalty2.dttt.pt.losses.png" width="24%"><img src="graphs/20240413222418_resnnpenalty.dttt.pt.losses.png" width="24%"></p>
+<p align="center">
 Prohibition (left two; linear and residual architectures) vs. penalty (right two; linear and residual architectures).
 </p>
 
@@ -30,7 +31,7 @@ The prohibition curves appear more noisy, likely since it is common for the bot 
 <p align="center">
 <img src="graphs/20240413203510_test_zeroout.dttt.pt.test0.png" width="24%"><img src="graphs/20240413213956_zeroout2.dttt.pt.test0.png" width="24%"><img src="graphs/20240413210030_test_penalty.dttt.pt.test0.png" width="24%"><img src="graphs/20240413212415_penalty2.dttt.pt.test0.png" width="24%">
 <img src="graphs/20240413203510_test_zeroout.dttt.pt.test1.png" width="24%"><img src="graphs/20240413213956_zeroout2.dttt.pt.test1.png" width="24%"><img src="graphs/20240413210030_test_penalty.dttt.pt.test1.png" width="24%"><img src="graphs/20240413212415_penalty2.dttt.pt.test1.png" width="24%">
-
+</p><p align="center">
 Performance metrics for prohibition (left two) vs. penalty (right two).
 </p>
 
@@ -47,8 +48,8 @@ To see this, I ran an experiment comparing a penalty of -2 vs. a penalty of -100
 
 <p align="center">
 <img src="graphs/20240325030438_badpenalty.dttt.pt.log.losses.png" width="40%"><img src="graphs/20240324030517_4000its.dttt.pt.log.losses.png" width="40%">
-
-Loss curve over 4000 iterations: -1000 penalty (left) vs. -2 penalty (right).
+<p>
+<p align="center">Loss curve over 4000 iterations: -1000 penalty (left) vs. -2 penalty (right).</p>
 
 <table align="center">
 <tr><td>iterations</td><td colspan="2">1000</td><td colspan="2">1500</td><td colspan="2">4000</td></tr>
@@ -59,9 +60,6 @@ Loss curve over 4000 iterations: -1000 penalty (left) vs. -2 penalty (right).
 <tr><td>player 2 invalid moves</td><td>6</td><td>63</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
 </table>
 
-
-
-</p>
 
 
 ### TODO
