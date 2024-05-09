@@ -40,7 +40,7 @@ class DMCTS(DeepRL):
     # Input batched size 1
     # Starting at a given state, conducts a fixed number of Monte-Carlo searches, using the Q function in visited states and the heuristic function in new states
     # Updates the Q, N, W, P functions for explored states, returns probability vector for initial state
-    def search(self, state, heuristic: nn.Module, num: int, ucb_parameter = 10.0, temperature=1.0, evaluation_batch_size = 8, p_threshold_multiplier = 10, max_depth=1000):
+    def search(self, state, heuristic: nn.Module, num: int, ucb_parameter, temperature=1.0, max_depth=1000):
         evaluation_queue = []
 
         # Do a certain number of searches from the initial state
@@ -105,7 +105,7 @@ class DMCTS(DeepRL):
 
 
 
-    def mcts(self, lr: float, num_iterations: int, num_selfplay: int, num_searches: int, max_steps: int, ucb_parameter: float, temperature: float, train_batch: int, p_threshold_multiplier: int, save_path=None, verbose=False, graph_smoothing=10, initial_log=""):        
+    def mcts(self, lr: float, num_iterations: int, num_selfplay: int, num_searches: int, max_steps: int, ucb_parameter: float, temperature: float, train_batch: int, save_path=None, verbose=False, graph_smoothing=10, initial_log=""):        
         logtext = initial_log
         
         start_time = time.perf_counter()
@@ -146,7 +146,7 @@ class DMCTS(DeepRL):
                         continue
 
                     # Do searches
-                    p_vector = self.search(s[play:play+1], heuristic=prior_p, ucb_parameter=ucb_parameter, num=num_searches, temperature=temperature, p_threshold_multiplier=p_threshold_multiplier)
+                    p_vector = self.search(s[play:play+1], heuristic=prior_p, ucb_parameter=ucb_parameter, num=num_searches, temperature=temperature)
 
                     # Add probability vector to record TODO these don't need to be sorted by play
                     states[play] = torch.cat([states[play], s[play:play+1]], dim=0)

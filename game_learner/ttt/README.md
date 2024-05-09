@@ -2,9 +2,26 @@
 
 The goal of this note is to record the results of some experiments conducted while attempting to train bots using reinforcement learning techniques guided by neural networks, for example tuning hyperparameters or playing with different model architectures.  Though we intend to train bots to play different games, we restrict our attention in this note to Tic-Tac-Toe, for which bots can be quickly trained on essentially any modern computer without special equipment.
 
+## Deep Q-networks (DQN)
+
 In a 2015 paper[^MKS15], Minh, Kavukcuoglu, Silver *et. al.* outline an algorithm for using neural networks within a Q-learning algorithm (DQN) to train bots to play various player vs. environment (PvE) games on the Atari video game platform.  The same algorithms may be readily adapted to PvP games by giving each player their own Q-function, with each player considering the other players as part of the environment.  Unlike the PvE setting, the ``environment'' is now no longer given by a static and fixed (stochastic) Markov decision process, but one which evolves along with the player.  We do not investigate whether the theoretical assumptions justifying Q-learning algorithms remain valid in this set-up, but experimentally we find that they are still able to train good bots.
 
-Before discussing DQN, we give a brief review of reinforcement learning.  The goal of reinforcement learning is to learn an optimal *policy* for a bot operating in some stochastic environment, i.e. an assignment $\pi: S \rightarrow A$ where $S$ is the set of game states and $A$ is the set of actions, or more generally a "stochastic" function, i.e. non-deterministic function with underlying probability distribution.  Alternatively, we can learn a *Q-function* (quality function) $Q: S \times A \rightarrow \bR$, which assigns a numerical value to the act of taking a given action at a given state.  A Q-function induces a (stochastic) policy by taking the actions with maximum value with equal probability.
+I made a few minor design modifications to the DQN algorithm (as well as ignoring issues that obviously do not arise in our setting).  I simulate games in batches, which is not difficult due to the very discrete nature of the games we consider, which should give a speed boost; this introduces the size of the simulation batches as an additional hyperparameter.
+
+We also note that convergence alone (i.e. vanishing of loss) does not necessarily indicate a good bot, since its performance *in natura* depends on the quality of the generated training data.  Ensuring good data often means not letting the behavior policy get too greedy.  Due to the random play, this means the loss typically has a non-zero lower bound.  I personally found it helpful to conceptually separate the simulation of data and the learning on that simulated data.
+
+### Dealing with illegal moves ###
+
+
+There is an immediate design choice that needs to be made: how to handle illegal moves by the bot.  Because the bot plays deterministically, if left unhandled it is possible for the bot to get stuck in infinite loops attempting illegal moves.  In classical Q-learning, actions are just a set and it is straightforward to restrict the set of moves to legal ones.  In deep Q-learning, actions are represented by basis vectors in a fixed vector space, and it is possible for the neural network to select an illegal move.  I saw three solutions:
++ **Randomness:** copy the ``in-game'' solution and choose a random action when an illegal action is chosen.
++ **Prohibition:** prohibit illegal moves by zeroing out their corresponding components.  Namely, if the bot assigned a high value to an illegal move,  ignore it and take the highest value amongst legal moves.
++ **Penalty:** teach the bot to avoid illegal moves by assigning a penalty to the player making an illegal move.
+
+Randomness appeared to me strictly inferior to prohibition, so I ruled it out.  Figure \ref{illegal moves fig} contains loss curves comparing prohibition and penalty for a residual neural network and a straightforward linear neural network.  One can see that the prohibition curves appear to have more local variance, likely due to the bot choosing exploration and then an illegal move being a fairly common occurrence.  In terms of performance, they seemed to be fairly similar, sometimes one perfoming better than the other.  However, the loss curves seem to exhibit more convergence for prohibition and some metrics depicted in Figure \ref{illegal moves metrics} seem to indicate that prohibition should perform better in general; intuitively this makes sense as there is less to learn.  In particular, for Test 1, we see that we tend to see much more separation between the green curve and the blue/orange curves using prohibition, an indication that the bot is learning to distinguish a particular group of losing moves vs. tying moves.
+
+
+
 
 
 [^MKS15]: Volodymyr Mnih, Koray Kavukcuoglu, David Silver, *et. al.*, Human-level control through deep reinforcement learning, *Nature* volume 518, pages 529–533 (2015).
