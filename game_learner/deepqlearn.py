@@ -91,24 +91,12 @@ class TensorMDP(MDP):
     # Chooses a action from the indices with maximum value (uniformly at random if more than one)
     def get_max_action(self, values) -> torch.Tensor:         # TODO what if all values are 0
         return self.get_random_action_weighted(values == values.flatten(1,-1).max(1).values.reshape((-1,) + self.action_projshape).float())
-    
-    # Return an action uniformly from non-zero entries
-    # Deprecated for get_random_action_weighted; more efficient
-    # def get_random_action_from_filter(self, filter, max_tries=100) -> torch.Tensor:
-    #     filter = filter != 0.
-    #     while (filter.flatten(1,-1).count_nonzero(dim=1) <= 1).prod().item() != 1:                             # Almost always terminates after one step
-    #         temp = torch.rand((filter.size(0),) + self.action_shape, device=self.device) * filter
-    #         filter = (temp == temp.flatten(1,-1).max(1).values.reshape((-1,) + self.action_projshape)).float()
-    #         max_tries -= 1
-    #         if max_tries == 0:
-    #             break
-    #     return filter * 1.
-    
+        
     # Input action shape, return an action with probability weighted by the entries
     def get_random_action_weighted(self, weights) -> torch.Tensor:
         # Eliminate negative entries and flatten
         weights = ((weights > 0) * weights).flatten(1, -1)
-        return (torch.cumsum(weights / torch.sum(weights, 1), 1) > torch.rand(weights.size(0),)[:,None]).diff(dim=1, prepend=torch.zeros((weights.size(0),1))).reshape((-1,) + self.action_shape)
+        return (torch.cumsum(weights / torch.sum(weights, 1)[:, None], 1) > torch.rand(weights.size(0),)[:,None]).diff(dim=1, prepend=torch.zeros((weights.size(0),1))).reshape((-1,) + self.action_shape)
     
     # Output has state shape
     def is_valid_action(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
@@ -130,6 +118,17 @@ class TensorMDP(MDP):
     def hashable_to_action(self, action):
         return torch.tensor(action).reshape(self.action_shape)
     
+    # Return an action uniformly from non-zero entries
+    # Deprecated for get_random_action_weighted; more efficient
+    # def get_random_action_from_filter(self, filter, max_tries=100) -> torch.Tensor:
+    #     filter = filter != 0.
+    #     while (filter.flatten(1,-1).count_nonzero(dim=1) <= 1).prod().item() != 1:                             # Almost always terminates after one step
+    #         temp = torch.rand((filter.size(0),) + self.action_shape, device=self.device) * filter
+    #         filter = (temp == temp.flatten(1,-1).max(1).values.reshape((-1,) + self.action_projshape)).float()
+    #         max_tries -= 1
+    #         if max_tries == 0:
+    #             break
+    #     return filter * 1.
 
 
 
