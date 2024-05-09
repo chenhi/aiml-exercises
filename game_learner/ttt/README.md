@@ -19,6 +19,7 @@ There is an immediate design choice that needs to be made: how to handle illegal
 + **Randomness:** choose a random action when an illegal action is chosen.
 + **Prohibition:** prohibit illegal moves by zeroing out their corresponding components.
 + **Penalty:** teach the bot to avoid illegal moves by assigning a penalty to illegal moves.
+
 Randomness appeared to me strictly inferior to prohibition, so I didn't experiment with it.  Below are the loss curves comparing prohibition and penalty.
 <p align="center">
 <img src="graphs/20240413213956_zeroout2.dttt.pt.losses.png" width="24%"><img src="graphs/20240413220118_zerooutrnn.dttt.pt.losses.png" width="24%"><img src="graphs/20240413212415_penalty2.dttt.pt.losses.png" width="24%"><img src="graphs/20240413222418_resnnpenalty.dttt.pt.losses.png" width="24%">
