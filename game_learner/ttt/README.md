@@ -80,7 +80,7 @@ To visualize the effect of greed on convergence and performance, I trained a bot
 
 
 <table align="center">
-<tr><td></td><td colspan="4">player 1</td<td colspan="4">player 2</td></tr>
+<tr><td></td><td colspan="4">player 1</td><td colspan="4">player 2</td></tr>
 <tr><td>greed</td><td>win</td><td>loss</td><td>tie</td><td>invalid</td><td>win</td><td>loss</td><td>tie</td><td>invalid</td></tr>
 <tr><td>no</td><td>69.37%</td><td>19.43%</td><td>11.20%</td><td>31168</td><td>47.47%</td><td>40.07%</td><td>12.46%</td><td>21536</td></tr>
 <tr><td>middle</td><td>98.96%</td><td>0.00%</td><td>1.04%</td><td>0</td><td>90.73%</td><td>0.00%</td><td>9.27%</td><td>0</td></tr>
