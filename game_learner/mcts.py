@@ -37,10 +37,9 @@ class DMCTS(DeepRL):
         # Exploration vs. exploitation: the second term dominates when unexplored, then the first term dominates when more explored
         return (self.q[statehash].nan_to_num(0) + self.p[statehash] * (param * math.sqrt(self.n_tot[statehash]) / (1 + self.n[statehash])))[None]
 
-    # Unbatched
+    # Input batched size 1
     # Starting at a given state, conducts a fixed number of Monte-Carlo searches, using the Q function in visited states and the heuristic function in new states
-    # Updates the Q, N, W, P functions
-    # Returns probability vector with batched dimension added
+    # Updates the Q, N, W, P functions for explored states, returns probability vector for initial state
     def search(self, state, heuristic: nn.Module, num: int, ucb_parameter = 10.0, temperature=1.0, evaluation_batch_size = 8, p_threshold_multiplier = 10, max_depth=1000):
         evaluation_queue = []
 

@@ -21,18 +21,25 @@ game = DMCTS(mdp, TTTResNN, torch.nn.CrossEntropyLoss(), torch.optim.Adam, devic
 
 
 
+b = 10
+
+
 
 s = game.mdp.get_initial_state()
 
 
+print(torch.softmax(game.pv(s).flatten(1, -1), dim=1))
+game.search(s, game.pv, 5000, ucb_parameter = b, temperature = 1)
+print("Q", game.q[mdp.state_to_hashable(s)])
+print("N", game.n[mdp.state_to_hashable(s)])
+print("W", game.w[mdp.state_to_hashable(s)])
+print("P", game.p[mdp.state_to_hashable(s)])
 
 
 
-#game.search(s, 0, game.pv, 5000)
-#print("Q1", game.q[mdp.state_to_hashable(s)])
-#print("N", game.n[mdp.state_to_hashable(s)])
-#print("W", game.w[mdp.state_to_hashable(s)])
-#print("P", game.p[mdp.state_to_hashable(s)])
+
+
+
 t, _ = mdp.transition(s, mdp.str_to_action("2,2"))
 #game.search(t, 0, game.pv, 4000)
 #print("Q2", game.q[mdp.state_to_hashable(t)])
@@ -41,20 +48,18 @@ t, _ = mdp.transition(s, mdp.str_to_action("2,2"))
 #print("P", game.p[mdp.state_to_hashable(t)])
 
 
-u = game.mdp.get_initial_state()
-u[0,0,0,0] = 1.
-u[0,1,1,1] = 1.
-u[0,0,2,2] = 1.
-print(game.mdp.board_str(u)[0])
+# u = game.mdp.get_initial_state()
+# u[0,0,0,0] = 1.
+# u[0,1,1,1] = 1.
+# u[0,0,2,2] = 1.
+# print(game.mdp.board_str(u)[0])
 
-b = 10
 
-print(torch.softmax(game.pv(u).flatten(1, -1), dim=1))
-game.search(u, game.pv, 5000, ucb_parameter = b, temperature = 1)
-print("Q", game.q[mdp.state_to_hashable(u)])
-print("N", game.n[mdp.state_to_hashable(u)])
-print("W", game.w[mdp.state_to_hashable(u)])
-print("P", game.p[mdp.state_to_hashable(u)])
-print("ucb", game.ucb(u, b))
-print("???", (game.ucb(u, b)) * game.mdp.valid_action_filter(u))
+
+# print(torch.softmax(game.pv(u).flatten(1, -1), dim=1))
+# game.search(u, game.pv, 5000, ucb_parameter = b, temperature = 1)
+# print("Q", game.q[mdp.state_to_hashable(u)])
+# print("N", game.n[mdp.state_to_hashable(u)])
+# print("W", game.w[mdp.state_to_hashable(u)])
+# print("P", game.p[mdp.state_to_hashable(u)])
 
