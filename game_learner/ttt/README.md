@@ -18,10 +18,10 @@ There is an immediate design choice that needs to be made: how to handle illegal
 + **Prohibition:** prohibit illegal moves by zeroing out their corresponding components.
 + **Penalty:** teach the bot to avoid illegal moves by assigning a penalty to illegal moves.
 Randomness appeared to me strictly inferior to prohibition, so I didn't experiment with it.  Below are the loss curves comparing prohibition and penalty for a residual neural network and a straightforward linear neural network.
-<center>
-<img src="20240413213956_zeroout2.dttt.pt.losses.png" style="width:24%;"><img src="20240413220118_zerooutrnn.dttt.pt.losses.png" style="width:24%;"><img src="20240413212415_penalty2.dttt.pt.losses.png" style="width:24%;"><img src="20240413222418_resnnpenalty.dttt.pt.losses.png" style="width:24%;">
+<p align="center">
+<img src="20240413213956_zeroout2.dttt.pt.losses.png" width="24%"><img src="20240413220118_zerooutrnn.dttt.pt.losses.png" width="24%"><img src="20240413212415_penalty2.dttt.pt.losses.png" width="24%"><img src="20240413222418_resnnpenalty.dttt.pt.losses.png" width="24%">
 Prohibition (left two) vs. penalty (right two) loss curves.
-</center>
+</p>
 
 One can see that the prohibition curves appear to have more local variance, likely due to the bot choosing exploration and then an illegal move being a fairly common occurrence.  In terms of performance, they seemed to be fairly similar, sometimes one perfoming better than the other.  However, the loss curves seem to exhibit more convergence for prohibition and some metrics depicted in Figure \ref{illegal moves metrics} seem to indicate that prohibition should perform better in general; intuitively this makes sense as there is less to learn.  In particular, for Test 1, we see that we tend to see much more separation between the green curve and the blue/orange curves using prohibition, an indication that the bot is learning to distinguish a particular group of losing moves vs. tying moves.
 
