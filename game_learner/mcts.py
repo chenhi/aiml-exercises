@@ -40,7 +40,7 @@ class DMCTS(DeepRL):
     # Starting at a given state, conducts a fixed number of Monte-Carlo searches, using the Q function in visited states and the heuristic function in new states
     # Updates the Q, N, W, P functions
     # Returns probability vector with batched dimension added
-    def search(self, state, heuristic: nn.Module, num: int, ucb_parameter = 2.0, temperature=1.0, evaluation_batch_size = 8, p_threshold = 1000, max_depth=1000):
+    def search(self, state, heuristic: nn.Module, num: int, ucb_parameter = 2.0, temperature=1.0, evaluation_batch_size = 8, p_threshold = 100, max_depth=1000):
         evaluation_queue = []
 
         # Do a certain number of searches from the initial state
@@ -109,13 +109,19 @@ class DMCTS(DeepRL):
 
 
 
-    def mcts(self, lr: float, num_iterations: int, num_selfplay: int, num_searches: int, max_steps: int, ucb_parameter: float, temperature: float, train_batch: int, save_path=None, verbose=False, graph_smoothing=10, initial_log=""):        
+    def mcts(self, lr: float, num_iterations: int, num_selfplay: int, num_searches: int, max_steps: int, ucb_parameter: float, temperature: float, train_batch: int, p_threshold: int, save_path=None, verbose=False, graph_smoothing=10, initial_log=""):        
+        logtext = initial_log
         prior_p = copy.deepcopy(self.pv)
         training_inputs = []
         training_values = []
 
         # In each iteration, we simulate a certain number of self-plays, then we train on the resulting data
         for i in range(num_iterations):
+            logtext += log(f"Iteration {i+1}")
+            opt = self.optimizer(self.pv.parameters(), lr=lr)
+                
+
+
             iteration_data = torch.tensor([])
             s = self.mdp.get_initial_state(num_selfplay)        # TODO not suppose to parallelize the self plays?
 
@@ -136,7 +142,7 @@ class DMCTS(DeepRL):
                         continue
 
                     # Do searches
-                    p_vector = self.search(s[play:play+1], heuristic=prior_p, ucb_parameter=ucb_parameter, num=num_searches, temperature=temperature)
+                    p_vector = self.search(s[play:play+1], heuristic=prior_p, ucb_parameter=ucb_parameter, num=num_searches, temperature=temperature, p_threshold=p_threshold)
 
                     # Add probability vector to record
                     states[play] = torch.cat([states[play], s[play:play+1]], dim=0)
@@ -163,25 +169,25 @@ class DMCTS(DeepRL):
 
             # Do training on recent data
             indices = list(range(training_values[-1].size(0)))
+            total_loss = 0.
+            num_train = 0.
+            self.pv.train()
             for i in range(training_values[-1].size(0)):
                 get_indices = random.sample(indices, min(len(indices), train_batch))
                 x = training_inputs[-1][get_indices]
                 y = training_values[-1][get_indices]
 
-
-                self.pv.train()
-                opt = self.optimizer(self.pv.parameters(), lr=lr)
                 pred = self.pv(x)
                 loss = self.loss_fn(pred, y)
-
-                # Optimize
                 loss.backward()
                 opt.step()
                 opt.zero_grad()
 
-                self.pv.eval()
+                total_loss += loss.item()
+                num_train += 1
 
-                print(f"Loss: {loss.item()}.")
+            self.pv.eval()
+            logtext += log(f"Loss: {total_loss/num_train} on {num_train} batches of size {min(len(indices), train_batch)}.")
         
 
 

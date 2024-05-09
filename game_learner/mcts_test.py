@@ -3,7 +3,7 @@ from tictactoe_tensor import TTTTensorMDP, TTTNN, TTTResNN
 import torch
 
 mdp = TTTTensorMDP()
-game = DMCTS(mdp, TTTResNN, torch.nn.HuberLoss(), torch.optim.Adam)
+game = DMCTS(mdp, TTTResNN, torch.nn.CrossEntropyLoss(), torch.optim.Adam)
 
 s = game.mdp.get_initial_state()
 #game.search(s, 0, game.pv, 5000)
@@ -38,4 +38,9 @@ b = 2
 # print("???", (game.ucb(u, b)) * game.mdp.valid_action_filter(u))
 
 
-game.mcts(lr = 0.5, num_iterations=5, num_selfplay=5, num_searches=10, max_steps=100, ucb_parameter=2, temperature=1, train_batch=64)
+game.mcts(lr = 0.01, num_iterations=20, num_selfplay=10, num_searches=100, max_steps=100, ucb_parameter=2, temperature=1, train_batch=64, p_threshold=100)
+
+print("Q", game.q[mdp.state_to_hashable(u)])
+print("N", game.n[mdp.state_to_hashable(u)])
+print("W", game.w[mdp.state_to_hashable(u)])
+print("P", game.p[mdp.state_to_hashable(u)])
