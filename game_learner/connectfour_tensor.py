@@ -44,8 +44,7 @@ class C4TensorMDP(TensorMDP):
         self.height, self.width, self.win_condition = height, width, win_condition
         self.area = self.height * self.width
         super().__init__(state_shape=(2,self.height,self.width), action_shape=(self.width,), discount=1, num_players=2, batched=True, default_memory = 1000000, default_hyperparameters=hyperpar, \
-                         symb = {0: "O", 1: "X", None: "-"}, input_str = f"Input column to play (1-{self.width}). ", penalty=-2)
-        self.device=device
+                         symb = {0: "O", 1: "X", None: "-"}, input_str = f"Input column to play (1-{self.width}). ", penalty=-2, device=device)
         
         # Generate kernels for detecting winner
         # Shape: (hw, 4x, h, w)

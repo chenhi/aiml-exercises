@@ -48,11 +48,13 @@ class ExperienceReplay():
 
 
 class TensorMDP(MDP):
-    def __init__(self, state_shape, action_shape, default_memory: int, discount=1, num_players=1, penalty = -2, num_simulations=1000, default_hyperparameters={}, symb = {}, nn_args={}, input_str = "", batched=False):
+    def __init__(self, state_shape, action_shape, default_memory: int, discount=1, num_players=1, penalty = -2, num_simulations=1000, default_hyperparameters={}, symb = {}, nn_args={}, input_str = "", batched=False, device="cpu"):
         
         super().__init__(None, None, discount, num_players, penalty, symb, input_str, default_hyperparameters, batched)
         self.nn_args = nn_args
         self.default_memory = default_memory
+        self.device=device
+
 
         # Whether we filter out illegal moves in training or not
         #self.filter_illegal = filter_illegal
@@ -96,7 +98,7 @@ class TensorMDP(MDP):
     def get_random_action_weighted(self, weights) -> torch.Tensor:
         # Eliminate negative entries and flatten
         weights = ((weights > 0) * weights).flatten(1, -1)
-        return (torch.cumsum(weights / torch.sum(weights, 1)[:, None], 1) > torch.rand(weights.size(0),)[:,None]).diff(dim=1, prepend=torch.zeros((weights.size(0),1))).reshape((-1,) + self.action_shape)
+        return (torch.cumsum(weights / torch.sum(weights, 1)[:, None], 1) > torch.rand(weights.size(0), device=self.device)[:,None]).diff(dim=1, prepend=torch.zeros((weights.size(0),1), device=self.device)).reshape((-1,) + self.action_shape)
     
     # Output has state shape
     def is_valid_action(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:

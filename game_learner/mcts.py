@@ -1,4 +1,4 @@
-import zipfile, os, random, warnings, datetime, copy, math
+import zipfile, os, random, warnings, datetime, copy, math, time
 import torch
 from torch import nn
 from collections import namedtuple, deque
@@ -13,7 +13,7 @@ class DMCTS(DeepRL):
     def __init__(self, mdp: TensorMDP, model: nn.Module, loss_fn, optimizer, model_args = {}, device="cpu"):
         super().__init__(mdp, model, loss_fn, optimizer, model_args, device)
         
-        self.pv = model()
+        self.pv = model().to(self.device)
         self.q = {}
         self.n = {}         # Keys: hashable states.  Values: tensor with shape of actions
         self.n_tot = {}
@@ -32,7 +32,7 @@ class DMCTS(DeepRL):
     def ucb(self, state, param: float):
         statehash = self.mdp.state_to_hashable(state)
         if statehash not in self.q:
-            return torch.zeros((1,) + self.mdp.action_shape)
+            return torch.zeros((1,) + self.mdp.action_shape, device=self.device)
         # Exploration vs. exploitation: the second term dominates when unexplored, then the first term dominates when more explored
         return (self.q[statehash].nan_to_num(0) + self.p[statehash] * (param * math.sqrt(self.n_tot[statehash]) / (1 + self.n[statehash])))[None]
 
@@ -40,7 +40,7 @@ class DMCTS(DeepRL):
     # Starting at a given state, conducts a fixed number of Monte-Carlo searches, using the Q function in visited states and the heuristic function in new states
     # Updates the Q, N, W, P functions
     # Returns probability vector with batched dimension added
-    def search(self, state, heuristic: nn.Module, num: int, ucb_parameter = 2.0, temperature=1.0, evaluation_batch_size = 8, p_threshold = 100, max_depth=1000):
+    def search(self, state, heuristic: nn.Module, num: int, ucb_parameter = 2.0, temperature=1.0, evaluation_batch_size = 8, p_threshold_multiplier = 10, max_depth=1000):
         evaluation_queue = []
 
         # Do a certain number of searches from the initial state
@@ -64,10 +64,10 @@ class DMCTS(DeepRL):
             # Once we reach a leaf, use the heuristic function p to simulate play
             # TODO this cna be parallelized, i.e. the evaluaiton
             if self.mdp.is_terminal(s).item() == False:
-                self.q[self.mdp.state_to_hashable(s)] = torch.zeros(self.mdp.action_shape)
-                self.n[self.mdp.state_to_hashable(s)] = torch.zeros(self.mdp.action_shape)
+                self.q[self.mdp.state_to_hashable(s)] = torch.zeros(self.mdp.action_shape, device=self.device)
+                self.n[self.mdp.state_to_hashable(s)] = torch.zeros(self.mdp.action_shape, device=self.device)
                 self.n_tot[self.mdp.state_to_hashable(s)] = 0
-                self.w[self.mdp.state_to_hashable(s)] = torch.zeros(self.mdp.action_shape)
+                self.w[self.mdp.state_to_hashable(s)] = torch.zeros(self.mdp.action_shape, device=self.device)
 
                 # Placeholder prior probability given by neural network, do in batches TODO implement
                 # evaluation_queue.append(s)
@@ -77,6 +77,7 @@ class DMCTS(DeepRL):
                 #         self.p[self.mdp.state_to_hashable(evaluation_queue[i])] = heuristic_prob[i:i+1]
 
                 # Sigmoid so that the values are in (0, 1)
+                # These prior probabilities are only assigned once; eventually, with enough visits the quality function will dominate the heuristic
                 self.p[self.mdp.state_to_hashable(s)] = torch.sigmoid(heuristic(s))
 
             while self.mdp.is_terminal(s).item() == False:
@@ -97,10 +98,13 @@ class DMCTS(DeepRL):
                     self.n_tot[self.mdp.state_to_hashable(s)] += action[0].sum().item()
                     self.w[self.mdp.state_to_hashable(s)] += action[0] * r[0,self.mdp.get_player(s)[0]][0]
                     self.q[self.mdp.state_to_hashable(s)] = self.w[self.mdp.state_to_hashable(s)] / self.n[self.mdp.state_to_hashable(s)]
-                    # Update the prior probability if threshold passed
-                    if self.n_tot[self.mdp.state_to_hashable(s)] > p_threshold:
-                        p_vector = self.n[self.mdp.state_to_hashable(s)] ** (1 / temperature)
-                        self.p[self.mdp.state_to_hashable(s)] = p_vector / p_vector.flatten().sum()
+                    # Update the prior probability if threshold passed      
+                    # TODO does it ever actually make sense to do this????  we don't train on it and maybe we want to keep the heuristic?
+                    # TODO but then when do we update P... confused
+                    # TODO commented this out because i think 
+                    # if self.n_tot[self.mdp.state_to_hashable(s)] > p_threshold_multiplier * self.mdp.valid_action_filter(s).sum().item():
+                    #     p_vector = self.n[self.mdp.state_to_hashable(s)] ** (1 / temperature)
+                    #     self.p[self.mdp.state_to_hashable(s)] = p_vector / p_vector.flatten().sum()
 
         # Return probability vector for initial state (even if it isn't updated)
         p_vector = self.n[self.mdp.state_to_hashable(state)] ** (1 / temperature)
@@ -109,9 +113,16 @@ class DMCTS(DeepRL):
 
 
 
-    def mcts(self, lr: float, num_iterations: int, num_selfplay: int, num_searches: int, max_steps: int, ucb_parameter: float, temperature: float, train_batch: int, p_threshold: int, save_path=None, verbose=False, graph_smoothing=10, initial_log=""):        
+    def mcts(self, lr: float, num_iterations: int, num_selfplay: int, num_searches: int, max_steps: int, ucb_parameter: float, temperature: float, train_batch: int, p_threshold_multiplier: int, save_path=None, verbose=False, graph_smoothing=10, initial_log=""):        
         logtext = initial_log
-        prior_p = copy.deepcopy(self.pv)
+        
+        start_time = time.perf_counter()
+        logtext += log(f"Started logging.")
+
+        # TODO The deep copy is only needed if we parallelize the training
+        # prior_p = copy.deepcopy(self.pv)
+        prior_p = self.pv
+        
         training_inputs = []
         training_values = []
 
@@ -122,27 +133,28 @@ class DMCTS(DeepRL):
                 
 
 
-            iteration_data = torch.tensor([])
+            iteration_data = torch.tensor([], device=self.device)
             s = self.mdp.get_initial_state(num_selfplay)        # TODO not suppose to parallelize the self plays?
 
             # The probability vectors for each self-play
-            states = [torch.tensor([]) for j in range(num_selfplay)]
-            p_vectors = [torch.tensor([]) for j in range(num_selfplay)]
+            states = [torch.tensor([], device=self.device) for j in range(num_selfplay)]
+            p_vectors = [torch.tensor([], device=self.device) for j in range(num_selfplay)]
             results = [None for j in range(num_selfplay)]
 
+            logtext += log(f"Self-plays at {time.perf_counter() - start_time}")
             # Each step in the self-plays
             for step in range(max_steps):
-                step_p = torch.tensor([])
+                step_p = torch.tensor([], device=self.device)
 
                 # Each self-play
                 for play in range(num_selfplay):
                     # If a result has been obtained, then append a trivial action and skip everything
                     if results[play] != None:
-                        step_p = torch.cat([step_p, torch.zeros((1,) + self.mdp.action_shape)], dim=0)
+                        step_p = torch.cat([step_p, torch.zeros((1,) + self.mdp.action_shape, device=self.device)], dim=0)
                         continue
 
                     # Do searches
-                    p_vector = self.search(s[play:play+1], heuristic=prior_p, ucb_parameter=ucb_parameter, num=num_searches, temperature=temperature, p_threshold=p_threshold)
+                    p_vector = self.search(s[play:play+1], heuristic=prior_p, ucb_parameter=ucb_parameter, num=num_searches, temperature=temperature, p_threshold_multiplier=p_threshold_multiplier)
 
                     # Add probability vector to record
                     states[play] = torch.cat([states[play], s[play:play+1]], dim=0)
@@ -164,6 +176,8 @@ class DMCTS(DeepRL):
             #     if results[play] == None:
             #         results[play] = torch.zeros(self.mdp.num_players)
 
+            logtext += log(f"Training at {time.perf_counter() - start_time}")
+
             training_inputs.append(torch.cat(states, dim=0))
             training_values.append(torch.cat(p_vectors, dim=0))
 
@@ -177,7 +191,9 @@ class DMCTS(DeepRL):
                 x = training_inputs[-1][get_indices]
                 y = training_values[-1][get_indices]
 
+
                 pred = self.pv(x)
+
                 loss = self.loss_fn(pred, y)
                 loss.backward()
                 opt.step()
