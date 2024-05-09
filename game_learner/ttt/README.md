@@ -74,7 +74,7 @@ To visualize the effect of greed on convergence and performance, I trained a bot
 + **Max greed:** the greed ramped from 0.0 to the maximum 1.0 linearly in the interval $[100, 3900]$.
 
 <p align="center">
-<img src="graphs/20240328201353_nogreed.dttt.pt.log.losses.png" width="33%"><img src="graphs/20240328101230_postbug_baseline.dttt.pt.log.losses.png" width="33%"><img src="graphs/20240328191907_greedto100.dttt.pt.log.losses.png" width="33%">
+<img src="graphs/20240328201353_nogreed.dttt.pt.losses.png" width="33%"><img src="graphs/20240328101230_postbug_baseline.dttt.pt.losses.png" width="33%"><img src="graphs/20240328191907_greedto100.dttt.pt.losses.png" width="33%">
 <p>
 <p align="center">Loss curves over 4000 iterations, no vs. middle vs. max greed.</p>
 
