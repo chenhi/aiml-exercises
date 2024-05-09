@@ -14,11 +14,13 @@ We also note that convergence alone (i.e. vanishing of loss) does not necessaril
 
 
 There is an immediate design choice that needs to be made: how to handle illegal moves by the bot.  Because the bot plays deterministically, if left unhandled it is possible for the bot to get stuck in infinite loops attempting illegal moves.  In classical Q-learning, actions are just a set and it is straightforward to restrict the set of moves to legal ones.  In deep Q-learning, actions are represented by basis vectors in a fixed vector space, and it is possible for the neural network to select an illegal move.  I saw three solutions:
-+ **Randomness:** copy the ``in-game'' solution and choose a random action when an illegal action is chosen.
-+ **Prohibition:** prohibit illegal moves by zeroing out their corresponding components.  Namely, if the bot assigned a high value to an illegal move,  ignore it and take the highest value amongst legal moves.
-+ **Penalty:** teach the bot to avoid illegal moves by assigning a penalty to the player making an illegal move.
++ **Randomness:** choose a random action when an illegal action is chosen.
++ **Prohibition:** prohibit illegal moves by zeroing out their corresponding components.
++ **Penalty:** teach the bot to avoid illegal moves by assigning a penalty to illegal moves.
+Randomness appeared to me strictly inferior to prohibition, so I didn't experiment with it.  
 
-Randomness appeared to me strictly inferior to prohibition, so I ruled it out.  Figure \ref{illegal moves fig} contains loss curves comparing prohibition and penalty for a residual neural network and a straightforward linear neural network.  One can see that the prohibition curves appear to have more local variance, likely due to the bot choosing exploration and then an illegal move being a fairly common occurrence.  In terms of performance, they seemed to be fairly similar, sometimes one perfoming better than the other.  However, the loss curves seem to exhibit more convergence for prohibition and some metrics depicted in Figure \ref{illegal moves metrics} seem to indicate that prohibition should perform better in general; intuitively this makes sense as there is less to learn.  In particular, for Test 1, we see that we tend to see much more separation between the green curve and the blue/orange curves using prohibition, an indication that the bot is learning to distinguish a particular group of losing moves vs. tying moves.
+
+Figure \ref{illegal moves fig} contains loss curves comparing prohibition and penalty for a residual neural network and a straightforward linear neural network.  One can see that the prohibition curves appear to have more local variance, likely due to the bot choosing exploration and then an illegal move being a fairly common occurrence.  In terms of performance, they seemed to be fairly similar, sometimes one perfoming better than the other.  However, the loss curves seem to exhibit more convergence for prohibition and some metrics depicted in Figure \ref{illegal moves metrics} seem to indicate that prohibition should perform better in general; intuitively this makes sense as there is less to learn.  In particular, for Test 1, we see that we tend to see much more separation between the green curve and the blue/orange curves using prohibition, an indication that the bot is learning to distinguish a particular group of losing moves vs. tying moves.
 
 
 
