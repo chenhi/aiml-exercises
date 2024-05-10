@@ -26,15 +26,15 @@ There is an immediate design choice that needs to be made: how to handle illegal
 
 Randomness appeared to me strictly inferior to prohibition, so I didn't experiment with it.  Below are the loss curves comparing prohibition and penalty.
 <p align="center">
-<img src="graphs/20240413213956_zeroout2.dttt.pt.losses.png" width="24%"><img src="graphs/20240413220118_zerooutrnn.dttt.pt.losses.png" width="24%"><img src="graphs/20240413212415_penalty2.dttt.pt.losses.png" width="24%"><img src="graphs/20240413222418_resnnpenalty.dttt.pt.losses.png" width="24%"></p>
+<img src="graphs/20240413213956_zeroout2.dttt.pt.losses.png" width="24%"> <img src="graphs/20240413220118_zerooutrnn.dttt.pt.losses.png" width="24%"> <img src="graphs/20240413212415_penalty2.dttt.pt.losses.png" width="24%"> <img src="graphs/20240413222418_resnnpenalty.dttt.pt.losses.png" width="24%"></p>
 <p align="center">
 Prohibition (left two; linear and residual architectures) vs. penalty (right two; linear and residual architectures).
 </p>
 
 The prohibition curves appear more noisy, likely since it is common for the bot to choose an illegal move during exploration and incur a penalty.  In terms of final performance against a random player, they seemed to be fairly similar, sometimes one perfoming better than the other.  The loss curves seem to exhibit more convergence for prohibition; intuitively this makes sense as there is less to learn.  Moreover, some specific case metrics seem to indicate that prohibition should perform better in general:
 <p align="center">
-<img src="graphs/20240413203510_test_zeroout.dttt.pt.test0.png" width="24%"><img src="graphs/20240413213956_zeroout2.dttt.pt.test0.png" width="24%"><img src="graphs/20240413210030_test_penalty.dttt.pt.test0.png" width="24%"><img src="graphs/20240413212415_penalty2.dttt.pt.test0.png" width="24%">
-<img src="graphs/20240413203510_test_zeroout.dttt.pt.test1.png" width="24%"><img src="graphs/20240413213956_zeroout2.dttt.pt.test1.png" width="24%"><img src="graphs/20240413210030_test_penalty.dttt.pt.test1.png" width="24%"><img src="graphs/20240413212415_penalty2.dttt.pt.test1.png" width="24%">
+<img src="graphs/20240413203510_test_zeroout.dttt.pt.test0.png" width="24%"> <img src="graphs/20240413213956_zeroout2.dttt.pt.test0.png" width="24%"> <img src="graphs/20240413210030_test_penalty.dttt.pt.test0.png" width="24%"> <img src="graphs/20240413212415_penalty2.dttt.pt.test0.png" width="24%">
+<img src="graphs/20240413203510_test_zeroout.dttt.pt.test1.png" width="24%"> <img src="graphs/20240413213956_zeroout2.dttt.pt.test1.png" width="24%"> <img src="graphs/20240413210030_test_penalty.dttt.pt.test1.png" width="24%"> <img src="graphs/20240413212415_penalty2.dttt.pt.test1.png" width="24%">
 </p><p align="center">
 Performance metrics for prohibition (left two) vs. penalty (right two).
 </p>
@@ -49,7 +49,7 @@ I implemented penalty first since it was more straightforward, but later switche
 The magnitude of the penalty has an effect on neural network training where it does not in classical Q-learning.  For classical Q-learning, the function is an arbitrary function on a discrete set of states.  For deep Q-learning, the function is ``built from'' linear functions defined on a vector space continuum (but only evaluated on a discrete subset).  In particular, for deep Q-learning, large values can skew the weights during training.  In the beginning, I had set the penalty to -1000, which worked classically but caused divergence when training neural networks.  I tested this in an experiment comparing penalties of -2 vs. -1000.  I also tested a penalty of -1, which was not significantly different from a penalty of -2.
 
 <p align="center">
-<img src="graphs/20240325030438_badpenalty.dttt.pt.log.losses.png" width="40%"><img src="graphs/20240324030517_4000its.dttt.pt.log.losses.png" width="40%">
+<img src="graphs/20240325030438_badpenalty.dttt.pt.log.losses.png" width="40%"> <img src="graphs/20240324030517_4000its.dttt.pt.log.losses.png" width="40%">
 <p>
 <p align="center">Loss curve over 4000 iterations: -1000 penalty (left) vs. -2 penalty (right).</p>
 
@@ -76,7 +76,7 @@ To visualize the effect of greed on convergence and performance, I trained a bot
 + **Max greed:** the greed ramped from 0.0 to the maximum 1.0 linearly in the interval $[100, 3900]$.
 
 <p align="center">
-<img src="graphs/20240328201353_nogreed.dttt.pt.losses.png" width="33%"><img src="graphs/20240328101230_postbug_baseline.dttt.pt.losses.png" width="33%"><img src="graphs/20240328191907_greedto100.dttt.pt.losses.png" width="33%">
+<img src="graphs/20240328201353_nogreed.dttt.pt.losses.png" width="33%"> <img src="graphs/20240328101230_postbug_baseline.dttt.pt.losses.png" width="33%"> <img src="graphs/20240328191907_greedto100.dttt.pt.losses.png" width="33%">
 <p>
 <p align="center">Loss curves over 4000 iterations, no vs. middle vs. max greed.</p>
 
