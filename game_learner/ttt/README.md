@@ -54,8 +54,8 @@ The magnitude of the penalty has an effect on neural network training where it d
 <p align="center">Loss curve over 4000 iterations: -1000 penalty (left) vs. -2 penalty (right).</p>
 
 <table align="center">
-<tr><td>iterations</td><td colspan="2">1000</td><td colspan="2">1500</td><td colspan="2">4000</td></tr>
-<tr><td>penalty</td><td>2</td><td>-1000</td><td>-2</td><td>-1000</td><td>2</td><td>-1000</td></tr>
+<tr><th>iterations</th><th colspan="2">1000</th><th colspan="2">1500</th><th colspan="2">4000</th></tr>
+<tr><th>penalty</th><th>2</th><th>-1000</th><th>-2</th><th>-1000</th><th>2</th><th>-1000</th></tr>
 <tr><td>player 1 losses vs. random</td><td>0.00%</td><td>0.00%</td><td>0.00%</td><td>0.00%</td><td>0.00%</td><td>0.00%</td></tr>
 <tr><td>player 2 losses vs. random</td><td>1.27%</td><td>1.25%</td><td>1.60%</td><td>2.81%</td><td>0.00%</td><td>0.10%</td></tr>
 <tr><td>player 1 invalid moves</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
@@ -82,8 +82,8 @@ To visualize the effect of greed on convergence and performance, I trained a bot
 
 
 <table align="center">
-<tr><td></td><td colspan="4">player 1</td><td colspan="4">player 2</td></tr>
-<tr><td></td><td>win</td><td>loss</td><td>tie</td><td>invalid</td><td>win</td><td>loss</td><td>tie</td><td>invalid</td></tr>
+<tr><th></th><th colspan="4">player 1</th><th colspan="4">player 2</th></tr>
+<tr><th></th><th>win</th><th>loss</th><th>tie</th><th>invalid</th><th>win</th><th>loss</th><th>tie</th><th>invalid</th></tr>
 <tr><td>no greed</td><td>69.37%</td><td>19.43%</td><td>11.20%</td><td>31168</td><td>47.47%</td><td>40.07%</td><td>12.46%</td><td>21536</td></tr>
 <tr><td>middle greed</td><td>98.96%</td><td>0.00%</td><td>1.04%</td><td>0</td><td>90.73%</td><td>0.00%</td><td>9.27%</td><td>0</td></tr>
 <tr><td>max greed</td><td>95.54%</td><td>0.63%</td><td>3.83%</td><td>284</td><td>90.44%</td><td>0.00%</td><td>9.56%</td><td>0</td></tr>
@@ -108,16 +108,17 @@ I ran experiments on varying the batch sizes, training for 800 iterations of len
 <p align="center">Loss curves over 800 iterations.  Going rightward doubles the training batch size, going down doubles the simulation batch size.</p>
 
 <table align="center">
-  <tr><th>sim/train batch size</th><th>p0 win</th><th>p0 loss</th><th>p0 tie</th><th>p1 win</th><th>p1 loss</th><th>p1 tie</th><th>time</th></tr>
-  <tr><td>32/256</td><td>99.11%</td><td>0.00%</td><td>0.89%</td><td>90.24%</td><td>0.59%</td><td>9.17%</td><td>8:01</td></tr>
-  <tr><td>32/512</td><td>98.97%</td><td>0.00%</td><td>1.03%</td><td>92.04%</td><td>0.17%</td><td>7.79%</td><td>13:49</td></tr>
-  <tr><td>32/1024</td><td>98.01%</td><td>0.00%</td><td>1.99%</td><td>90.71%</td><td>0.80%</td><td>8.49%</td><td>21:40</td></tr>
-  <tr><td>64/256</td><td>98.99%</td><td>0.00%</td><td>1.01%</td><td>90.37%</td><td>0.60%</td><td>9.03%</td><td>9:05</td></tr>
-  <tr><td>64/512</td><td>98.79%</td><td>0.00%</td><td>1.21%</td><td>91.52%</td><td>0.50%</td><td>7.98%</td><td>13:07</td></tr>
-  <tr><td>64/1024</td><td>98.89%</td><td>0.00%</td><td>1.11%</td><td>90.55%</td><td>0.58%</td><td>8.87%</td><td>22:15</td></tr>
-  <tr><td>128/256</td><td>98.72%</td><td>0.00%</td><td>1.28%</td><td>89.28%</td><td>0.59%</td><td>10.13%</td><td>10:02</td></tr>
-  <tr><td>128/512</td><td>98.92%</td><td>0.00%</td><td>1.08%</td><td>90.51%</td><td>0.25%</td><td>9.24%</td><td>14:11</td></tr>
-  <tr><td>128/1024</td><td>98.97%</td><td>0.00%</td><td>1.03%</td><td>91.03%</td><td>0.20%</td><td>8.77%</td><td>25:39</td></tr>
+  <tr><th colspan="2">batch size</th><th colspan="3">player 1</th><th colspan="3">player 2</th><th></th></tr>
+  <tr><th>simulation</th><th>training</th><th>win</th><th>loss</th><th>tie</th><th>win</th><th>loss</th><th>tie</th><th>time</th></tr>
+  <tr><td>32</td><td>256</td><td>99.11%</td><td>0.00%</td><td>0.89%</td><td>90.24%</td><td>0.59%</td><td>9.17%</td><td>8:01</td></tr>
+  <tr><td>32</td><td>512</td><td>98.97%</td><td>0.00%</td><td>1.03%</td><td>92.04%</td><td>0.17%</td><td>7.79%</td><td>13:49</td></tr>
+  <tr><td>32</td><td>1024</td><td>98.01%</td><td>0.00%</td><td>1.99%</td><td>90.71%</td><td>0.80%</td><td>8.49%</td><td>21:40</td></tr>
+  <tr><td>64</td><td>256</td><td>98.99%</td><td>0.00%</td><td>1.01%</td><td>90.37%</td><td>0.60%</td><td>9.03%</td><td>9:05</td></tr>
+  <tr><td>64</td><td>512</td><td>98.79%</td><td>0.00%</td><td>1.21%</td><td>91.52%</td><td>0.50%</td><td>7.98%</td><td>13:07</td></tr>
+  <tr><td>64</td><td>1024</td><td>98.89%</td><td>0.00%</td><td>1.11%</td><td>90.55%</td><td>0.58%</td><td>8.87%</td><td>22:15</td></tr>
+  <tr><td>128</td><td>256</td><td>98.72%</td><td>0.00%</td><td>1.28%</td><td>89.28%</td><td>0.59%</td><td>10.13%</td><td>10:02</td></tr>
+  <tr><td>128</td><td>512</td><td>98.92%</td><td>0.00%</td><td>1.08%</td><td>90.51%</td><td>0.25%</td><td>9.24%</td><td>14:11</td></tr>
+  <tr><td>128</td><td>1024</td><td>98.97%</td><td>0.00%</td><td>1.03%</td><td>91.03%</td><td>0.20%</td><td>8.77%</td><td>25:39</td></tr>
 </table>
 
 
