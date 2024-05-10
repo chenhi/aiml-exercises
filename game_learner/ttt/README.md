@@ -18,11 +18,12 @@ To evaluate the training of bots, we use the following metrics.
 
 ### Dealing with illegal moves
 
-
 There is an immediate design choice that needs to be made: how to handle illegal moves by the bot.  Because the bot plays deterministically, if left unhandled it is possible for the bot to get stuck in infinite loops attempting illegal moves.  In classical Q-learning, actions are just a set and it is straightforward to restrict the set of moves to legal ones.  In deep Q-learning, actions are represented by basis vectors in a fixed vector space, and it is possible for the neural network to select an illegal move.  I saw three solutions:
 + **Randomness:** choose a random action when an illegal action is chosen.
 + **Prohibition:** prohibit illegal moves by zeroing out their corresponding components.
 + **Penalty:** teach the bot to avoid illegal moves by assigning a penalty to illegal moves.
+
+#### Penalty vs. prohibition
 
 Randomness appeared to me strictly inferior to prohibition, so I didn't experiment with it.  Below are the loss curves comparing prohibition and penalty.
 <p align="center">
@@ -44,7 +45,7 @@ In particular, for Test 1, we see that we tend to see much more separation betwe
 I implemented penalty first since it was more straightforward, but later switched to prohibition.  Many experiments in the remainder of the document use penalty; one unintended benefit of this is that the number of illegal moves attempted by the bot can be used as a metric for how well the bot has learned the basic rules of the game.
 
 
-### Magnitude of penalty
+#### Magnitude of penalty
 
 The magnitude of the penalty has an effect on neural network training where it does not in classical Q-learning.  For classical Q-learning, the function is an arbitrary function on a discrete set of states.  For deep Q-learning, the function is ``built from'' linear functions defined on a vector space continuum (but only evaluated on a discrete subset).  In particular, for deep Q-learning, large values can skew the weights during training.  In the beginning, I had set the penalty to -1000, which worked classically but caused divergence when training neural networks.  I tested this in an experiment comparing penalties of -2 vs. -1000.  I also tested a penalty of -1, which was not significantly different from a penalty of -2.
 
@@ -64,9 +65,13 @@ The magnitude of the penalty has an effect on neural network training where it d
 
 With a large penalty the model much longer to begin to converge.  A large penalty negatively impacts the performance of the bot measured in losses as well as, perhaps counterintuitively, its ability to avoid illegal moves.  In the long term, the bot appears to be able to adjust its weights to account for the large penalty, but in general it seems best to avoid it.
 
-### Greed and convergence
+### Generating good data to train on
 
-To generate good gameplay data, the bots must strike a balance between exploration and exploitation.  For Q-learning we will use a simple greed parameter to control the probability that the bot plays according to what it thinks is optimal (exploitation) versus randomly (exploration).  It is an annoying convention that the so-called greed parameter measures how much the bot explores; we will use the term *exploration parameter* instead, which is complementary to the *greed parameter*, i.e. a greed parameter of 0 means it always plays randomly.  This greed parameter may change over time.
+In Q-learning, the training data is generated along side the actual training on that data.  To generate good gameplay data, the bots must strike a balance between exploration and exploitation.  Moreover, we need to decide how much of the data to keep, and how much to discard.
+
+#### Greed and convergence
+
+For Q-learning we will use a simple greed parameter to control the probability that the bot plays according to what it thinks is optimal (exploitation) versus randomly (exploration).  It is an annoying convention that the so-called greed parameter measures how much the bot explores; we will use the term *exploration parameter* instead, which is complementary to the *greed parameter*, i.e. a greed parameter of 0 means it always plays randomly.  This greed parameter may change over time.
 
 In PvE games, it is typically recommended to start the greed low, around 0.0, and then end high, around 0.9.  The reasoning is that the bot should explore a lot in the beginning, then hone in on a winning strategy.  In PvP games, experimentally, it appears better to keep the ending greed lower.  We postulate the following reason: in PvE situations, the player has, ignoring randomness, total control over which branch of the game tree to go down.  Therefore, it is okay for the player to forget branches of the tree that it does not like.  On the other hand, in PvP situations, the opposing player has an equal share of control.  Setting the greed parameter too high can causes the neural network to forget some branches of the game tree.
 
@@ -91,7 +96,30 @@ To visualize the effect of greed on convergence and performance, I trained a bot
 
 We observe that higher greed can result in converging to a value with lower loss, but does not necessarily result in a better bot.  We also observe divergence for the first player and convergence for the second player using the no-greed policy.  My guess for why is that if the opponent plays randomly, this can result in higher variance in outcomes.
 
-### Simulation vs. training batch sizes
+
+#### Replay memory size
+
+An essential question in Q-learning is what simulation data to train the bot on.  We could train on all data from the last $k$ iterations, but this results in a tradeoff between stability vs. speed in training.  Instead we use *replay memory*,[^MKS15] i.e. sample data from a memory of fixed size.
+
+<p align="center">
+<img src="graphs/20240330154852_small_memory_1000.dttt.pt.losses.png" width="33%"> <img src="graphs/20240330180235_standard_defaults6_penalty1.dttt.pt.losses.png" width="33%"> <img src="graphs/20240330163919_massive_memory.dttt.pt.losses.png" width="33%">
+<p>
+<p align="center">Loss curves over 4000 iterations: memory size 1,000 (left) vs. 100,000 penalty (middle) vs. $\infty$ (right).</p>
+
+<table align="center">
+  <tr><th></th><th colspan="4">player 1</th><th colspan="4">player 2</th><th></th></tr>
+  <tr><th>memory size</th><th>win</th><th>loss</th><th>tie</th><th>invalid moves</th><th>win</th><th>loss</th><th>tie</th><th>invalid move</th><th>time</th></tr>
+  <tr><td>1k</td><td>96.56%</td><td>0.31%</td><td>3.13%</td><td>112</td><td>83.67%</td><td>1.82%</td><td>14.51%</td><td>290</td><td>48:27</td></tr>
+  <tr><td>100k</td><td>98.97%</td><td>0.00%</td><td>1.03%</td><td>0</td><td>91.78%</td><td>0.00%</td><td>8.22%</td><td>24</td><td>47:32</td></tr>
+  <tr><td>$\infty$</td><td>98.99%</td><td>0.00%</td><td>1.01%</td><td>0</td><td>90.91%</td><td>0.00%</td><td>9.09%</td><td>19</td><td>1:14:22</td></tr>
+</table>
+
+We observe that a lower memory leads to higher variance.  Interestingly, a higher memory also leads to more variance, but not nearly as much.  When the memory is low, correlations in the simulations are immediately and repeatedly trained on, while when the memory is too high, the distribution of experiences in the replay memory will reflect a lower greed overall, which leads to more randomness and higher variance; as additional evidence of this, we also see less/slower convergence as one might expect from a less greedy policy.
+
+
+### Hyperparameters for model training
+
+#### Simulation vs. training batch sizes
 
 In each step of an episode, the algorithm simulates a play of the game by the current player, and then trains on data sampled from the replay memory.  Both of these can be done efficiently in batches, with simulation batch size $b_s$ and training batch size $b_t$.  On average, given $n$ players, each player's replay memory increases by $b_s/n$ each round.  Since it doesn't make sense to simulate more than we can train on, we can impose the condition $b_t/b_s \geq 1/n$.
 
@@ -125,7 +153,7 @@ I ran experiments on varying the batch sizes, training for 800 iterations of len
 We observe that enlarging the training batch is far more computationally costly than enlarging simulation batch.  Enlarging the training batch decreases variance in training, but doesn't generally result in a better bot nor change the shape of the loss curve substantially.  On the other hand, enlarging the simulation batch leads to more data being generated, which appears to lead to faster convergence, and better bot performance at the end.  We note that we never reach the lower bound on the training-simulation batch ratio in the above experiments.
 
 
-### Learning rate
+#### Learning rate
 
 Selecting a learning rate in machine learning is typically understood as a tradeoff between faster convergence and better convergence toward a minimum loss (due to the stochstic nature of sampling training batch from the data).  The main difference in our setting is that the distribution of training data evolves over time, as the greed parameter ramps up.  This mean it's likely that the minimum loss also changes over time, which has interesting implications for the learning rate.
 
@@ -152,25 +180,9 @@ We observe that increasing the learning rate does not result in faster convergen
 
 The lossless AI for learning rate 0.0005 appears to be a fluke, a retraining with the same parameters yields similar numbers as its neighbors.
 
+#### Policy-to-target network copy frequency
 
-### Replay memory size
 
-An essential question in Q-learning is what simulation data to train the bot on.  We could train on all data from the last $k$ iterations, but this results in a tradeoff between stability vs. speed in training.  Instead we use *replay memory*,[^MKS15] i.e. sample data from a memory of fixed size.
-
-<p align="center">
-<img src="graphs/20240330154852_small_memory_1000.dttt.pt.losses.png" width="33%"> <img src="graphs/20240330180235_standard_defaults6_penalty1.dttt.pt.losses.png" width="33%"> <img src="graphs/20240330163919_massive_memory.dttt.pt.losses.png" width="33%">
-<p>
-<p align="center">Loss curves over 4000 iterations: memory size 1,000 (left) vs. 100,000 penalty (middle) vs. $\infty$ (right).</p>
-
-<table align="center">
-  <tr><th></th><th colspan="4">player 1</th><th colspan="4">player 2</th><th></th></tr>
-  <tr><th>memory size</th><th>win</th><th>loss</th><th>tie</th><th>invalid moves</th><th>win</th><th>loss</th><th>tie</th><th>invalid move</th><th>time</th></tr>
-  <tr><td>1k</td><td>96.56%</td><td>0.31%</td><td>3.13%</td><td>112</td><td>83.67%</td><td>1.82%</td><td>14.51%</td><td>290</td><td>48:27</td></tr>
-  <tr><td>100k</td><td>98.97%</td><td>0.00%</td><td>1.03%</td><td>0</td><td>91.78%</td><td>0.00%</td><td>8.22%</td><td>24</td><td>47:32</td></tr>
-  <tr><td>$\infty$</td><td>98.99%</td><td>0.00%</td><td>1.01%</td><td>0</td><td>90.91%</td><td>0.00%</td><td>9.09%</td><td>19</td><td>1:14:22</td></tr>
-</table>
-
-We observe that a lower memory leads to higher variance.  Interestingly, a higher memory also leads to more variance, but not nearly as much.  When the memory is low, correlations in the simulations are immediately and repeatedly trained on, while when the memory is too high, the distribution of experiences in the replay memory will reflect a lower greed overall, which leads to more randomness and higher variance; as additional evidence of this, we also see less/slower convergence as one might expect from a less greedy policy.
 
 
 ### Neural network architecture
@@ -179,7 +191,6 @@ We observe that a lower memory leads to higher variance.  Interestingly, a highe
 
 #### Residual skip connections
 
-### Policy-to-target network copy frequency
 
 
 
