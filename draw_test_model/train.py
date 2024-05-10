@@ -60,7 +60,8 @@ digitsTrainData = datasets.MNIST(
     root="data",
     train=True,
     download=True,
-    transform=v2.Compose([v2.RandomAffine(10, translate=(.3,.3), scale=(.75, 1.)), torchvision.transforms.ToTensor()]),
+    transform=v2.Compose([v2.RandomAffine(30, translate=(.2,.2), scale=(.6, 1.), shear=(-20, 20, -20, 20)), torchvision.transforms.ToTensor()]),
+    #transform=torchvision.transforms.ToTensor(),
 )
 digitsTestData = datasets.MNIST(
     root="data",

@@ -29,13 +29,25 @@ class DMCTS(DeepRL):
     #     return self.q[statehash]
 
 
-    # Unbatched, return action shape
-    def ucb(self, state, param: float):
-        statehash = self.mdp.state_to_hashable(state)
-        if statehash not in self.q:
-            return torch.zeros((1,) + self.mdp.action_shape, device=self.device)
+    # Batched, return action shape
+    def ucb(self, state: torch.Tensor, param: torch.Tensor | float):
+        q, p, n_tot, n = torch.tensor([], device=self.device), torch.tensor([], device=self.device), torch.tensor([], device=self.device), torch.tensor([], device=self.device)
+        for i in range(state.size(0)):
+            statehash = self.mdp.state_to_hashable(state)
+            if statehash in self.q:
+                q = torch.cat([q, self.q[statehash][None]])
+                p = torch.cat([p, self.p[statehash][None]])
+                n = torch.cat([n, self.n[statehash][None]])
+                n_tot = torch.cat([n_tot, torch.tensor([self.n_tot[statehash]], device=self.device)])
+            else:
+                q = torch.cat([q, torch.zeros((1,) + self.mdp.action_shape, device=self.device)])
+                p = torch.cat([p, torch.zeros((1,) + self.mdp.action_shape, device=self.device)])
+                n = torch.cat([n, torch.zeros((1,) + self.mdp.action_shape, device=self.device)])
+                n_tot = torch.cat([n_tot, torch.zeros(1)])
+        n_tot = n_tot.reshape((-1,) + self.mdp.action_projshape)
+
         # Exploration vs. exploitation: the second term dominates when unexplored, then the first term dominates when more explored
-        return (self.q[statehash].nan_to_num(0) + self.p[statehash] * (param * math.sqrt(self.n_tot[statehash]) / (1 + self.n[statehash])))[None]
+        return q.nan_to_num(0) + p * (param * math.sqrt(n_tot) / (1 + n))
 
     # Input batched size 1
     # Starting at a given state, conducts a fixed number of Monte-Carlo searches, using the Q function in visited states and the heuristic function in new states
@@ -56,7 +68,10 @@ class DMCTS(DeepRL):
                     break
 
                 # Q has values [-1, 1] generally, so do a shift
-                action = self.mdp.get_max_action((1 + self.ucb(s, ucb_parameter)) * self.mdp.valid_action_filter(s))
+                valid_actions = self.mdp.valid_action_filter(s)
+                num_valid = valid_actions.sum()
+                # Scale the parameter by the number of valid actions
+                action = self.mdp.get_max_action((1 + self.ucb(s, ucb_parameter * num_valid)) * valid_actions)
                 history.append((s, action))
                 s, r = self.mdp.transition(s, action)
                 depth += 1
@@ -78,6 +93,7 @@ class DMCTS(DeepRL):
 
                 # Sigmoid so that the values are in (0, 1)
                 # These prior probabilities are only assigned once; eventually, with enough visits the quality function will dominate the heuristic
+                # TODO zero out invalid?
                 self.p[self.mdp.state_to_hashable(s)] = torch.softmax(heuristic(s).flatten(1, -1), dim=1).reshape((-1, ) + self.mdp.action_shape)
 
             while self.mdp.is_terminal(s).item() == False:
@@ -105,7 +121,7 @@ class DMCTS(DeepRL):
 
 
 
-    def mcts(self, lr: float, num_iterations: int, num_selfplay: int, num_searches: int, max_steps: int, ucb_parameter: float, temperature: float, train_batch: int, save_path=None, verbose=False, graph_smoothing=10, initial_log=""):        
+    def mcts(self, lr: float, num_iterations: int, num_selfplay: int, num_searches: int, max_steps: int, ucb_parameter: float, temperature: float, train_batch: int, train_iterations = 1, save_path=None, verbose=False, graph_smoothing=10, initial_log=""):        
         logtext = initial_log
         
         start_time = time.perf_counter()
@@ -129,60 +145,52 @@ class DMCTS(DeepRL):
             s = self.mdp.get_initial_state(num_selfplay)        # TODO not suppose to parallelize the self plays?
 
             # The probability vectors for each self-play
-            states = [torch.tensor([], device=self.device) for j in range(num_selfplay)]
-            p_vectors = [torch.tensor([], device=self.device) for j in range(num_selfplay)]
-            results = [None for j in range(num_selfplay)]
+            states = torch.tensor([], device=self.device)
+            p_vectors = torch.tensor([], device=self.device)
 
             logtext += log(f"Self-plays at {time.perf_counter() - start_time}")
             # Each step in the self-plays
             for step in range(max_steps):
                 step_p = torch.tensor([], device=self.device)
 
-                # Each self-play
-                for play in range(num_selfplay):
-                    # If a result has been obtained, then append a trivial action and skip everything
-                    if results[play] != None:
-                        step_p = torch.cat([step_p, torch.zeros((1,) + self.mdp.action_shape, device=self.device)], dim=0)
-                        continue
-
+                # Each self-play TODO parallelize search
+                for play in range(s.size(0)):
                     # Do searches
                     p_vector = self.search(s[play:play+1], heuristic=prior_p, ucb_parameter=ucb_parameter, num=num_searches, temperature=temperature)
 
                     # Add probability vector to record TODO these don't need to be sorted by play
-                    states[play] = torch.cat([states[play], s[play:play+1]], dim=0)
-                    p_vectors[play] = torch.cat([p_vectors[play], p_vector], dim=0)
+                    states = torch.cat([states, s[play:play+1]], dim=0)
+                    p_vectors = torch.cat([p_vectors, p_vector], dim=0)
                     step_p = torch.cat([step_p, p_vector], dim=0)
 
                 # Select actions and do all the transitions
                 a = self.mdp.get_random_action_weighted(step_p)
-                s, r = self.mdp.transition(s, a)
+                s, _ = self.mdp.transition(s, a)
 
-                # If state is terminal, then record the result (i.e. the winner)
-                for play in range(num_selfplay):
-                    if results[play] == None and self.mdp.is_terminal(s[play:play+1]).item():
-                        results[play] = r[play]
-
-            # We do not actually need to bother with the results, since we do not have the bot concede    
-            # TODO having the bot concede might be efficient in training?  so it doesn't have to run the search all the way through all the time?        
-            # For unresolved games, set rewards to zero
-            # for play in range(num_selfplay):
-            #     if results[play] == None:
-            #         results[play] = torch.zeros(self.mdp.num_players)
+                # If state is terminal, then discard it
+                s = s[self.mdp.is_terminal(s).flatten()]
+                # If there are no more states, break
+                if s.size(0) == 0:
+                    break
+                        
+            # TODO think about having the bot concede? might save some simulations
 
             logtext += log(f"Training at {time.perf_counter() - start_time}")
 
-            training_inputs.append(torch.cat(states, dim=0))
-            training_values.append(torch.cat(p_vectors, dim=0))
+            training_inputs.append(states)
+            training_values.append(p_vectors)
 
             # Do training on recent data
-            indices = list(range(training_values[-1].size(0)))
+            inputs = torch.cat(training_inputs[-train_iterations:-1])
+            values = torch.cat(training_values[-train_iterations:-1])
+            indices = list(range(inputs.size(0)))
             total_loss = 0.
             num_train = 0.
             self.pv.train()
-            for i in range(training_values[-1].size(0)):
+            for i in range(inputs.size(0)):
                 get_indices = random.sample(indices, min(len(indices), train_batch))
-                x = training_inputs[-1][get_indices]
-                y = training_values[-1][get_indices]
+                x = inputs[get_indices]
+                y = values[get_indices]
 
                 # Before softmax
                 pred = self.pv(x)
@@ -197,6 +205,9 @@ class DMCTS(DeepRL):
 
             self.pv.eval()
             logtext += log(f"Loss: {total_loss/num_train} on {num_train} batches of size {min(len(indices), train_batch)}.")
+
+            # Saving:
+            # 1. dictionaries 2. heuristic 3. data??
         
 
 

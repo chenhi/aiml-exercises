@@ -78,6 +78,56 @@ class ConvBig(nn.Module):             # Input shape (1, 28, 28) or (BATCH SIZE, 
 
 
 
+class ConvSkip2(nn.Module):             # Input shape (1, 28, 28) or (BATCH SIZE, 1, 28, 28)
+    def __init__(self):
+        super().__init__()
+        self.label = "convskip"
+        # How to do initialization?
+        self.stack1 = nn.Sequential(
+            nn.Conv2d(1, 64, (3,3), padding='same'),                    # Input channel 1, output 32, filter size (3,3)
+            nn.ReLU(),
+            nn.Dropout(p=0.2),
+            nn.BatchNorm2d(64),
+            nn.Conv2d(64, 64, (3,3), padding='same'),                    # Input channel 1, output 32, filter size (3,3)
+            nn.MaxPool2d((2,2)),    # Image now 14x14
+            nn.ReLU(),              # ReLU after MaxPool more efficient
+            nn.Dropout(p=0.2),
+            nn.BatchNorm2d(64),
+        )
+        self.stack2 = nn.Sequential(
+            nn.Conv2d(64, 64, (3,3), padding='same'),
+            nn.ReLU(),
+            nn.Dropout(p=0.2),
+            nn.BatchNorm2d(64),
+            nn.Conv2d(64, 64, (3,3), padding='same'),  
+            nn.MaxPool2d((2,2)),    # Image now 7x7
+            nn.ReLU(),
+            nn.Dropout(p=0.2),
+            nn.BatchNorm2d(64),
+        )
+
+        self.stack3 = nn.Sequential(
+            nn.Linear(7*7*64 + 14*14*64, 512),
+            nn.ReLU(),
+            nn.Dropout(p=0.2),
+            nn.BatchNorm1d(512),
+            nn.Linear(512, 64),
+            nn.ReLU(),
+            nn.Dropout(p=0.2),
+            nn.BatchNorm1d(64),
+            nn.Linear(64, 10)
+        )
+
+        self.flatten = nn.Flatten()
+    
+    def forward(self, x):
+        x1 = self.stack1(x)
+        x2 = self.stack2(x1)
+        x12 = torch.cat([self.flatten(x1), self.flatten(x2)], dim=1)
+        logits = self.stack3(x12)
+        return logits
+
+
 class ConvSkip(nn.Module):             # Input shape (1, 28, 28) or (BATCH SIZE, 1, 28, 28)
     def __init__(self):
         super().__init__()

@@ -10,9 +10,11 @@ In a 2015 paper[^MKS15], Minh, Kavukcuoglu, Silver *et. al.* outline an algorith
 
 I made a few minor design modifications to the DQN algorithm (as well as ignoring issues that obviously do not arise in our setting).  I simulate games in batches, which is not difficult due to the very discrete nature of the games we consider, which should give a speed boost; this introduces the size of the simulation batches as an additional hyperparameter.
 
-We also note that convergence alone (i.e. vanishing of loss) does not necessarily indicate a good bot, since its performance *in natura* depends on the quality of the generated training data.  Ensuring good data often means not letting the behavior policy get too greedy.  Due to the random play, this means the loss typically has a non-zero lower bound.  I personally found it helpful to conceptually separate the simulation of data and the learning on that simulated data.
+To evaluate the training of bots, we use the following metrics.
++ First, we can visualize the loss curves (which we smooth with an averaging kernel of width 11 for readability).  Convergence alone (i.e. vanishing of loss) does not necessarily indicate a good bot, since its performance *in natura* depends on the quality of the generated training data.  Ensuring good data often means not letting the behavior policy get too greedy.  Due to the random play, this means the loss typically has a non-zero lower bound.  I personally found it helpful to conceptually separate the simulation of data and the learning on that simulated data.
++ Next, we chose one test scenario for each player where the player's next moves could be easily separated into good and bad moves, and plotted statistics related to the values of the Q-function for those moves.  This tests whether the bot has learned the best strategy in this scenario.  However, sometimes the bot has the ability to avoid this particular branch of the tree, and therefore can safely ignore these strategies.
++ Finally, we run 10,000 simulations of the bot against a random player and report the number of wins, loss and ties (and possibly invalid moves attempted) at the end of training.
 
-Finally, we note that all loss curves have undergone a smoothing with kernel width 11 for readability.
 
 ### Dealing with illegal moves
 
@@ -81,13 +83,45 @@ To visualize the effect of greed on convergence and performance, I trained a bot
 
 <table align="center">
 <tr><td></td><td colspan="4">player 1</td><td colspan="4">player 2</td></tr>
-<tr><td>greed</td><td>win</td><td>loss</td><td>tie</td><td>invalid</td><td>win</td><td>loss</td><td>tie</td><td>invalid</td></tr>
-<tr><td>no</td><td>69.37%</td><td>19.43%</td><td>11.20%</td><td>31168</td><td>47.47%</td><td>40.07%</td><td>12.46%</td><td>21536</td></tr>
-<tr><td>middle</td><td>98.96%</td><td>0.00%</td><td>1.04%</td><td>0</td><td>90.73%</td><td>0.00%</td><td>9.27%</td><td>0</td></tr>
-<tr><td>max</td><td>95.54%</td><td>0.63%</td><td>3.83%</td><td>284</td><td>90.44%</td><td>0.00%</td><td>9.56%</td><td>0</td></tr>
+<tr><td></td><td>win</td><td>loss</td><td>tie</td><td>invalid</td><td>win</td><td>loss</td><td>tie</td><td>invalid</td></tr>
+<tr><td>no greed</td><td>69.37%</td><td>19.43%</td><td>11.20%</td><td>31168</td><td>47.47%</td><td>40.07%</td><td>12.46%</td><td>21536</td></tr>
+<tr><td>middle greed</td><td>98.96%</td><td>0.00%</td><td>1.04%</td><td>0</td><td>90.73%</td><td>0.00%</td><td>9.27%</td><td>0</td></tr>
+<tr><td>max greed</td><td>95.54%</td><td>0.63%</td><td>3.83%</td><td>284</td><td>90.44%</td><td>0.00%</td><td>9.56%</td><td>0</td></tr>
 </table>
 
 We observe that higher greed can result in converging to a value with lower loss, but does not necessarily result in a better bot.  We also observe divergence for the first player and convergence for the second player using the no-greed policy.  My guess for why is that if the opponent plays randomly, this can result in higher variance in outcomes.
+
+### Simulation/training batch sizes and learning rate
+
+In each step of an episode, the algorithm simulates a play of the game by the current player, and then trains on data sampled from the replay memory.  Both of these can be done efficiently in batches, with simulation batch size $b_s$ and training batch size $b_t$.  On average, given $n$ players, each player's replay memory increases by $b_s/n$ each round.  Since it doesn't make sense to simulate more than we can train on, we can impose the condition $b_s \leq n b_t$.  
+
+Note that increasing the training batch size doesn't mean more updates to the weights, but averaging over more entries in the updates, which has the effect of decreasing the variance.  To increase the magnitude of the updates, one can adjust the learning rate.
+
+I ran experiments on varying the batch sizes, training for 800 iterations of length 15 at a learning rate of 0.00025.  The greed ramp was $[20, 500]$ in range $[0.0, 0.6]$, training began at episode 20, and the policy network was copied very episode.  
+
+
+<p align="center">
+<img src="graphs/20240330201726_800its.dttt.pt.losses.png" width="33%"><img src="graphs/20240330205932_train_up2.dttt.pt.losses.png" width="33%"><img src="graphs/20240330203140_train_up4.dttt.pt.losses.png" width="33%">
+<img src="graphs/20240330212410_sim_up2.dttt.pt.losses.png" width="33%"><img src="graphs/20240330214045_sim2_train2.dttt.pt.losses.png" width="33%"><img src="graphs/20240330220010_sim2_train4.dttt.pt.losses.png" width="33%">
+<img src="graphs/20240330225523_batches_128_256.dttt.pt.losses.png" width="33%"><img src="graphs/20240330231102_128_512.dttt.pt.losses.png" width="33%"><img src="graphs/20240330233134_128_1024.dttt.pt.losses.png" width="33%">
+<p>
+<p align="center">Loss curves over 800 iterations.  Going rightward doubles the training batch size, going down doubles the simulation batch size.</p>
+
+<table align="center">
+  <tr><th>sim/train batch size</th><th>p0 win</th><th>p0 loss</th><th>p0 tie</th><th>p1 win</th><th>p1 loss</th><th>p1 tie</th><th>time</th></tr>
+  <tr><td>32/256</td><td>99.11%</td><td>0.00%</td><td>0.89%</td><td>90.24%</td><td>0.59%</td><td>9.17%</td><td>8:01</td></tr>
+  <tr><td>32/512</td><td>98.97%</td><td>0.00%</td><td>1.03%</td><td>92.04%</td><td>0.17%</td><td>7.79%</td><td>13:49</td></tr>
+  <tr><td>32/1024</td><td>98.01%</td><td>0.00%</td><td>1.99%</td><td>90.71%</td><td>0.80%</td><td>8.49%</td><td>21:40</td></tr>
+  <tr><td>64/256</td><td>98.99%</td><td>0.00%</td><td>1.01%</td><td>90.37%</td><td>0.60%</td><td>9.03%</td><td>9:05</td></tr>
+  <tr><td>64/512</td><td>98.79%</td><td>0.00%</td><td>1.21%</td><td>91.52%</td><td>0.50%</td><td>7.98%</td><td>13:07</td></tr>
+  <tr><td>64/1024</td><td>98.89%</td><td>0.00%</td><td>1.11%</td><td>90.55%</td><td>0.58%</td><td>8.87%</td><td>22:15</td></tr>
+  <tr><td>128/256</td><td>98.72%</td><td>0.00%</td><td>1.28%</td><td>89.28%</td><td>0.59%</td><td>10.13%</td><td>10:02</td></tr>
+  <tr><td>128/512</td><td>98.92%</td><td>0.00%</td><td>1.08%</td><td>90.51%</td><td>0.25%</td><td>9.24%</td><td>14:11</td></tr>
+  <tr><td>128/1024</td><td>98.97%</td><td>0.00%</td><td>1.03%</td><td>91.03%</td><td>0.20%</td><td>8.77%</td><td>25:39</td></tr>
+</table>
+
+
+We observe that enlarging the training batch is far more computationally costly than enlarging simulation batch.  Moreover, enlarging the training batch decreases variance in training, but doesn't generally result in a better bot nor change the shape of the loss curve substantially.  On the other hand, enlarging the simulation batch leads to more data being generated, which appears to lead to faster convergence (though, one has to also enlarge the training batch size to keep up with the lower bound on the ratio).  The effect on bot performance appears more noticable.
 
 
 

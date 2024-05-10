@@ -1,4 +1,3 @@
-from app import app
 from io import StringIO
 
 def log(l: str) -> str:

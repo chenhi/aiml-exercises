@@ -17,7 +17,8 @@ mdp = TTTTensorMDP(device=device)
 game = DMCTS(mdp, TTTResNN, torch.nn.CrossEntropyLoss(), torch.optim.Adam, device=device)
 
 
-#game.mcts(lr = 0.01, num_iterations=50, num_selfplay=10, num_searches=100, max_steps=100, ucb_parameter=2, temperature=1, train_batch=8, p_threshold_multiplier=10)
+
+game.mcts(lr = 0.01, num_iterations=50, num_selfplay=10, num_searches=100, max_steps=100, ucb_parameter=10, temperature=1, train_batch=8)
 
 
 
@@ -29,7 +30,7 @@ s = game.mdp.get_initial_state()
 
 
 print(torch.softmax(game.pv(s).flatten(1, -1), dim=1))
-game.search(s, game.pv, 5000, ucb_parameter = b, temperature = 1)
+game.search(s, game.pv, 100, ucb_parameter = 10, temperature = 1)
 print("Q", game.q[mdp.state_to_hashable(s)])
 print("N", game.n[mdp.state_to_hashable(s)])
 print("W", game.w[mdp.state_to_hashable(s)])
