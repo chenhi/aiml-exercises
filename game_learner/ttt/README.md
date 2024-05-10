@@ -93,7 +93,7 @@ We observe that higher greed can result in converging to a value with lower loss
 
 ### Simulation vs. training batch sizes
 
-In each step of an episode, the algorithm simulates a play of the game by the current player, and then trains on data sampled from the replay memory.  Both of these can be done efficiently in batches, with simulation batch size $b_s$ and training batch size $b_t$.  On average, given $n$ players, each player's replay memory increases by $b_s/n$ each round.  Since it doesn't make sense to simulate more than we can train on, we can impose the condition $b_s \leq n b_t$.  
+In each step of an episode, the algorithm simulates a play of the game by the current player, and then trains on data sampled from the replay memory.  Both of these can be done efficiently in batches, with simulation batch size $b_s$ and training batch size $b_t$.  On average, given $n$ players, each player's replay memory increases by $b_s/n$ each round.  Since it doesn't make sense to simulate more than we can train on, we can impose the condition $b_t/b_s \geq 1/n$.
 
 Note that increasing the training batch size doesn't mean more updates to the weights, but averaging over more entries in the updates, which has the effect of decreasing the variance.  To increase the magnitude of the updates, one can adjust the learning rate.
 
@@ -122,7 +122,7 @@ I ran experiments on varying the batch sizes, training for 800 iterations of len
 </table>
 
 
-We observe that enlarging the training batch is far more computationally costly than enlarging simulation batch.  Moreover, enlarging the training batch decreases variance in training, but doesn't generally result in a better bot nor change the shape of the loss curve substantially.  On the other hand, enlarging the simulation batch leads to more data being generated, which appears to lead to faster convergence (though, one has to also enlarge the training batch size to keep up with the lower bound on the ratio).  The effect on bot performance appears more noticable.
+We observe that enlarging the training batch is far more computationally costly than enlarging simulation batch.  Enlarging the training batch decreases variance in training, but doesn't generally result in a better bot nor change the shape of the loss curve substantially.  On the other hand, enlarging the simulation batch leads to more data being generated, which appears to lead to faster convergence, and better bot performance at the end.  We note that we never reach the lower bound on the training-simulation batch ratio in the above experiments.
 
 
 ### Learning rate
