@@ -13,7 +13,7 @@ I made a few minor design modifications to the DQN algorithm (as well as ignorin
 To evaluate the training of bots, we use the following metrics.
 + First, we can visualize the loss curves (which we smooth with an averaging kernel of width 11 for readability).  Convergence alone (i.e. vanishing of loss) does not necessarily indicate a good bot, since its performance *in natura* depends on the quality of the generated training data.  Ensuring good data often means not letting the behavior policy get too greedy.  Due to the random play, this means the loss typically has a non-zero lower bound.  I personally found it helpful to conceptually separate the simulation of data and the learning on that simulated data.
 + Next, we chose one test scenario for each player where the player's next moves could be easily separated into good and bad moves, and plotted statistics related to the values of the Q-function for those moves.  This tests whether the bot has learned the best strategy in this scenario.  However, sometimes the bot has the ability to avoid this particular branch of the tree, and therefore can safely ignore these strategies.
-+ Finally, we run 10,000 simulations of the bot against a random player and report the number of wins, loss and ties (and possibly invalid moves attempted) at the end of training.
++ Finally, we run 10,000 simulations of the bot against a random player and report the number of wins, loss and ties (and possibly invalid moves attempted) at the end of training.  We also sometimes record the time for training, though this was done on a CPU, not a GPU, so should not be taken too seriously.
 
 
 ### Dealing with illegal moves
@@ -91,7 +91,7 @@ To visualize the effect of greed on convergence and performance, I trained a bot
 
 We observe that higher greed can result in converging to a value with lower loss, but does not necessarily result in a better bot.  We also observe divergence for the first player and convergence for the second player using the no-greed policy.  My guess for why is that if the opponent plays randomly, this can result in higher variance in outcomes.
 
-### Simulation/training batch sizes and learning rate
+### Simulation vs. training batch sizes
 
 In each step of an episode, the algorithm simulates a play of the game by the current player, and then trains on data sampled from the replay memory.  Both of these can be done efficiently in batches, with simulation batch size $b_s$ and training batch size $b_t$.  On average, given $n$ players, each player's replay memory increases by $b_s/n$ each round.  Since it doesn't make sense to simulate more than we can train on, we can impose the condition $b_s \leq n b_t$.  
 
@@ -109,7 +109,7 @@ I ran experiments on varying the batch sizes, training for 800 iterations of len
 
 <table align="center">
   <tr><th colspan="2">batch size</th><th colspan="3">player 1</th><th colspan="3">player 2</th><th></th></tr>
-  <tr><th>simulation</th><th>training</th><th>win</th><th>loss</th><th>tie</th><th>win</th><th>loss</th><th>tie</th><th>time</th></tr>
+  <tr><th>simulation</th><th>training</th><th>win</th><th>loss</th><th>tie</th><th>win</th><th>loss</th><th>tie</th><th>time (CPU)</th></tr>
   <tr><td>32</td><td>256</td><td>99.11%</td><td>0.00%</td><td>0.89%</td><td>90.24%</td><td>0.59%</td><td>9.17%</td><td>8:01</td></tr>
   <tr><td>32</td><td>512</td><td>98.97%</td><td>0.00%</td><td>1.03%</td><td>92.04%</td><td>0.17%</td><td>7.79%</td><td>13:49</td></tr>
   <tr><td>32</td><td>1024</td><td>98.01%</td><td>0.00%</td><td>1.99%</td><td>90.71%</td><td>0.80%</td><td>8.49%</td><td>21:40</td></tr>
@@ -123,6 +123,46 @@ I ran experiments on varying the batch sizes, training for 800 iterations of len
 
 
 We observe that enlarging the training batch is far more computationally costly than enlarging simulation batch.  Moreover, enlarging the training batch decreases variance in training, but doesn't generally result in a better bot nor change the shape of the loss curve substantially.  On the other hand, enlarging the simulation batch leads to more data being generated, which appears to lead to faster convergence (though, one has to also enlarge the training batch size to keep up with the lower bound on the ratio).  The effect on bot performance appears more noticable.
+
+
+### Learning rate
+
+Selecting a learning rate in machine learning is typically understood as a tradeoff between faster convergence and better convergence toward a minimum loss (due to the stochstic nature of sampling training batch from the data).  The main difference in our setting is that the distribution of training data evolves over time, as the greed parameter ramps up.  This mean it's likely that the minimum loss also changes over time, which has interesting implications for the learning rate.
+
+I ran experiments varying the learning rate over 800 iterations, with simulation batch size 128 and training batch size 256.
+
+<p align="center">
+<img src="graphs/20240330225523_batches_128_256.dttt.pt.losses.png" width="33%"> <img src="graphs/20240331001249_128_256_lr.dttt.pt.losses.png" width="33%"> <img src="graphs/20240331002916_128_256_lrupup.dttt.pt.losses.png" width="33%">
+<img src="graphs/20240331211836_0025.dttt.pt.losses.png" width="33%"> <img src="graphs/20240331213435_005.dttt.pt.losses.png" width="33%"> <img src="graphs/20240331172315_001.dttt.pt.losses.png" width="33%">
+<p>
+<p align="center">Loss curves over 800 iterations with learning rates 2.5e-4, 5e-4, 1e-3 (top row) and 2.5e-3, 5e-3, 1e-2 (bottom row).</p>
+
+<table align="center">
+  <tr><th></th><th colspan="4">player 1</th><th colspan="4">player 2</th></tr>
+  <tr><th>learning rate</th><th>win</th><th>loss</th><th>tie</th><th>invalid move</th><th>win</th><th>loss</th><th>tie</th><th>invalid move</th></tr>
+  <tr><td>0.00025</td><td>98.72%</td><td>0.00%</td><td>1.28%</td><td>0</td><td>89.28%</td><td>0.59%</td><td>10.13%</td><td></td></tr>
+  <tr><td>0.0005</td><td>98.99%</td><td>0.00%</td><td>1.01%</td><td>0</td><td>90.39%</td><td>0.00%</td><td>9.61%</td><td>0</td></tr>
+  <tr><td>0.001</td><td>98.97%</td><td>0.00%</td><td>1.03%</td><td>0</td><td>90.26%</td><td>0.58%</td><td>9.16%</td><td>65</td></tr>
+  <tr><td>0.0025</td><td>99.48%</td><td>0.00%</td><td>0.52%</td><td>420</td><td>90.50%</td><td>0.90%</td><td>8.60%</td><td>763</td></tr>
+  <tr><td>0.005</td><td>98.48%</td><td>0.00%</td><td>1.52%</td><td>201</td><td>91.03%</td><td>0.49%</td><td>8.48%</td><td>10</td></tr>
+  <tr><td>0.01</td><td>98.42%</td><td>0.15%</td><td>1.43%</td><td>134</td><td>87.88%</td><td>2.81%</td><td>9.31%</td><td>1328</td></tr>
+</table>
+
+We observe that increasing the learning rate does not result in faster convergence; instead, it is the rate of greed annealing which is limiting.  A high learning rate does appear to shorten the initial period of high magnitude noise.  Moreover, I also ran experiments with even smaller learning rates of 1e-4, 1e-5, and 1e-6, in which the bots diverged catastrophically.  A possible explanation for this is that if the learning rate is too low, then it can fail to "catch up" to the moving minimum and find itself at values where it begins to diverge.
+
+The lossless AI for learning rate 0.0005 appears to be a fluke, a retraining with the same parameters yields similar numbers as its neighbors.
+
+
+
+
+### Replay memory size
+
+
+### Neural network architecture
+
+
+### Policy-to-target network copy frequency
+
 
 
 
