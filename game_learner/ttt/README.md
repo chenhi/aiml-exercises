@@ -4,7 +4,7 @@ The goal of this note is to record the results of some experiments conducted whi
 
 Ultimately, our goal is to train bots to play a game from scratch, i.e. without human knowledge like AlphaZero[^SSS17] as opposed to AlphaGo[^SH16].
 
-## Deep Q-networks (DQN)
+# Deep Q-networks (DQN)
 
 In a 2015 paper[^MKS15], Minh, Kavukcuoglu, Silver *et. al.* outline an algorithm for using neural networks within a Q-learning algorithm (DQN) to train bots to play various player vs. environment (PvE) games on the Atari video game platform.  The same algorithms may be readily adapted to PvP games by giving each player their own Q-function, with each player considering the other players as part of the environment.  Unlike the PvE setting, the "environment" is now no longer given by a static and fixed (stochastic) Markov decision process, but one which evolves along with the player.  We do not investigate whether the theoretical assumptions justifying Q-learning algorithms remain valid in this set-up, but experimentally we find that they are still able to train good bots.
 
@@ -16,14 +16,14 @@ To evaluate the training of bots, we use the following metrics.
 + Finally, we run 10,000 simulations of the bot against a random player and report the number of wins, loss and ties (and possibly invalid moves attempted) at the end of training.  We also sometimes record the time for training, though this was done on a CPU, not a GPU, so should not be taken too seriously.
 
 
-### Dealing with illegal moves
+## Dealing with illegal moves
 
 There is an immediate design choice that needs to be made: how to handle illegal moves by the bot.  Because the bot plays deterministically, if left unhandled it is possible for the bot to get stuck in infinite loops attempting illegal moves.  In classical Q-learning, actions are just a set and it is straightforward to restrict the set of moves to legal ones.  In deep Q-learning, actions are represented by basis vectors in a fixed vector space, and it is possible for the neural network to select an illegal move.  I saw three solutions:
 + **Randomness:** choose a random action when an illegal action is chosen.
 + **Prohibition:** prohibit illegal moves by zeroing out their corresponding components.
 + **Penalty:** teach the bot to avoid illegal moves by assigning a penalty to illegal moves.
 
-#### Penalty vs. prohibition
+### Penalty vs. prohibition
 
 Randomness appeared to me strictly inferior to prohibition, so I didn't experiment with it.  Below are the loss curves comparing prohibition and penalty.
 <p align="center">
@@ -45,7 +45,7 @@ In particular, for Test 1, we see that we tend to see much more separation betwe
 I implemented penalty first since it was more straightforward, but later switched to prohibition.  Many experiments in the remainder of the document use penalty; one unintended benefit of this is that the number of illegal moves attempted by the bot can be used as a metric for how well the bot has learned the basic rules of the game.
 
 
-#### Magnitude of penalty
+### Magnitude of penalty
 
 The magnitude of the penalty has an effect on neural network training where it does not in classical Q-learning.  For classical Q-learning, the function is an arbitrary function on a discrete set of states.  For deep Q-learning, the function is ``built from'' linear functions defined on a vector space continuum (but only evaluated on a discrete subset).  In particular, for deep Q-learning, large values can skew the weights during training.  In the beginning, I had set the penalty to -1000, which worked classically but caused divergence when training neural networks.  I tested this in an experiment comparing penalties of -2 vs. -1000.  I also tested a penalty of -1, which was not significantly different from a penalty of -2.
 
@@ -65,11 +65,11 @@ The magnitude of the penalty has an effect on neural network training where it d
 
 With a large penalty the model much longer to begin to converge.  A large penalty negatively impacts the performance of the bot measured in losses as well as, perhaps counterintuitively, its ability to avoid illegal moves.  In the long term, the bot appears to be able to adjust its weights to account for the large penalty, but in general it seems best to avoid it.
 
-### Generating good data to train on
+## Generating good data to train on
 
 In Q-learning, the training data is generated along side the actual training on that data.  To generate good gameplay data, the bots must strike a balance between exploration and exploitation.  Moreover, we need to decide how much of the data to keep, and how much to discard.
 
-#### Greed and convergence
+### Greed and convergence
 
 For Q-learning we will use a simple greed parameter to control the probability that the bot plays according to what it thinks is optimal (exploitation) versus randomly (exploration).  It is an annoying convention that the so-called greed parameter measures how much the bot explores; we will use the term *exploration parameter* instead, which is complementary to the *greed parameter*, i.e. a greed parameter of 0 means it always plays randomly.  This greed parameter may change over time.
 
@@ -97,7 +97,7 @@ To visualize the effect of greed on convergence and performance, I trained a bot
 We observe that higher greed can result in converging to a value with lower loss, but does not necessarily result in a better bot.  We also observe divergence for the first player and convergence for the second player using the no-greed policy.  My guess for why is that if the opponent plays randomly, this can result in higher variance in outcomes.
 
 
-#### Replay memory size
+### Replay memory size
 
 An essential question in Q-learning is what simulation data to train the bot on.  We could train on all data from the last $k$ iterations, but this results in a tradeoff between stability vs. speed in training.  Instead we use *replay memory*,[^MKS15] i.e. sample data from a memory of fixed size.
 
@@ -117,9 +117,9 @@ An essential question in Q-learning is what simulation data to train the bot on.
 We observe that a lower memory leads to higher variance.  Interestingly, a higher memory also leads to more variance, but not nearly as much.  When the memory is low, correlations in the simulations are immediately and repeatedly trained on, while when the memory is too high, the distribution of experiences in the replay memory will reflect a lower greed overall, which leads to more randomness and higher variance; as additional evidence of this, we also see less/slower convergence as one might expect from a less greedy policy.
 
 
-### Hyperparameters for model training
+## Hyperparameters for model training
 
-#### Simulation vs. training batch sizes
+### Simulation vs. training batch sizes
 
 In each step of an episode, the algorithm simulates a play of the game by the current player, and then trains on data sampled from the replay memory.  Both of these can be done efficiently in batches, with simulation batch size $b_s$ and training batch size $b_t$.  On average, given $n$ players, each player's replay memory increases by $b_s/n$ each round.  Since it doesn't make sense to simulate more than we can train on, we can impose the condition $b_t/b_s \geq 1/n$.
 
@@ -153,7 +153,7 @@ I ran experiments on varying the batch sizes, training for 800 iterations of len
 We observe that enlarging the training batch is far more computationally costly than enlarging simulation batch.  Enlarging the training batch decreases variance in training, but doesn't generally result in a better bot nor change the shape of the loss curve substantially.  On the other hand, enlarging the simulation batch leads to more data being generated, which appears to lead to faster convergence, and better bot performance at the end.  We note that we never reach the lower bound on the training-simulation batch ratio in the above experiments.
 
 
-#### Learning rate
+### Learning rate
 
 Selecting a learning rate in machine learning is typically understood as a tradeoff between faster convergence and better convergence toward a minimum loss (due to the stochstic nature of sampling training batch from the data).  The main difference in our setting is that the distribution of training data evolves over time, as the greed parameter ramps up.  This mean it's likely that the minimum loss also changes over time, which has interesting implications for the learning rate.
 
@@ -180,22 +180,22 @@ We observe that increasing the learning rate does not result in faster convergen
 
 The lossless AI for learning rate 0.0005 appears to be a fluke, a retraining with the same parameters yields similar numbers as its neighbors.
 
-#### Policy-to-target network copy frequency
+### Policy-to-target network copy frequency
 
 
 
 
-### Neural network architecture
+## Neural network architecture
 
-#### Fully connected / convolutional architectures
+### Fully connected / convolutional architectures
 
-#### Residual skip connections
-
-
+### Residual skip connections
 
 
 
-### TODO
+
+
+## TODO
 
 We will see later, e.g. in Figure \ref{relu or batch}, that sometimes a player 0 bot can be trained to never lose but still occasionally attempt illegal moves, reflecting that it's generally easier for player 0 to win.
 
