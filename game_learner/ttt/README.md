@@ -140,7 +140,7 @@ I ran experiments varying the learning rate over 800 iterations, with simulation
 <table align="center">
   <tr><th></th><th colspan="4">player 1</th><th colspan="4">player 2</th></tr>
   <tr><th>learning rate</th><th>win</th><th>loss</th><th>tie</th><th>invalid move</th><th>win</th><th>loss</th><th>tie</th><th>invalid move</th></tr>
-  <tr><td>0.00025</td><td>98.72%</td><td>0.00%</td><td>1.28%</td><td>0</td><td>89.28%</td><td>0.59%</td><td>10.13%</td><td></td></tr>
+  <tr><td>0.00025</td><td>98.72%</td><td>0.00%</td><td>1.28%</td><td>0</td><td>89.28%</td><td>0.59%</td><td>10.13%</td><td>0</td></tr>
   <tr><td>0.0005</td><td>98.99%</td><td>0.00%</td><td>1.01%</td><td>0</td><td>90.39%</td><td>0.00%</td><td>9.61%</td><td>0</td></tr>
   <tr><td>0.001</td><td>98.97%</td><td>0.00%</td><td>1.03%</td><td>0</td><td>90.26%</td><td>0.58%</td><td>9.16%</td><td>65</td></tr>
   <tr><td>0.0025</td><td>99.48%</td><td>0.00%</td><td>0.52%</td><td>420</td><td>90.50%</td><td>0.90%</td><td>8.60%</td><td>763</td></tr>
