@@ -170,9 +170,7 @@ An essential question in Q-learning is what simulation data to train the bot on.
   <tr><td>$\infty$</td><td>98.99%</td><td>0.00%</td><td>1.01%</td><td>0</td><td>90.91%</td><td>0.00%</td><td>9.09%</td><td>19</td><td>1:14:22</td></tr>
 </table>
 
-
-
-\sss From the experiment in Figure \ref{replay memory} we see that a lower memory leads to higher variance.  Interestingly, a higher memory also leads to more variance, but not nearly as much.  An explanation might be: when the memory is low, randomness in the simulations are \emph{repeatedly} reflected in the distribution as they are more likely to be repeatedly drawn multiple times in a row.  On the other hand, when the memory is too high, effectively the distribution of experiences in the replay memory will reflect a lower greed, which leads to more randomness and higher variance; as additional evidence of this, we also see less convergence as one might expect from a less greedy policy (see \textsection \ref{greed sec}).
+We observe that a lower memory leads to higher variance.  Interestingly, a higher memory also leads to more variance, but not nearly as much.  A possible reason might be that when the memory is low, correlations in the simulations are immediately and repeatedly reflected in the samples, while when the memory is too high, the distribution of experiences in the replay memory will reflect a lower greed, which leads to more randomness and higher variance; as additional evidence of this, we also see less convergence as one might expect from a less greedy policy (see \textsection \ref{greed sec}).
 
 
 
