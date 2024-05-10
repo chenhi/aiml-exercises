@@ -153,9 +153,30 @@ We observe that increasing the learning rate does not result in faster convergen
 The lossless AI for learning rate 0.0005 appears to be a fluke, a retraining with the same parameters yields similar numbers as its neighbors.
 
 
-
-
 ### Replay memory size
+
+An essential question in Q-learning is what simulation data to train the bot on.  We could train on all data from the last $k$ iterations, but this results in a tradeoff between stability vs. speed in training.  Instead, as in[^MKS15], we use *replay memory*, i.e. sample data from the last $k$ iterations (or alternatively, we simply set a maximum size for the memory).
+
+<p align="center">
+<img src="graphs/20240330154852_small_memory_1000.dttt.pt.losses.png" width="33%"> <img src="graphs/20240330180235_standard_defaults6_penalty1.dttt.pt.losses.png" width="33%"> <img src="graphs/20240330163919_massive_memory.dttt.pt.losses.png" width="33%">
+<p>
+<p align="center">Loss curves over 4000 iterations: memory size 1,000 (left) vs. 100,000 penalty (middle) vs. $\infty$ (right).</p>
+
+<table align="center">
+  <tr><th></th><th colspan="4">player 1</th><th colspan="4">player 2</th><th></th></tr>
+  <tr><th>memory size</th><th>win</th><th>loss</th><th>tie</th><th>invalid moves</th><th>win</th><th>loss</th><th>tie</th><th>invalid move</th><th>time</th></tr>
+  <tr><td>1k</td><td>96.56%</td><td>0.31%</td><td>3.13%</td><td>112</td><td>83.67%</td><td>1.82%</td><td>14.51%</td><td>290</td><td>48:27</td></tr>
+  <tr><td>100k</td><td>98.97%</td><td>0.00%</td><td>1.03%</td><td>0</td><td>91.78%</td><td>0.00%</td><td>8.22%</td><td>24</td><td>47:32</td></tr>
+  <tr><td>$\infty$</td><td>98.99%</td><td>0.00%</td><td>1.01%</td><td>0</td><td>90.91%</td><td>0.00%</td><td>9.09%</td><td>19</td><td>1:14:22</td></tr>
+</table>
+
+
+
+\sss From the experiment in Figure \ref{replay memory} we see that a lower memory leads to higher variance.  Interestingly, a higher memory also leads to more variance, but not nearly as much.  An explanation might be: when the memory is low, randomness in the simulations are \emph{repeatedly} reflected in the distribution as they are more likely to be repeatedly drawn multiple times in a row.  On the other hand, when the memory is too high, effectively the distribution of experiences in the replay memory will reflect a lower greed, which leads to more randomness and higher variance; as additional evidence of this, we also see less convergence as one might expect from a less greedy policy (see \textsection \ref{greed sec}).
+
+
+
+
 
 
 ### Neural network architecture
