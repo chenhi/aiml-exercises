@@ -101,9 +101,9 @@ I ran experiments on varying the batch sizes, training for 800 iterations of len
 
 
 <p align="center">
-<img src="graphs/20240330201726_800its.dttt.pt.losses.png" width="33%"><img src="graphs/20240330205932_train_up2.dttt.pt.losses.png" width="33%"><img src="graphs/20240330203140_train_up4.dttt.pt.losses.png" width="33%">
-<img src="graphs/20240330212410_sim_up2.dttt.pt.losses.png" width="33%"><img src="graphs/20240330214045_sim2_train2.dttt.pt.losses.png" width="33%"><img src="graphs/20240330220010_sim2_train4.dttt.pt.losses.png" width="33%">
-<img src="graphs/20240330225523_batches_128_256.dttt.pt.losses.png" width="33%"><img src="graphs/20240330231102_128_512.dttt.pt.losses.png" width="33%"><img src="graphs/20240330233134_128_1024.dttt.pt.losses.png" width="33%">
+<img src="graphs/20240330201726_800its.dttt.pt.losses.png" width="33%"> <img src="graphs/20240330205932_train_up2.dttt.pt.losses.png" width="33%"> <img src="graphs/20240330203140_train_up4.dttt.pt.losses.png" width="33%">
+<img src="graphs/20240330212410_sim_up2.dttt.pt.losses.png" width="33%"> <img src="graphs/20240330214045_sim2_train2.dttt.pt.losses.png" width="33%"> <img src="graphs/20240330220010_sim2_train4.dttt.pt.losses.png" width="33%">
+<img src="graphs/20240330225523_batches_128_256.dttt.pt.losses.png" width="33%"> <img src="graphs/20240330231102_128_512.dttt.pt.losses.png" width="33%"> <img src="graphs/20240330233134_128_1024.dttt.pt.losses.png" width="33%">
 <p>
 <p align="center">Loss curves over 800 iterations.  Going rightward doubles the training batch size, going down doubles the simulation batch size.</p>
 
