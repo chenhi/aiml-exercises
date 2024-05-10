@@ -155,7 +155,7 @@ The lossless AI for learning rate 0.0005 appears to be a fluke, a retraining wit
 
 ### Replay memory size
 
-An essential question in Q-learning is what simulation data to train the bot on.  We could train on all data from the last $k$ iterations, but this results in a tradeoff between stability vs. speed in training.  Instead, as in[^MKS15], we use *replay memory*, i.e. sample data from the last $k$ iterations (or alternatively, we simply set a maximum size for the memory).
+An essential question in Q-learning is what simulation data to train the bot on.  We could train on all data from the last $k$ iterations, but this results in a tradeoff between stability vs. speed in training.  Instead we use *replay memory*,[^MKS15] i.e. sample data from a memory of fixed size.
 
 <p align="center">
 <img src="graphs/20240330154852_small_memory_1000.dttt.pt.losses.png" width="33%"> <img src="graphs/20240330180235_standard_defaults6_penalty1.dttt.pt.losses.png" width="33%"> <img src="graphs/20240330163919_massive_memory.dttt.pt.losses.png" width="33%">
@@ -170,15 +170,14 @@ An essential question in Q-learning is what simulation data to train the bot on.
   <tr><td>$\infty$</td><td>98.99%</td><td>0.00%</td><td>1.01%</td><td>0</td><td>90.91%</td><td>0.00%</td><td>9.09%</td><td>19</td><td>1:14:22</td></tr>
 </table>
 
-We observe that a lower memory leads to higher variance.  Interestingly, a higher memory also leads to more variance, but not nearly as much.  A possible reason might be that when the memory is low, correlations in the simulations are immediately and repeatedly reflected in the samples, while when the memory is too high, the distribution of experiences in the replay memory will reflect a lower greed, which leads to more randomness and higher variance; as additional evidence of this, we also see less convergence as one might expect from a less greedy policy (see \textsection \ref{greed sec}).
-
-
-
-
+We observe that a lower memory leads to higher variance.  Interestingly, a higher memory also leads to more variance, but not nearly as much.  When the memory is low, correlations in the simulations are immediately and repeatedly trained on, while when the memory is too high, the distribution of experiences in the replay memory will reflect a lower greed overall, which leads to more randomness and higher variance; as additional evidence of this, we also see less/slower convergence as one might expect from a less greedy policy.
 
 
 ### Neural network architecture
 
+#### Fully connected / convolutional architectures
+
+#### Residual skip connections
 
 ### Policy-to-target network copy frequency
 
