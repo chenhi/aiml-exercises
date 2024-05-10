@@ -182,7 +182,25 @@ The lossless AI for learning rate 0.0005 appears to be a fluke, a retraining wit
 
 ### Policy-to-target network copy frequency
 
+The DQN algorithm[^MKS15] utilizes two separate Q-functions (and neural networks): the *policy Q-function* $Q$ and the *target Q-function* $\hat{Q}$.  The policy Q-function is the one being actively trained and is used to do simulations for the bot.  The target Q-function provides the target $y$-values during updates:
+<p align="center">$Q(s, a) \mapsto Q(s, a) - \alpha \cdot \left(Q(s,a) - (r + \hat{Q}(\pi_u(t)))\right).$</p>
+Every *copy period*, the policy $Q$ is copied over to the target $\hat{Q}$.  This is intended to reduce variance in training.
 
+<p align="center">
+<img src="graphs/20240416230705_resnet_1layer_2blocks.dttt.pt.losses.png" width="24%"> <img src="graphs/20240417012932_copy3.dttt.pt.losses.png" width="24%"> <img src="graphs/20240417011258_copy5.dttt.pt.losses.png" width="24%"> <img src="graphs/20240417014659_copy7.dttt.pt.losses.png" width="24%">
+<p>
+<p align="center">Loss curves when copying every 1,3,5,7 episodes.</p>
+
+<table align="center">
+  <tr><th></th><th colspan="3">player 1</th><th colspan="3">player 2</th></tr>
+  <tr><th>copy period</th><th>win</th><th>loss</th><th>tie</th><th>win</th><th>loss</th><th>tie</th></tr>
+  <tr><td>1</td><td>98.88%</td><td>0.00%</td><td>1.12%</td><td>89.53%</td><td>0.21%</td><td>10.26%</td></tr>
+  <tr><td>3</td><td>98.92%</td><td>0.00%</td><td>1.08%</td><td>88.86%</td><td>0.00%</td><td>11.14%</td></tr>
+  <tr><td>5</td><td>98.96%</td><td>0.00%</td><td>1.04%</td><td>90.80%</td><td>0.06%</td><td>9.14%</td></tr>
+  <tr><td>7</td><td>98.70%</td><td>0.00%</td><td>1.30%</td><td>90.56%</td><td>0.43%</td><td>9.01%</td></tr>
+</table>
+
+We observe that increasing the copy period results in a smoother loss curve, but bigger "humps".  In terms of the end result, a copy period between 3 to 5 seemed best.
 
 
 ## Neural network architecture

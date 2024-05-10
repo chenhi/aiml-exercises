@@ -600,7 +600,7 @@ class DQN(DeepRL):
                     tests[j].append(test_results[j])
 
             
-
+        # End-of-training logging and saving
 
         if do_logging:
             end_time = datetime.datetime.now()
