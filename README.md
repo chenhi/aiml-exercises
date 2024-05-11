@@ -1,6 +1,6 @@
 # aiml-exercises
 Some machine learning exercises.  See:
-[Experiments on a Q-learning toy example](https://github.com/chenhi/aiml-exercises/tree/main/game_learner/ttt)
++ [Experiments on a Q-learning toy example](https://github.com/chenhi/aiml-exercises/tree/main/game_learner/ttt)
 
 
 Learning goals:
