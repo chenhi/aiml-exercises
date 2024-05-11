@@ -1,5 +1,9 @@
 # aiml-exercises
-Some machine learning exercises.  Learning goals below.
+Some machine learning exercises.  See:
+[Experiments on a Q-learning toy example](https://github.com/chenhi/aiml-exercises/tree/main/game_learner/ttt)
+
+
+Learning goals:
 
 draw_tensor_model:
 * Learn to build a Flask app.
