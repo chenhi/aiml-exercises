@@ -1,19 +1,17 @@
 # Experiments on a toy example: Tic-Tac-Toe
 
-The goal of this note is to record the results of some experiments conducted while attempting to train bots using reinforcement learning techniques guided by neural networks, for example tuning hyperparameters or playing with different model architectures.  Though we intend to train bots to play different games, we restrict our attention in this note to Tic-Tac-Toe, for which bots can be quickly trained on essentially any modern computer without special equipment.
-
-Ultimately, our goal is to train bots to play a game from scratch, i.e. without human knowledge like AlphaZero[^SSS17] as opposed to AlphaGo[^SH16].
+The goal of this note is to record the results of some experiments conducted while attempting to train bots using reinforcement learning techniques guided by neural networks, for example tuning hyperparameters or playing with different model architectures.  I train bots to play a game from scratch, i.e. without human knowledge like AlphaZero[^SSS17] as opposed to AlphaGo[^SH16].  Though I intend to train bots to play more sophisticated games, we restrict our attention in this note to Tic-Tac-Toe, for which bots can be quickly trained on essentially any modern computer without special equipment.
 
 # Deep Q-networks (DQN)
 
-In a 2015 paper[^MKS15], Minh, Kavukcuoglu, Silver *et. al.* outline an algorithm for using neural networks within a Q-learning algorithm (DQN) to train bots to play various player vs. environment (PvE) games on the Atari video game platform.  The same algorithms may be readily adapted to PvP games by giving each player their own Q-function, with each player considering the other players as part of the environment.  Unlike the PvE setting, the "environment" is now no longer given by a static and fixed (stochastic) Markov decision process, but one which evolves along with the player.  We do not investigate whether the theoretical assumptions justifying Q-learning algorithms remain valid in this set-up, but experimentally we find that they are still able to train good bots.
+In a 2015 paper[^MKS15], Minh, Kavukcuoglu, Silver *et. al.* outline an algorithm for using neural networks within a Q-learning algorithm (DQN) to train bots to play various player vs. environment (PvE) games on the Atari video game platform.  The same algorithms may be readily adapted to PvP games by giving each player their own Q-function, with each player considering the other players as part of the environment.  Unlike the PvE setting, the "environment" is now no longer given by a static and fixed (stochastic) Markov decision process, but one which evolves along with the player.  We do not investigate whether the theoretical assumptions justifying Q-learning remain valid in this set-up, but experimentally we find that the algorithm is still able to train good bots.
 
 I made a few minor design modifications to the DQN algorithm (as well as ignoring issues that obviously do not arise in our setting).  I simulate games in batches, which is not difficult due to the very discrete nature of the games we consider, which should give a speed boost; this introduces the size of the simulation batches as an additional hyperparameter.
 
 To evaluate the training of bots, we use the following metrics.
 + First, we can visualize the loss curves (which we smooth with an averaging kernel of width 11 for readability).  Convergence alone (i.e. vanishing of loss) does not necessarily indicate a good bot, since its performance *in natura* depends on the quality of the generated training data.  Ensuring good data often means not letting the behavior policy get too greedy.  Due to the random play, this means the loss typically has a non-zero lower bound.  I personally found it helpful to conceptually separate the simulation of data and the learning on that simulated data.
-+ Next, we chose one test scenario for each player where the player's next moves could be easily separated into good and bad moves, and plotted statistics related to the values of the Q-function for those moves.  This tests whether the bot has learned the best strategy in this scenario.  However, sometimes the bot has the ability to avoid this particular branch of the tree, and therefore can safely ignore these strategies.
-+ Finally, we run 10,000 simulations of the bot against a random player and report the number of wins, loss and ties (and possibly invalid moves attempted) at the end of training.  We also sometimes record the time for training, though this was done on a CPU, not a GPU, so should not be taken too seriously.
++ Next, I chose one test scenario for each player where the player's next moves could be easily separated into good and bad moves, and plotted statistics related to the values of the Q-function for those moves.  This tests whether the bot has learned the best strategy in this scenario.  However, sometimes the bot has the ability to avoid this particular branch of the tree, and therefore can safely ignore these strategies.
++ Finally, I ran 10,000 simulations of the bot against a random player and report the number of wins, loss and ties (and possibly invalid moves attempted) at the end of training.  I sometimes also record the time for training, though this was done on a CPU, not a GPU, so should not be taken too seriously.
 
 
 ## Dealing with illegal moves
@@ -40,7 +38,7 @@ The prohibition curves appear more noisy, likely since it is common for the bot 
 Performance metrics for prohibition (left two) vs. penalty (right two).
 </p>
 
-In particular, for Test 1, we see that we tend to see much more separation between the green curve and the blue/orange curves using prohibition, an indication that the bot is learning to distinguish a particular group of losing moves vs. tying moves.
+In particular, for Test 1, we tend to see much more separation between the green curve and the blue/orange curves using prohibition, an indication that the bot is learning to distinguish a particular group of losing moves vs. tying moves.
 
 I implemented penalty first since it was more straightforward, but later switched to prohibition.  Many experiments in the remainder of the document use penalty; one unintended benefit of this is that the number of illegal moves attempted by the bot can be used as a metric for how well the bot has learned the basic rules of the game.
 
@@ -73,7 +71,7 @@ In Q-learning, the training data is generated along side the actual training on 
 
 For Q-learning we will use a simple greed parameter to control the probability that the bot plays according to what it thinks is optimal (exploitation) versus randomly (exploration).  It is an annoying convention that the so-called greed parameter measures how much the bot explores; we will use the term *exploration parameter* instead, which is complementary to the *greed parameter*, i.e. a greed parameter of 0 means it always plays randomly.  This greed parameter may change over time.
 
-In PvE games, it is typically recommended to start the greed low, around 0.0, and then end high, around 0.9.  The reasoning is that the bot should explore a lot in the beginning, then hone in on a winning strategy.  In PvP games, experimentally, it appears better to keep the ending greed lower.  We postulate the following reason: in PvE situations, the player has, ignoring randomness, total control over which branch of the game tree to go down.  Therefore, it is okay for the player to forget branches of the tree that it does not like.  On the other hand, in PvP situations, the opposing player has an equal share of control.  Setting the greed parameter too high can causes the neural network to forget some branches of the game tree.
+In PvE games, it is typically recommended to start the greed low, around 0.0, and then end high, around 0.9.  The reasoning is that the bot should explore a lot in the beginning, then hone in on a winning strategy.  In PvP games, experimentally, it appears better to keep the ending greed lower.  I postulate the following reason: in PvE situations, the player has, ignoring randomness, total control over which branch of the game tree to go down.  Therefore, it is okay for the player to forget branches of the tree that it does not like.  On the other hand, in PvP situations, the opposing player has an equal share of control.  Setting the greed parameter too high can causes the neural network to forget some branches of the game tree.
 
 To visualize the effect of greed on convergence and performance, I trained a bot under the following schemes for 4000 iterations.
 + **No greed:** the greed stayed at 0.0 throughout, i.e. the training data was completely randomly generated.
@@ -99,7 +97,7 @@ We observe that higher greed can result in converging to a value with lower loss
 
 ### Replay memory size
 
-An essential question in Q-learning is what simulation data to train the bot on.  We could train on all data from the last $k$ iterations, but this results in a tradeoff between stability vs. speed in training.  Instead we use *replay memory*,[^MKS15] i.e. sample data from a memory of fixed size.
+An essential question in Q-learning is what simulation data to train the bot on.  We could train on all data from the last $k$ iterations, but this results in a tradeoff between stability vs. speed in training.  Instead I use *replay memory*,[^MKS15] i.e. sample data from a memory of fixed size.
 
 <p align="center">
 <img src="graphs/20240330154852_small_memory_1000.dttt.pt.losses.png" width="33%"> <img src="graphs/20240330180235_standard_defaults6_penalty1.dttt.pt.losses.png" width="33%"> <img src="graphs/20240330163919_massive_memory.dttt.pt.losses.png" width="33%">
@@ -210,7 +208,7 @@ Our program has the ability to replay losses when simulating games against a ran
 
 ### Fully connected / convolutional architectures
 
-We first ran experiments with a simple architecture where all internal layers had the same width $2^m \cdot 3^2$; recall the inputs have dimension $2 \cdot 3^2$ and the outputs have dimension $3^2$.  I found that for $m \leq 4$ the networks generally diverged, while for $m = 5$ they generally converged.  I did not increase the width further.
+I first ran experiments with a simple architecture where all internal layers had the same width $2^m \cdot 3^2$; recall the inputs have dimension $2 \cdot 3^2$ and the outputs have dimension $3^2$.  I found that for $m \leq 4$ the networks generally diverged, while for $m = 5$ they generally converged.  I did not increase the width further.
 
 Next, fixing $m = 5$, I experimented with increasing the depth of the neural network, and with swapping the order of ReLU and normalization.
 
@@ -238,7 +236,7 @@ We observe that the performance seems to increase, then deterioriate with more l
 
 ### Residual skip connections
 
-We experiment residual neural networks with a width of $9 \times 32 = 288$, residual blocks with $\ell = 1, 2$ layers, and $1 \leq b \leq 4$ hidden residual blocks.
+I experimented with neural networks with a width of $9 \times 32 = 288$, with skip connections every layer or every other layer.
 
 <p align="center">
 <img src="graphs/20240416225351_resnet_1layer_1block.dttt.pt.losses.png" width="24%"> <img src="graphs/20240416230705_resnet_1layer_2blocks.dttt.pt.losses.png" width="24%"> <img src="graphs/20240416232316_resnet_1layer_3blocks.dttt.pt.losses.png" width="24%"> <img src="graphs/20240416234128_resnet_1layer_4blocks.dttt.pt.losses.png" width="24%">
