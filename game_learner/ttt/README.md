@@ -242,7 +242,7 @@ I experimented with neural networks with a width of $9 \times 32 = 288$, with sk
 <img src="graphs/20240416225351_resnet_1layer_1block.dttt.pt.losses.png" width="24%"> <img src="graphs/20240416230705_resnet_1layer_2blocks.dttt.pt.losses.png" width="24%"> <img src="graphs/20240416232316_resnet_1layer_3blocks.dttt.pt.losses.png" width="24%"> <img src="graphs/20240416234128_resnet_1layer_4blocks.dttt.pt.losses.png" width="24%">
 <img src="graphs/blank.png" width="24%"> <img src="graphs/20240417000213_resnet_2layer_1block.dttt.pt.losses.png" width="24%"> <img src="graphs/blank.png" width="24%"> <img src="graphs/20240417001708_resnet_2layers_2blocks.dttt.pt.losses.png" width="24%">
 <p>
-<p align="center">Loss curves with a skip connection every layer with 1, 2, 3, 4 layers (top row) and a skip connection every two layers with 2, 4 layers (bottom row).</p>
+<p align="center">Loss curves over 800 iterations with a skip connection every layer with 1, 2, 3, 4 layers (top row) and a skip connection every two layers with 2, 4 layers (bottom row).</p>
 
 <table align="center">
   <tr><th>hidden layers</th><th>layers per skip</th><th>time</th><th>player 2 losses per 100,000</th></tr>
