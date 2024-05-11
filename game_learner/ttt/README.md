@@ -205,17 +205,61 @@ We observe that increasing the copy period results in a smoother loss curve, but
 
 ## Neural network architecture
 
+Our program has the ability to replay losses when simulating games against a random player.  We've observed with early models that the losses were "dumb", e.g. neglecting to block an imminent victory.  This can be an indication that the neural network is not deep enough to learn an abstract rule.
+
+
 ### Fully connected / convolutional architectures
+
+We first ran experiments with a simple architecture where all internal layers had the same width $2^m \cdot 3^2$; recall the inputs have dimension $2 \cdot 3^2$ and the outputs have dimension $3^2$.  I found that for $m \leq 4$ the networks generally diverged, while for $m = 5$ they generally converged.  I did not increase the width further.
+
+Next, fixing $m = 5$, I experimented with increasing the depth of the neural network, and with swapping the order of ReLU and normalization.
+
+<p align="center">
+<img src="graphs/20240401184304_2x32_relufirst.dttt.pt.losses.png" width="24%"> <img src="graphs/20240401182753_3x32_relufirst.dttt.pt.losses.png" width="24%"> <img src="graphs/20240401185900_4x32_relufirst.dttt.pt.losses.png" width="24%"> <img src="graphs/20240401191833_5x32_relufirst.dttt.pt.losses.png" width="24%">
+<p>
+<p align="center">Loss for 2, 3, 4, 5 hidden layers with leaky ReLU before batch norm.</p>
+
+<table align="center">
+  <tr><th colspan="2">architecture</th><th colspan="4">player 1</th><th colspan="4">player 2</th><th></th></tr>
+  <tr><th>hidden layers</th><th>batch or ReLU first</th><th>win</th><th>loss</th><th>tie</th><th>invalid moves</th><th>win</th><th>loss</th><th>tie</th><th>invalid moves</th><th>time</th></tr>
+  <tr><td>2</td><td>batch</td><td>98.99</td><td>0.00</td><td>1.01</td><td>0</td><td>89.49</td><td>0.46</td><td>10.05</td><td>0</td><td>8:32</td></tr>
+  <tr><td>2</td><td>ReLU</td><td>98.82</td><td>0.00</td><td>1.18</td><td>0</td><td>89.30</td><td>0.11</td><td>10.59</td><td>0</td><td>8:26</td></tr>
+  <tr><td>3</td><td>batch</td><td>99.07</td><td>0.00</td><td>0.93</td><td>68</td><td>90.35</td><td>0.00</td><td>9.65</td><td>0</td><td>10:18</td></tr>
+  <tr><td>3</td><td>ReLU</td><td>98.90</td><td>0.00</td><td>1.10</td><td>0</td><td>89.96</td><td>0.00</td><td>10.04</td><td>0</td><td>10:25</td></tr>
+  <tr><td>4</td><td>batch</td><td>98.97</td><td>0.00</td><td>1.03</td><td>70</td><td>91.69</td><td>0.00</td><td>8.31</td><td>0</td><td>11:25</td></tr>
+  <tr><td>4</td><td>ReLU</td><td>98.90</td><td>0.00</td><td>1.10</td><td>0</td><td>89.00</td><td>0.25</td><td>10.75</td><td>0</td><td>13:33</td></tr>
+  <tr><td>5</td><td>batch</td><td>98.55</td><td>0.55</td><td>0.90</td><td>288</td><td>90.15</td><td>0.32</td><td>9.53</td><td>0</td><td>15:39</td></tr>
+  <tr><td>5</td><td>ReLU</td><td>98.49</td><td>0.48</td><td>1.03</td><td>212</td><td>90.29</td><td>0.86</td><td>8.85</td><td>0</td><td>13:58</td></tr>
+</table>
+
+
+We observe that the performance seems to increase, then deterioriate with more layers.  This is a somewhat common issue with deep neural networks caused by a vanishing gradient problem that is generally resolved using skip connections.  It does not appear important whether normalization of ReLU comes first.
+
 
 ### Residual skip connections
 
+We experiment residual neural networks with a width of $9 \times 32 = 288$, residual blocks with $\ell = 1, 2$ layers, and $1 \leq b \leq 4$ hidden residual blocks.
+
+<p align="center">
+<img src="graphs/20240416225351_resnet_1layer_1block.dttt.pt.losses.png" width="24%"> <img src="graphs/20240416230705_resnet_1layer_2blocks.dttt.pt.losses.png" width="24%"> <img src="graphs/20240416232316_resnet_1layer_3blocks.dttt.pt.losses.png" width="24%"> <img src="graphs/20240416234128_resnet_1layer_4blocks.dttt.pt.losses.png" width="24%">
+<img src="graphs/blank.png" width="24%"> <img src="graphs/20240417000213_resnet_2layer_1block.dttt.pt.losses.png" width="24%"> <img src="graphs/blank.png" width="24%"> <img src="graphs/20240417001708_resnet_2layers_2blocks.dttt.pt.losses.png" width="24%">
+<p>
+<p align="center">Loss curves with a skip connection every layer with 1, 2, 3, 4 layers (top row) and a skip connection every two layers with 2, 4 layers (bottom row).</p>
+
+<table align="center">
+  <tr><th>num layers</th><th>layers per skip</th><th>time</th><th>p2 losses</th></tr>
+  <tr><td>1</td><td>1</td><td>6:32</td><td>28</td></tr>
+  <tr><td>2</td><td>1</td><td>9:33</td><td>21</td></tr>
+  <tr><td>3</td><td>1</td><td>12:13</td><td>18</td></tr>
+  <tr><td>4</td><td>1</td><td>12:00</td><td>0</td></tr>
+  <tr><td>2</td><td>2</td><td>7:58</td><td>23</td></tr>
+  <tr><td>4</td><td>2</td><td>12:08</td><td>28</td></tr>
+</table>
+
+Unsurprisingly, we see faster convergence and better performance with more skip connections, as well as with more layers.  Interestingly, even with only a single hidden layer and a single skip connection, the model does performs fairly well.
 
 
 
-
-## TODO
-
-We will see later, e.g. in Figure \ref{relu or batch}, that sometimes a player 0 bot can be trained to never lose but still occasionally attempt illegal moves, reflecting that it's generally easier for player 0 to win.
 
 [^MKS15]: Volodymyr Mnih, Koray Kavukcuoglu, David Silver, *et. al.*, Human-level control through deep reinforcement learning, *Nature* volume 518, pages 529–533 (2015).
 
