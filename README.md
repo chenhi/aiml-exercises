@@ -9,14 +9,12 @@ draw_tensor_model:
 * Learn to build a Flask app.
 * Build some basic AI models using MNIST data.
 * Have an interface for testing and tweaking the models using spontaneously created data.
-* TODO: More fine-tuning.
+* TODO: Try to get accuracy above 99.9%
 
 game_learner:
 * Write some general classes for training an AI to play games using Q learning. (done)
-* Train a bot to play tic-tac-toe using Q learning.
-* Train a bot to play Connect 4 using deep Q learning.
-* TODO: Experiment with hyperparameter tuning and write up observations.
-* TODO: See how good the bots can get trained on a cloud GPU.
+* Train a bot to play tic-tac-toe using Q learning and experiment with hyperparameters.
+* Train a bot to play Connect 4 using deep Q learning (partially trained on the cloud).
 * TODO: Do the same but with Monte Carlo search trees.
 
 tensor_puzzles:
