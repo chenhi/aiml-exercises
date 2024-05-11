@@ -247,7 +247,7 @@ We experiment residual neural networks with a width of $9 \times 32 = 288$, resi
 <p align="center">Loss curves with a skip connection every layer with 1, 2, 3, 4 layers (top row) and a skip connection every two layers with 2, 4 layers (bottom row).</p>
 
 <table align="center">
-  <tr><th>num layers</th><th>layers per skip</th><th>time</th><th>player 2 losses per 100,000</th></tr>
+  <tr><th>hidden layers</th><th>layers per skip</th><th>time</th><th>player 2 losses per 100,000</th></tr>
   <tr><td>1</td><td>1</td><td>6:32</td><td>28</td></tr>
   <tr><td>2</td><td>1</td><td>9:33</td><td>21</td></tr>
   <tr><td>3</td><td>1</td><td>12:13</td><td>18</td></tr>
