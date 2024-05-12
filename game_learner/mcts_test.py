@@ -18,8 +18,11 @@ game = DMCTS(mdp, TTTResNN, torch.nn.CrossEntropyLoss(), torch.optim.Adam, devic
 
 
 
-game.mcts(lr = 0.01, num_iterations=50, num_selfplay=10, num_searches=100, max_steps=100, ucb_parameter=10, temperature=1, train_batch=8)
+game.mcts(lr = 0.01, num_iterations=20, num_selfplay=10, num_searches=100, max_steps=100, ucb_parameter=10, temperature=1, train_batch=8, save_path="testmcts_save")
 
+game.q.load("testmcts_save")
+
+game.simulate_against_random(1000)
 
 
 b = 10
@@ -29,12 +32,12 @@ b = 10
 s = game.mdp.get_initial_state()
 
 
-print(torch.softmax(game.pv(s).flatten(1, -1), dim=1))
-game.search(s, game.pv, 100, ucb_parameter = 10, temperature = 1)
-print("Q", game.q[mdp.state_to_hashable(s)])
-print("N", game.n[mdp.state_to_hashable(s)])
-print("W", game.w[mdp.state_to_hashable(s)])
-print("P", game.p[mdp.state_to_hashable(s)])
+# print(torch.softmax(game.pv(s).flatten(1, -1), dim=1))
+# game.search(s, game.pv, 100, ucb_parameter = 10, temperature = 1)
+# print("Q", game.q[mdp.state_to_hashable(s)])
+# print("N", game.n[mdp.state_to_hashable(s)])
+# print("W", game.w[mdp.state_to_hashable(s)])
+# print("P", game.p[mdp.state_to_hashable(s)])
 
 
 

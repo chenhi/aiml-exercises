@@ -52,7 +52,7 @@ def load_bots(qgame, saves) -> str:
         try:
             index = int(res[0])
             if index >= 0 and index < len(saves):
-                qgame.load(base_path + f'bots/{shortname}/' + saves[index])
+                qgame.q.load(base_path + f'bots/{shortname}/' + saves[index])
                 logtext += log(f"Loaded {saves[index]} for all players.")
             else:
                 raise Exception
@@ -67,7 +67,7 @@ def load_bots(qgame, saves) -> str:
                 if index < 0 or index >= len(saves):
                     logtext += log(f"{i} is not a bot on the list.  Loading RANDOMBOT as player {i}.")
                 else:
-                    game.load(base_path + f'bots/{shortname}/' + saves[index], [i])
+                    game.q.load(base_path + f'bots/{shortname}/' + saves[index], [i])
             except:
                 logtext += log(f"Didn't understand {s}.  Loading RANDOMBOT as player {i}.")
         if len(res) > game.mdp.num_players:
@@ -448,9 +448,9 @@ while True:
             s, r = game.mdp.transition(s,a)
         else:
             print("Action values:")
-            print(item(game.qs[p].get(s, None), mdp))
-            print(item(game.qs[p].get(s, None) + game.mdp.neginf_kill_actions(s), mdp))
-            a = game.qs[p].policy(s)
+            print(item(game.q.get(s, None), mdp))
+            print(item(game.q.get(s, None) + game.mdp.neginf_kill_actions(s), mdp))
+            a = game.q.policy(s)
             print(f"Chosen action: \n{item(a, mdp)}.\n")
             if mdp.is_valid_action(s, a):
                 s, r = game.mdp.transition(s, a)

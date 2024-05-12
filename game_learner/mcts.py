@@ -1,4 +1,4 @@
-import zipfile, os, random, warnings, datetime, copy, math, time
+import zipfile, os, random, warnings, datetime, copy, math, time, pickle
 import torch
 from torch import nn
 from collections import namedtuple, deque
@@ -8,29 +8,23 @@ import matplotlib.pyplot as plt
 from deepqlearn import TensorMDP, NNQFunction, DeepRL
 
 
-class DMCTS(DeepRL):
+class MCTSQFunction(PrototypeQFunction):
+    def __init__(self, mdp: TensorMDP, heuristic_model: nn.Module, model_args={}, device="cpu"):
+        self.device = device
+        self.mdp = mdp
+        self.h = heuristic_model(**model_args, **self.mdp.nn_args).to(self.device)
+        self.h.eval()
 
-    def __init__(self, mdp: TensorMDP, model: nn.Module, loss_fn, optimizer, model_args = {}, device="cpu"):
-        super().__init__(mdp, model, loss_fn, optimizer, model_args, device)
-        
-        self.pv = model().to(self.device)
+        # Keys: hashable states.  Values: tensor with shape of actions
         self.q = {}
-        self.n = {}         # Keys: hashable states.  Values: tensor with shape of actions
+        self.n = {}         
         self.n_tot = {}
         self.w = {}
         self.p = {}
-                
 
-    # Unbatched
-    # def q_val(self, state):
-    #     statehash = self.mdp.state_to_hashable(state)
-    #     if statehash not in self.q:
-    #         return torch.zeros((1,) + self.mdp.action_shape)
-    #     return self.q[statehash]
-
-
-    # Batched, return action shape
-    def ucb(self, state: torch.Tensor, param: torch.Tensor | float):
+    # Gets a probability vector or the maximum
+    # 
+    def get(self, state: torch.Tensor, heuristic_parameter: torch.Tensor | float):
         q, p, n_tot, n = torch.tensor([], device=self.device), torch.tensor([], device=self.device), torch.tensor([], device=self.device), torch.tensor([], device=self.device)
         for i in range(state.size(0)):
             statehash = self.mdp.state_to_hashable(state)
@@ -47,7 +41,47 @@ class DMCTS(DeepRL):
         n_tot = n_tot.reshape((-1,) + self.mdp.action_projshape)
 
         # Exploration vs. exploitation: the second term dominates when unexplored, then the first term dominates when more explored
-        return q.nan_to_num(0) + p * (param * math.sqrt(n_tot) / (1 + n))
+        return q.nan_to_num(0) + p * (heuristic_parameter * math.sqrt(n_tot) / (1 + n))
+    
+
+    def policy(self, state: torch.Tensor, heuristic_parameter = 0., stochastic=True, valid_filter=True):
+        if stochastic:
+            return self.mdp.get_random_action_weighted(self.get(state, heuristic_parameter))
+        else:
+            return self.mdp.get_max_action(self.ucb(state, heuristic_parameter))
+        
+    def save(self, fname):
+        with open(fname + ".q", 'wb') as f:
+            pickle.dump({'q': self.q, 'n': self.n, 'n_tot': self.n_tot, 'w': self.w, 'p': self.p}, f)
+        model_scripted = torch.jit.script(self.h)
+        model_scripted.save(fname + ".h")
+
+    def load(self, fname, indices=None):
+        with open(fname + ".q", 'rb') as f:
+            load_dict = pickle.load(f)
+            self.q = load_dict['q']
+            self.n = load_dict['n']
+            self.n_tot = load_dict['n_tot']
+            self.w = load_dict['w']
+            self.p = load_dict['p']
+        self.h = torch.jit.load(fname + ".h")
+    
+    def null(self, indices = None):
+        self.q, self.n, self.n_tot, self.w, self.p = {}, {}, {}, {}, {}
+        #self.h.weight.data.fill_(0.)
+        # TODO Heuristic function reset not implemented
+
+        
+    
+
+
+
+class DMCTS(DeepRL):
+
+    def __init__(self, mdp: TensorMDP, model: nn.Module, loss_fn, optimizer, model_args = {}, device="cpu"):
+        super().__init__(mdp, MCTSQFunction(mdp, model, model_args, device), device)
+        self.loss_fn = loss_fn
+        self.optimizer = optimizer
 
     # Input batched size 1
     # Starting at a given state, conducts a fixed number of Monte-Carlo searches, using the Q function in visited states and the heuristic function in new states
@@ -62,7 +96,7 @@ class DMCTS(DeepRL):
             depth = 0
 
             # Go down tree, using upper confidence bound and dictionary q values to play
-            while self.mdp.state_to_hashable(s) in self.q and self.mdp.is_terminal(s).item() == False:
+            while self.mdp.state_to_hashable(s) in self.q.q and self.mdp.is_terminal(s).item() == False:
                 if depth >= max_depth:
                     print("Max depth researched in selection.")
                     break
@@ -71,7 +105,7 @@ class DMCTS(DeepRL):
                 valid_actions = self.mdp.valid_action_filter(s)
                 num_valid = valid_actions.sum()
                 # Scale the parameter by the number of valid actions
-                action = self.mdp.get_max_action((1 + self.ucb(s, ucb_parameter * num_valid)) * valid_actions)
+                action = self.mdp.get_max_action((1 + self.q.get(s, ucb_parameter * num_valid)) * valid_actions)
                 history.append((s, action))
                 s, r = self.mdp.transition(s, action)
                 depth += 1
@@ -79,10 +113,10 @@ class DMCTS(DeepRL):
             # Once we reach a leaf, use the heuristic function p to simulate play
             # TODO this cna be parallelized, i.e. the evaluaiton
             if self.mdp.is_terminal(s).item() == False:
-                self.q[self.mdp.state_to_hashable(s)] = torch.zeros(self.mdp.action_shape, device=self.device)
-                self.n[self.mdp.state_to_hashable(s)] = torch.zeros(self.mdp.action_shape, device=self.device)
-                self.n_tot[self.mdp.state_to_hashable(s)] = 0
-                self.w[self.mdp.state_to_hashable(s)] = torch.zeros(self.mdp.action_shape, device=self.device)
+                self.q.q[self.mdp.state_to_hashable(s)] = torch.zeros(self.mdp.action_shape, device=self.device)
+                self.q.n[self.mdp.state_to_hashable(s)] = torch.zeros(self.mdp.action_shape, device=self.device)
+                self.q.n_tot[self.mdp.state_to_hashable(s)] = 0
+                self.q.w[self.mdp.state_to_hashable(s)] = torch.zeros(self.mdp.action_shape, device=self.device)
 
                 # Placeholder prior probability given by neural network, do in batches TODO implement
                 # evaluation_queue.append(s)
@@ -94,7 +128,7 @@ class DMCTS(DeepRL):
                 # Sigmoid so that the values are in (0, 1)
                 # These prior probabilities are only assigned once; eventually, with enough visits the quality function will dominate the heuristic
                 # TODO zero out invalid?
-                self.p[self.mdp.state_to_hashable(s)] = torch.softmax(heuristic(s).flatten(1, -1), dim=1).reshape((-1, ) + self.mdp.action_shape)
+                self.q.p[self.mdp.state_to_hashable(s)] = torch.softmax(heuristic(s).flatten(1, -1), dim=1).reshape((-1, ) + self.mdp.action_shape)
 
             while self.mdp.is_terminal(s).item() == False:
                 if depth >= max_depth:
@@ -108,20 +142,20 @@ class DMCTS(DeepRL):
             
             while len(history) > 0:
                 s, action = history.pop()
-                if self.mdp.state_to_hashable(s) in self.p:
-                    self.n[self.mdp.state_to_hashable(s)] += action[0]
-                    self.n_tot[self.mdp.state_to_hashable(s)] += action[0].sum().item()
-                    self.w[self.mdp.state_to_hashable(s)] += action[0] * r[0,self.mdp.get_player(s)[0]][0]
-                    self.q[self.mdp.state_to_hashable(s)] = self.w[self.mdp.state_to_hashable(s)] / self.n[self.mdp.state_to_hashable(s)]
+                if self.mdp.state_to_hashable(s) in self.q.p:
+                    self.q.n[self.mdp.state_to_hashable(s)] += action[0]
+                    self.q.n_tot[self.mdp.state_to_hashable(s)] += action[0].sum().item()
+                    self.q.w[self.mdp.state_to_hashable(s)] += action[0] * r[0,self.mdp.get_player(s)[0]][0]
+                    self.q.q[self.mdp.state_to_hashable(s)] = self.q.w[self.mdp.state_to_hashable(s)] / self.q.n[self.mdp.state_to_hashable(s)]
 
         # Return probability vector for initial state (even if it isn't updated)
-        p_vector = self.n[self.mdp.state_to_hashable(state)] ** (1 / temperature)
+        p_vector = self.q.n[self.mdp.state_to_hashable(state)] ** (1 / temperature)
         return (p_vector / p_vector.flatten().sum())[None]
                 
 
 
 
-    def mcts(self, lr: float, num_iterations: int, num_selfplay: int, num_searches: int, max_steps: int, ucb_parameter: float, temperature: float, train_batch: int, train_iterations = 1, save_path=None, verbose=False, graph_smoothing=10, initial_log=""):        
+    def mcts(self, lr: float, num_iterations: int, num_selfplay: int, num_searches: int, max_steps: int, ucb_parameter: float, temperature: float, train_batch: int, train_iterations = 1, save_path=None, verbose=True, initial_log=""):        
         logtext = initial_log
         
         start_time = time.perf_counter()
@@ -129,15 +163,17 @@ class DMCTS(DeepRL):
 
         # TODO The deep copy is only needed if we parallelize the training
         # prior_p = copy.deepcopy(self.pv)
-        prior_p = self.pv
+        prior_p = self.q.h
         
         training_inputs = []
         training_values = []
 
+        start_time = datetime.datetime.now()
+
         # In each iteration, we simulate a certain number of self-plays, then we train on the resulting data
         for i in range(num_iterations):
-            logtext += log(f"Iteration {i+1}")
-            opt = self.optimizer(self.pv.parameters(), lr=lr)
+            logtext += log(f"Iteration {i+1}", verbose)
+            opt = self.optimizer(self.q.h.parameters(), lr=lr)
                 
 
 
@@ -148,7 +184,7 @@ class DMCTS(DeepRL):
             states = torch.tensor([], device=self.device)
             p_vectors = torch.tensor([], device=self.device)
 
-            logtext += log(f"Self-plays at {time.perf_counter() - start_time}")
+            logtext += log(f"Self-plays at {time.perf_counter() - start_time}", verbose)
             # Each step in the self-plays
             for step in range(max_steps):
                 step_p = torch.tensor([], device=self.device)
@@ -168,32 +204,32 @@ class DMCTS(DeepRL):
                 s, _ = self.mdp.transition(s, a)
 
                 # If state is terminal, then discard it
-                s = s[self.mdp.is_terminal(s).flatten()]
+                s = s[(~self.mdp.is_terminal(s)).flatten()]
                 # If there are no more states, break
                 if s.size(0) == 0:
                     break
                         
             # TODO think about having the bot concede? might save some simulations
 
-            logtext += log(f"Training at {time.perf_counter() - start_time}")
+            logtext += log(f"Training at {time.perf_counter() - start_time}", verbose)
 
             training_inputs.append(states)
             training_values.append(p_vectors)
 
             # Do training on recent data
-            inputs = torch.cat(training_inputs[-train_iterations:-1])
-            values = torch.cat(training_values[-train_iterations:-1])
+            inputs = torch.cat(training_inputs[-train_iterations:])
+            values = torch.cat(training_values[-train_iterations:])
             indices = list(range(inputs.size(0)))
             total_loss = 0.
             num_train = 0.
-            self.pv.train()
+            self.q.h.train()
             for i in range(inputs.size(0)):
                 get_indices = random.sample(indices, min(len(indices), train_batch))
                 x = inputs[get_indices]
                 y = values[get_indices]
 
                 # Before softmax
-                pred = self.pv(x)
+                pred = self.q.h(x)
 
                 loss = self.loss_fn(pred, y)
                 loss.backward()
@@ -203,8 +239,17 @@ class DMCTS(DeepRL):
                 total_loss += loss.item()
                 num_train += 1
 
-            self.pv.eval()
-            logtext += log(f"Loss: {total_loss/num_train} on {num_train} batches of size {min(len(indices), train_batch)}.")
+            self.q.h.eval()
+            logtext += log(f"Loss: {total_loss/num_train} on {num_train} batches of size {min(len(indices), train_batch)}.", verbose)
+
+        if save_path != None:
+            self.q.save(save_path)
+            logtext += log(f"Saved model to {save_path}.h, {save_path}.q", verbose)
+
+            logpath = save_path + ".log"
+            with open(logpath, "w") as f:
+                logtext += log(f"Saved logs to {logpath}", verbose)
+                f.write(logtext)
 
             # Saving:
             # 1. dictionaries 2. heuristic 3. data??

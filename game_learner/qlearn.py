@@ -9,6 +9,15 @@ class PrototypeQFunction():
     
     def get(self, state, action) -> float:
         raise NotImplementedError
+    
+    def save(self, fname):
+        raise NotImplementedError     
+
+    def load(self, fname, indices=None):
+        raise NotImplementedError
+    
+    def null(self, indices = None):
+        raise NotImplementedError
 
 
 # WARNING: states and actions must be hashable if using with QFunction.
@@ -138,6 +147,7 @@ class QFunction(PrototypeQFunction):
     def copy(self):
         new_q = QFunction(self.mdp.copy())
         new_q.q = self.q.copy()
+        return new_q
     
     def get(self, s, a) -> float:
         if a == None:
@@ -158,7 +168,7 @@ class QFunction(PrototypeQFunction):
             raise NotImplementedError           #If there are infinitely many actions, this needs to be handled explicitly
     
     # Returns a list of optimal policies.  If the state is terminal or there are no valid actions, return empty list.
-    # This is probably only ever called internally.  But separating it anyway.
+    # Only used internally.
     def policies(self, state):
         if self.mdp.is_terminal(state):
             return []

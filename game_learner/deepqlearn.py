@@ -134,7 +134,7 @@ class TensorMDP(MDP):
 
 
 
-# A Q-function where the inputs and outputs are all tensors
+# A Q-function where the inputs and outputs are all tensors, for a single player
 class NNQFunction(QFunction):
     def __init__(self, mdp: TensorMDP, q_model, model_args={}, device="cpu"):
         if mdp.state_shape == None or mdp.action_shape == None:
@@ -207,8 +207,68 @@ class NNQFunction(QFunction):
         self.q.eval()
 
         return loss.item()
+    
+
+# A wrapper for Q functions for multiple players
+class NNQMultiFunction(QFunction):
+    def __init__(self, mdp: TensorMDP, q_model, model_args={}, device="cpu"):
+        self.qs = [NNQFunction(mdp, q_model, model_args=model_args, device=device) for i in range(mdp.num_players)]
+        self.mdp = mdp
+        self.device=device
+
+    # If input action = None, then return the entire vector of action values of shape (batch, ) + action_shape
+    # Otherwise, output shape (batch, )
+    def get(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
+        players = self.mdp.get_player(state)
+        output = torch.zeros((state.size(0), ) + self.mdp.action_shape) if action == None else torch.zeros(state.size(0), device=self.device)
+        for p in range(self.mdp.num_players):
+            indices = torch.arange(state.size(0), device=self.device)[players.flatten() == p]
+            output[indices] = self.qs[p].get(state[indices], None if action == None else action[indices])
+        return output
+
+    # Input is a tensor of shape (batches, ) + state.shape
+    # Output is a tensor of shape (batches, )
+    def val(self, state, valid_filter=True) -> torch.Tensor:
+        players = self.mdp.get_player(state)
+        output = torch.zeros((state.size(0), ) + self.mdp.state_shape, device=self.device)
+        for p in range(self.mdp.num_players):
+            indices = torch.arange(state.size(0), device=self.device)[players.flatten() == p]
+            output[indices] = self.qs[p].val(state, valid_filter)
+        return output
+    
+    # Input is a batch of state vectors
+    # Returns the value of an optimal policy at a given state, shape (batches, ) + action_shape
+    def policy(self, state, valid_filter=True) -> torch.Tensor:
+        players = self.mdp.get_player(state)
+        output = torch.zeros((state.size(0), ) + self.mdp.action_shape, device=self.device)
+        for p in range(self.mdp.num_players):
+            indices = torch.arange(state.size(0), device=self.device)[players.flatten() == p]
+            output[indices] = self.qs[p].policy(state, valid_filter)
+        return output
+    
+    def save(self, fname):
+        zf = zipfile.ZipFile(fname, mode="w")
+        for i in range(self.mdp.num_players):
+            model_scripted = torch.jit.script(self.qs[i].q)
+            model_scripted.save(f"temp/player.{i}")
+            zf.write(f"temp/player.{i}", f"player.{i}", compress_type=zipfile.ZIP_STORED)
+            os.remove(f"temp/player.{i}")
+        zf.close()        
+
+    def load(self, fname, indices=None):
+        zf = zipfile.ZipFile(fname, mode="r")
+        for i in range(self.mdp.num_players):
+            if indices == None or i in indices:
+                zf.extract(f"player.{i}", "temp/")
+                self.qs[i].q = torch.jit.load(f"temp/player.{i}")
+                os.remove(f"temp/player.{i}")
+        zf.close()
 
 
+    def null(self, indices = None):
+        for i in range(self.mdp.num_players):
+            if indices == None or i in indices:
+                self.qs[i].lobotomize()
 
 
 
@@ -220,29 +280,14 @@ def greedy_tensor(q: NNQFunction, state, eps = 0., valid_filter=True):
 
 
 
-
-
-
-
-
-
+# Base class for implementing reinforcement learning algorithms
+# Contains some common methods, e.g. simulating games, etc.
 class DeepRL():
-    def __init__(self, mdp: TensorMDP, model: nn.Module, loss_fn, optimizer, model_args = {}, device="cpu"):
+    def __init__(self, mdp: TensorMDP, q: PrototypeQFunction, device="cpu"):
         # An mdp that encodes the rules of the game.  The current player is part of the state, which is of the form (current player, actual state)
         self.mdp = mdp
         self.device = device
-        self.loss_fn = loss_fn
-        self.optimizer = optimizer
-        
-    def save(self, fname):
-        raise NotImplementedError     
-
-    def load(self, fname, indices=None):
-        raise NotImplementedError
-    
-    def null(self, indices = None):
-        raise NotImplementedError
-
+        self.q = q
     
     def stepthru_game(self):
         s = self.mdp.get_initial_state()
@@ -252,7 +297,7 @@ class DeepRL():
             turn += 1
             p = int(self.mdp.get_player(s)[0].item())
             print(f"Turn {turn}, player {p+1} ({self.mdp.symb[p]})")
-            a = self.qs[p].policy(s)
+            a = self.q.policy(s)
             print(f"Chosen action: {self.mdp.action_str(a)[0]}")
             s, r = self.mdp.transition(s, a)
             print(f"Next state:\n{self.mdp.board_str(s)[0]}")
@@ -264,8 +309,8 @@ class DeepRL():
     def simulate(self):
         s = self.mdp.get_initial_state()
         while self.mdp.is_terminal(s) == False:
-            p = int(self.mdp.get_player(s)[0].item())
-            a = self.qs[p].policy(s)
+            # p = int(self.mdp.get_player(s)[0].item())
+            a = self.q.policy(s)
             if self.mdp.is_valid_action(s, a):
                 s, r = self.mdp.transition(s, a)
             else:
@@ -273,7 +318,7 @@ class DeepRL():
                 s, r = self.mdp.transition(s, a)
         return r
 
-    def simulate_against_random(self, num_simulations: int, valid_filter=True, replay_loss = False, verbose = False):
+    def simulate_against_random(self, num_simulations: int, valid_filter=True, replay_loss = False, verbose = True):
         output = []
         for i in range(self.mdp.num_players):
             if verbose:
@@ -286,7 +331,7 @@ class DeepRL():
                 while self.mdp.is_terminal(s).item() == False:
                     p = int(self.mdp.get_player(s).item())
                     if p == i:
-                        a = self.qs[i].policy(s, valid_filter=valid_filter)
+                        a = self.q.policy(s, valid_filter=valid_filter)
                         if self.mdp.is_valid_action(s, a).item():
                             s, r = self.mdp.transition(s, a)
                         else:
@@ -324,11 +369,15 @@ class DeepRL():
 class DQN(DeepRL):
     def __init__(self, mdp: TensorMDP, model: nn.Module, loss_fn, optimizer, memory_capacity: int, model_args = {}, device="cpu"):
         # An mdp that encodes the rules of the game.  The current player is part of the state, which is of the form (current player, actual state)
-        self.mdp = mdp
-        self.device = device
+        # self.mdp = mdp
+        # self.device = device
 
-        # For deep Q learning
-        self.qs = [NNQFunction(mdp, model, model_args=model_args, device=device) for i in range(mdp.num_players)]
+        # # For deep Q learning
+        # #self.qs = [NNQFunction(mdp, model, model_args=model_args, device=device) for i in range(mdp.num_players)]
+        # self.q = NNQMultiFunction(mdp, model, model_args, device)
+
+        super().__init__(mdp, NNQMultiFunction(mdp, model, model_args, device), device)
+
         self.memories = [ExperienceReplay(memory_capacity) for i in range(mdp.num_players)]
         self.memory_capacity = memory_capacity
         self.loss_fn = loss_fn
@@ -336,60 +385,6 @@ class DQN(DeepRL):
 
         # For classical Q learning
         self.q_dict = {}
-
-    def save(self, fname):
-        zf = zipfile.ZipFile(fname, mode="w")
-        for i in range(self.mdp.num_players):
-            model_scripted = torch.jit.script(self.qs[i].q)
-            model_scripted.save(f"temp/player.{i}")
-            zf.write(f"temp/player.{i}", f"player.{i}", compress_type=zipfile.ZIP_STORED)
-            os.remove(f"temp/player.{i}")
-        zf.close()
-
-            
-
-    def load(self, fname, indices=None):
-        zf = zipfile.ZipFile(fname, mode="r")
-        for i in range(self.mdp.num_players):
-            if indices == None or i in indices:
-                zf.extract(f"player.{i}", "temp/")
-                self.qs[i].q = torch.jit.load(f"temp/player.{i}")
-                os.remove(f"temp/player.{i}")
-        zf.close()
-
-
-    def null(self, indices = None):
-        for i in range(self.mdp.num_players):
-            if indices == None or i in indices:
-                self.qs[i].lobotomize()
-                
-    # def stepthru_game(self):
-    #     s = self.mdp.get_initial_state()
-    #     print(f"Initial state:\n{self.mdp.board_str(s)[0]}")
-    #     turn = 0
-    #     while self.mdp.is_terminal(s) == False:
-    #         turn += 1
-    #         p = int(self.mdp.get_player(s)[0].item())
-    #         print(f"Turn {turn}, player {p+1} ({self.mdp.symb[p]})")
-    #         a = self.qs[p].policy(s)
-    #         print(f"Chosen action: {self.mdp.action_str(a)[0]}")
-    #         s, r = self.mdp.transition(s, a)
-    #         print(f"Next state:\n{self.mdp.board_str(s)[0]}")
-    #         print(f"Rewards for players: {r[0].tolist()}")
-    #         input("Enter to continue.\n")
-    #     input("Terminal state reached.  Enter to end. ")
-
-    # def simulate(self):
-    #     s = self.mdp.get_initial_state()
-    #     while self.mdp.is_terminal(s) == False:
-    #         p = int(self.mdp.get_player(s)[0].item())
-    #         a = self.qs[p].policy(s)
-    #         if self.mdp.is_valid_action(s, a):
-    #             s, r = self.mdp.transition(s, a)
-    #         else:
-    #             a = self.mdp.get_random_action(s)
-    #             s, r = self.mdp.transition(s, a)
-    #     return r
 
 
     # Keeps the first action; the assumption is the later actions are "passive" (i.e. not performed by the given player)
@@ -420,49 +415,6 @@ class DQN(DeepRL):
         return (TransitionData(new_s, new_a, new_t, new_r), TransitionData(new_s[filter], new_a[filter], new_t[filter], new_r[filter]))
 
 
-    # def simulate_against_random(self, num_simulations: int, replay_loss = False, verbose = False):
-    #     output = []
-    #     for i in range(self.mdp.num_players):
-    #         if verbose:
-    #             print(f"Simulating player {i} against random bot for {num_simulations} simulations.")
-    #         wins, losses, ties, invalids, unknowns  = 0, 0, 0, 0, 0
-    #         for j in range(num_simulations):
-    #             s = self.mdp.get_initial_state()
-    #             if replay_loss:
-    #                 history = [s]
-    #             while self.mdp.is_terminal(s).item() == False:
-    #                 p = int(self.mdp.get_player(s).item())
-    #                 if p == i:
-    #                     a = self.qs[i].policy(s)
-    #                     if self.mdp.is_valid_action(s, a).item():
-    #                         s, r = self.mdp.transition(s, a)
-    #                     else:
-    #                         invalids += 1
-    #                         a = self.mdp.get_random_action(s)
-    #                         s, r = self.mdp.transition(s, a)
-    #                 else:
-    #                     a = self.mdp.get_random_action(s)
-    #                     s, r = self.mdp.transition(s, a)
-    #                 if replay_loss:
-    #                     history.append(s)
-    #             if r[0,i].item() == 1.:
-    #                 wins += 1
-    #             elif r[0, i].item() == -1.:
-    #                 losses += 1
-    #                 if replay_loss:
-    #                     for s in history:
-    #                         print(self.mdp.board_str(s)[0])
-    #                         input()
-    #             elif r[0, i].item() == 0.:
-    #                 ties += 1
-    #             else:
-    #                 unknowns += 1
-    #         output.append((wins, losses, ties, invalids, unknowns))
-    #         if verbose:
-    #             print(f"Player {i} {wins} wins, {losses} losses, {ties} ties, {invalids} invalid moves, {unknowns} unknown results.")
-    #     return output
-            
-        
     def minmax(self, state = None):
         if state == None:
             state = self.mdp.get_initial_state()
@@ -501,7 +453,7 @@ class DQN(DeepRL):
         if do_logging:
             logtext += log(f"Device: {self.device}", verbose)
             logtext += log(f"MDP:\n{self.mdp}", verbose)
-            logtext += log(f"Model:\n{self.qs[0].q}", verbose)
+            logtext += log(f"Model:\n{self.q.qs[0].q}", verbose)
             logtext += log(f"Loss function:\n{self.loss_fn}", verbose)
             logtext += log(f"Optimizer:\n{self.optimizer}", verbose)
             logtext += log(f"Zeroing out invalid moves" if valid_filter else f"Penalizing invalid moves")
@@ -509,14 +461,14 @@ class DQN(DeepRL):
             
             episode_losses = [[] for i in range(self.mdp.num_players)]
             tests = []                                          # Format: tests[i][j] is the jth iteration of the ith test
-            initial_test = self.mdp.tests(self.qs)
+            initial_test = self.mdp.tests(self.q.qs)
             for i in range(len(initial_test)):
                 tests.append([initial_test[i]])
             start_time = datetime.datetime.now()
             logtext += log(f"Starting training at {start_time}\n", verbose)
                         
         # Initialize target network
-        target_qs = [copy.deepcopy(self.qs[i]) for i in range(self.mdp.num_players)]
+        target_qs = [copy.deepcopy(self.q.qs[i]) for i in range(self.mdp.num_players)]
         for i in range(self.mdp.num_players):
             target_qs[i].q.eval()
         
@@ -548,7 +500,7 @@ class DQN(DeepRL):
                 for pi in range(self.mdp.num_players):
                     # Get the indices corresponding to this player's turn
                     indices = torch.arange(sim_batch, device=self.device)[p.flatten() == pi]
-                    a[indices] = greedy_tensor(self.qs[pi], s[indices], expl_cur, valid_filter=valid_filter)
+                    a[indices] = greedy_tensor(self.q.qs[pi], s[indices], expl_cur, valid_filter=valid_filter)
 
 
                 # Do the transition 
@@ -567,7 +519,7 @@ class DQN(DeepRL):
                 # Train the policy on a random sample in memory (once the memory bank is big enough)
                 for i in range(self.mdp.num_players):
                     if len(self.memories[i]) >= train_batch and ep_num >= training_delay:
-                        losses[i] += self.qs[i].update(self.memories[i].sample(train_batch), lr, optimizer_class=self.optimizer, loss_fn=self.loss_fn, target_q=target_qs[i], valid_filter=valid_filter)
+                        losses[i] += self.q.qs[i].update(self.memories[i].sample(train_batch), lr, optimizer_class=self.optimizer, loss_fn=self.loss_fn, target_q=target_qs[i], valid_filter=valid_filter)
                         num_updates[i] += train_batch
 
                 # Set the state to the next state
@@ -577,7 +529,7 @@ class DQN(DeepRL):
             # Copy the target network to the policy network if it is time
             if ep_num > training_delay and (ep_num+1) % copy_interval_eps == 0:
                 for i in range(self.mdp.num_players):
-                    target_qs[i].q.load_state_dict(self.qs[i].q.state_dict())
+                    target_qs[i].q.load_state_dict(self.q.qs[i].q.state_dict())
                 logtext += log("Copied policy to target networks for all players.", verbose)
 
             # Save a copy of the model if time
@@ -595,7 +547,7 @@ class DQN(DeepRL):
                     else:
                         losses[i] = float('NaN')
                 logtext += log(f"Episode {ep_num+1} average loss: {losses}", verbose)
-                test_results = self.mdp.tests(self.qs)
+                test_results = self.mdp.tests(self.q.qs)
                 for j in range(len(test_results)):
                     tests[j].append(test_results[j])
 
@@ -607,13 +559,9 @@ class DQN(DeepRL):
             logtext += log(f"\nTraining finished at {end_time}")
             logtext += log(f"Total time: {end_time - start_time}")
 
-            simulation_results = self.simulate_against_random(self.mdp.num_simulations)
-            for i in range(self.mdp.num_players):
-                logtext += log(f"In {self.mdp.num_simulations} simulations by player {i}, {simulation_results[i][0]} wins, {simulation_results[i][1]} losses, {simulation_results[i][2]} ties, {simulation_results[i][3]} invalid moves, {simulation_results[i][4]} unknown results.")
-
         if save_path != None:
             # Save final model
-            self.save(save_path)
+            self.q.save(save_path)
             logtext += log(f"Saved final model to {save_path}")
             
             # Plot losses
@@ -642,6 +590,13 @@ class DQN(DeepRL):
                 plt.savefig(plotpath)
                 logtext += log(f"Saved test {j} plot to {plotpath}", verbose)
 
+        if do_logging:
+            logtext += log("Benchmarking against random.")
+            simulation_results = self.simulate_against_random(self.mdp.num_simulations)
+            for i in range(self.mdp.num_players):
+                logtext += log(f"In {self.mdp.num_simulations} simulations by player {i}, {simulation_results[i][0]} wins, {simulation_results[i][1]} losses, {simulation_results[i][2]} ties, {simulation_results[i][3]} invalid moves, {simulation_results[i][4]} unknown results.")
+
+        if save_path != None:
             logpath = save_path + ".log"
             with open(logpath, "w") as f:
                 logtext += log(f"Saved logs to {logpath}", verbose)
