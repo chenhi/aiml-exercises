@@ -150,7 +150,7 @@ class C4TensorMDP(TensorMDP):
 
     # Return shape (b, 1, 1, 1)
     def get_player(self, state: torch.Tensor) -> torch.Tensor:
-        return (state.sum((1,2,3)) % 2)[:,None,None,None]
+        return (state.sum((1,2,3)) % 2).int()[:,None,None,None]
 
     # Return shape (b, 2, 1, 1)
     def get_player_vector(self, state: torch.Tensor) -> torch.Tensor:

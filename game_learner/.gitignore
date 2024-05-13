@@ -19,3 +19,6 @@ bots/c4/*
 !bots/dc4
 bots/dc4/*
 !/bots/dc4/20240329000901_continue_mll.dc4.pt
+
+ttt/bots
+c4/bots

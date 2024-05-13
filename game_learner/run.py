@@ -432,41 +432,42 @@ while True:
                 players.append(player_index)
         except:
             print(f"Didn't recognize {r.strip()}.  Using bot.")
+    game.play(players)
     
-    s = game.mdp.get_initial_state()
-    total_rewards = torch.zeros(1, mdp.num_players)
-    while item(game.mdp.is_terminal(s), mdp) == False:
-        p = int(item(game.mdp.get_player(s), mdp))
-        print(f"\n{item(game.mdp.board_str(s), mdp, is_list=True)}")
+    # s = game.mdp.get_initial_state()
+    # total_rewards = torch.zeros(1, mdp.num_players)
+    # while item(game.mdp.is_terminal(s), mdp) == False:
+    #     p = int(item(game.mdp.get_player(s), mdp))
+    #     print(f"\n{item(game.mdp.board_str(s), mdp, is_list=True)}")
 
-        if p in players:
-            res = input(mdp.input_str)
-            a = mdp.str_to_action(res)
-            if a == None:
-                print("Did not understand input.")
-                continue
-            s, r = game.mdp.transition(s,a)
-        else:
-            print("Action values:")
-            print(item(game.q.get(s, None), mdp))
-            print(item(game.q.get(s, None) + game.mdp.neginf_kill_actions(s), mdp))
-            a = game.q.policy(s)
-            print(f"Chosen action: \n{item(a, mdp)}.\n")
-            if mdp.is_valid_action(s, a):
-                s, r = game.mdp.transition(s, a)
-            else:
-                print("Bot tried to make an illegal move.  Playing randomly.")
-                a = game.mdp.get_random_action(s)
-                print(f"Randomly chosen action: \n{item(a, mdp)}.\n")
-                s, r = game.mdp.transition(s, a)
-        total_rewards += r
-        print(f"Rewards: {r.tolist()[0]}.")
-        print(f"Aggregate rewards: {total_rewards.tolist()[0]}.")
-    if item(r, mdp)[p] == 1.:
-        winnerstr = f"Player {p + 1} ({game.mdp.symb[p]}), {'a person' if p in players else 'a bot'}, won."
-    elif item(r, mdp)[p] == 0.:
-        winnerstr = 'The game is a tie.'
-    else:
-        winnerstr = "Somehow I'm not sure who won."
+    #     if p in players:
+    #         res = input(mdp.input_str)
+    #         a = mdp.str_to_action(res)
+    #         if a == None:
+    #             print("Did not understand input.")
+    #             continue
+    #         s, r = game.mdp.transition(s,a)
+    #     else:
+    #         print("Action values:")
+    #         print(item(game.q.get(s, None), mdp))
+    #         print(item(game.q.get(s, None) + game.mdp.neginf_kill_actions(s), mdp))
+    #         a = game.q.policy(s)
+    #         print(f"Chosen action: \n{item(a, mdp)}.\n")
+    #         if mdp.is_valid_action(s, a):
+    #             s, r = game.mdp.transition(s, a)
+    #         else:
+    #             print("Bot tried to make an illegal move.  Playing randomly.")
+    #             a = game.mdp.get_random_action(s)
+    #             print(f"Randomly chosen action: \n{item(a, mdp)}.\n")
+    #             s, r = game.mdp.transition(s, a)
+    #     total_rewards += r
+    #     print(f"Rewards: {r.tolist()[0]}.")
+    #     print(f"Aggregate rewards: {total_rewards.tolist()[0]}.")
+    # if item(r, mdp)[p] == 1.:
+    #     winnerstr = f"Player {p + 1} ({game.mdp.symb[p]}), {'a person' if p in players else 'a bot'}, won."
+    # elif item(r, mdp)[p] == 0.:
+    #     winnerstr = 'The game is a tie.'
+    # else:
+    #     winnerstr = "Somehow I'm not sure who won."
     
-    print(f"\n{item(game.mdp.board_str(s), mdp, is_list=True)}\n\n{winnerstr}\nTotal rewards: {total_rewards.tolist()[0]}.\n\n")
+    # print(f"\n{item(game.mdp.board_str(s), mdp, is_list=True)}\n\n{winnerstr}\nTotal rewards: {total_rewards.tolist()[0]}.\n\n")

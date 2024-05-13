@@ -1,5 +1,6 @@
 from mcts import DMCTS
 from tictactoe_tensor import TTTTensorMDP, TTTNN, TTTResNN
+from connectfour_tensor import C4TensorMDP, C4ResNN
 import torch
 
 device = (
@@ -11,25 +12,39 @@ device = (
 )
 
 
-# TODO regularize using weight_decay=lr/10?
-
 mdp = TTTTensorMDP(device=device)
 game = DMCTS(mdp, TTTResNN, torch.nn.CrossEntropyLoss(), torch.optim.Adam, device=device)
+# game.mcts(lr = 0.01, num_iterations=50, num_selfplay=20, num_searches=20, max_steps=100, ucb_parameter=10, temperature=1, train_batch=8, train_iterations=5, save_path="ttt/bots/50its.ttt.mcts")
+
+game.q.load("ttt/bots/50its.ttt.mcts")
+#game.simulate_against_random(1000, replay_loss=True)
+
+
+# TODO regularize using weight_decay=lr/10?
+
+#mdp = C4TensorMDP(device=device)
+#game = DMCTS(mdp, C4ResNN, torch.nn.CrossEntropyLoss(), torch.optim.Adam, device=device)
+
+#game.q.load("c4/bots/10its.c4.mcts")
+
+#game.mcts(lr = 0.01, num_iterations=10, num_selfplay=10, num_searches=10, max_steps=100, ucb_parameter=10, temperature=1, train_batch=8, train_iterations=5, save_path="c4/bots/10moreits.c4.mcts")
+
+#game.q.load("c4/bots/10its.c4.mcts")
+
+#game.stepthru_game(verbose=True)
+
+
+#game.simulate_against_random(1000)
+
+game.play([1])
 
 
 
-game.mcts(lr = 0.01, num_iterations=20, num_selfplay=10, num_searches=100, max_steps=100, ucb_parameter=10, temperature=1, train_batch=8, save_path="testmcts_save")
-
-game.q.load("testmcts_save")
-
-game.simulate_against_random(1000)
-
-
-b = 10
+#b = 10
 
 
 
-s = game.mdp.get_initial_state()
+#s = game.mdp.get_initial_state()
 
 
 # print(torch.softmax(game.pv(s).flatten(1, -1), dim=1))
@@ -44,7 +59,7 @@ s = game.mdp.get_initial_state()
 
 
 
-t, _ = mdp.transition(s, mdp.str_to_action("2,2"))
+#t, _ = mdp.transition(s, mdp.str_to_action("2,2"))
 #game.search(t, 0, game.pv, 4000)
 #print("Q2", game.q[mdp.state_to_hashable(t)])
 #print("N", game.n[mdp.state_to_hashable(t)])

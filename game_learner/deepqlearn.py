@@ -86,6 +86,10 @@ class TensorMDP(MDP):
     def neginf_kill_actions(self, state: torch.Tensor) -> torch.Tensor:
         return (-torch.inf * (1 - self.valid_action_filter(state).float())).nan_to_num(0)
     
+    # Helper function
+    def masked_softmax(self, state: torch.Tensor) -> torch.Tensor:
+        return (state + self.neginf_kill_actions(state)).flatten(1, -1).softmax(dim=1).reshape((-1,) + self.action_shape)
+    
     # Chooses a valid action unifoirmly at random
     def get_random_action(self, state) -> torch.Tensor:
         return self.get_random_action_weighted(self.valid_action_filter(state).float())
@@ -96,7 +100,7 @@ class TensorMDP(MDP):
         
     # Input action shape, return an action with probability weighted by the entries
     def get_random_action_weighted(self, weights) -> torch.Tensor:
-        # Eliminate negative entries and flatten
+        # Zero out negative entries and flatten
         weights = ((weights > 0) * weights).flatten(1, -1)
         return (torch.cumsum(weights / torch.sum(weights, 1)[:, None], 1) > torch.rand(weights.size(0), device=self.device)[:,None]).diff(dim=1, prepend=torch.zeros((weights.size(0),1), device=self.device)).reshape((-1,) + self.action_shape)
     
@@ -289,7 +293,49 @@ class DeepRL():
         self.device = device
         self.q = q
     
-    def stepthru_game(self):
+    def play(self, human_players: list):
+        s = self.mdp.get_initial_state()
+        total_rewards = torch.zeros(1, self.mdp.num_players)
+        while self.mdp.is_terminal(s).item() == False:
+            p = int(self.mdp.get_player(s).item())
+            print(f"\n{self.mdp.board_str(s)[0]}")
+
+            if p in human_players:
+                res = input(self.mdp.input_str)
+                a = self.mdp.str_to_action(res)
+                if a == None:
+                    print("Did not understand input.")
+                    continue
+                s, r = self.mdp.transition(s,a)
+            else:
+                print("Action values:")
+                print(self.q.get(s, None))
+                print("Action values, masked with softmax:")
+                print(torch.softmax((self.q.get(s, None) + self.mdp.neginf_kill_actions(s)).flatten(1,-1), dim=1).reshape((-1,) + self.mdp.action_shape))
+                a = self.q.policy(s)
+                print(f"Chosen action: \n{a}.\n")
+                if self.mdp.is_valid_action(s, a):
+                    s, r = self.mdp.transition(s, a)
+                else:
+                    print("Bot tried to make an illegal move.  Playing randomly.")
+                    a = self.mdp.get_random_action(s)
+                    print(f"Randomly chosen action: \n{item(a, mdp)}.\n")
+                    s, r = self.mdp.transition(s, a)
+            total_rewards += r
+            print(f"Rewards: {r.tolist()[0]}.")
+            print(f"Aggregate rewards: {total_rewards.tolist()[0]}.")
+        if r[0,p].item() == 1.:
+            winnerstr = f"Player {p + 1} ({self.mdp.symb[p]}), {'a person' if p in human_players else 'a bot'}, won."
+        elif r[0,p].item() == 0.:
+            winnerstr = 'The game is a tie.'
+        else:
+            winnerstr = "Somehow I'm not sure who won."
+        
+        print(f"\n{self.mdp.board_str(s)[0]}\n\n{winnerstr}\nTotal rewards: {total_rewards.tolist()[0]}.\n\n")
+
+
+
+    def stepthru_game(self, verbose=False):
         s = self.mdp.get_initial_state()
         print(f"Initial state:\n{self.mdp.board_str(s)[0]}")
         turn = 0
@@ -297,6 +343,8 @@ class DeepRL():
             turn += 1
             p = int(self.mdp.get_player(s)[0].item())
             print(f"Turn {turn}, player {p+1} ({self.mdp.symb[p]})")
+            if verbose:
+                print(f"Values: {self.q.get(s)}")
             a = self.q.policy(s)
             print(f"Chosen action: {self.mdp.action_str(a)[0]}")
             s, r = self.mdp.transition(s, a)
