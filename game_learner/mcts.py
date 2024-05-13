@@ -196,11 +196,9 @@ class DMCTS(DeepRL):
         for i in range(num_iterations):
             logtext += log(f"Iteration {i+1}", verbose)
             opt = self.optimizer(self.q.h.parameters(), lr=lr)
-                
 
 
-            iteration_data = torch.tensor([], device=self.device)
-            s = self.mdp.get_initial_state(num_selfplay)        # TODO not suppose to parallelize the self plays?
+            s = self.mdp.get_initial_state(num_selfplay)
 
             # The probability vectors for each self-play
             states = torch.tensor([], device=self.device)
@@ -217,7 +215,7 @@ class DMCTS(DeepRL):
                     # TODO bug?  max depth reached in 2nd iteration?
                     p_vector = self.search(s[play:play+1], heuristic=self.q.h, ucb_parameter=ucb_parameter, num=num_searches, temperature=temperature)
 
-                    # Add probability vector to record TODO these don't need to be sorted by play
+                    # Add probability vector to record
                     states = torch.cat([states, s[play:play+1]], dim=0)
                     p_vectors = torch.cat([p_vectors, p_vector], dim=0)
                     step_p = torch.cat([step_p, p_vector], dim=0)
@@ -276,9 +274,6 @@ class DMCTS(DeepRL):
                 logtext += log(f"Saved logs to {logpath}", verbose)
                 f.write(logtext)
 
-            # Saving:
-            # 1. dictionaries 2. heuristic 3. data??
-        
 
 
                 
