@@ -5,7 +5,7 @@ from torch import nn
 
 class TTTTensorMDP(TensorMDP):
 
-    def __init__(self, discount=1, device = "cpu"):
+    def __init__(self, discount=1, penalty=-1, device = "cpu"):
         defaults1 = {
             'lr': 0.00025, 
             'greed_start': 0.0, 
@@ -98,7 +98,7 @@ class TTTTensorMDP(TensorMDP):
             'copy_interval_eps': 1,
             }
         super().__init__(state_shape=(2,3,3), action_shape=(3,3), default_memory=100000, discount=discount, num_players=2, batched=True, default_hyperparameters=defaults7, \
-                         symb = {0: "X", 1: "O", None: "-"}, input_str = "Input position to play, e.g. '1, 3' for the 1st row and 3rd column: ", penalty=-1, num_simulations=10000, device=device)
+                         symb = {0: "X", 1: "O", None: "-"}, input_str = "Input position to play, e.g. '1, 3' for the 1st row and 3rd column: ", penalty=penalty, num_simulations=10000, device=device)
         
     def __str__(self):
         return f"TTTTensorMDP: discount={self.discount}, penalty={self.penalty}, device={self.device}"

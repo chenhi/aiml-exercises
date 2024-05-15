@@ -170,7 +170,7 @@ class DMCTS(DeepRL):
 
             # The AlphaGo algorithm calls for argmax, but we will do random, because the node statistics are not updated in parallel for us
             #action = self.mdp.get_max_action((1 + self.q.ucb_get(s, ucb_parameter * num_valid)) * valid_actions)
-            action = self.mdp.get_random_action_weighted((1 + self.q.ucb_get(s, ucb_parameter * num_valid)) * valid_actions)
+            action = self.mdp.get_random_action_weighted(self.mdp.masked_softmax(self.q.ucb_get(s, ucb_parameter * num_valid), s))
             for i in range(action.size(0)):
                 self.q.n[self.mdp.state_to_hashable(s[i])] += action[i]
 

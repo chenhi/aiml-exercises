@@ -12,7 +12,7 @@ device = (
 )
 
 
-mdp = TTTTensorMDP(device=device)
+mdp = TTTTensorMDP(penalty=-0.1, device=device)
 game = DMCTS(mdp, TTTResNN, torch.nn.CrossEntropyLoss(), torch.optim.Adam, device=device)
 
 # s = mdp.get_initial_state(2)
@@ -24,7 +24,7 @@ game = DMCTS(mdp, TTTResNN, torch.nn.CrossEntropyLoss(), torch.optim.Adam, devic
 # print(game.q.w[mdp.state_to_hashable(mdp.get_initial_state())])
 
 
-game.mcts(lr = 0.001, num_iterations=50, num_selfplay=20, num_searches=20, max_steps=100, ucb_parameter=10, temperature=1, train_batch=8, train_iterations=5, save_path="ttt/bots/50its.ttt.mcts")
+game.mcts(lr = 0.001, num_iterations=50, num_selfplay=30, num_searches=20, max_steps=100, ucb_parameter=10, temperature=1, train_batch=8, train_iterations=5, save_path="ttt/bots/30sp.50its.ttt.mcts")
 
 #game.q.load("ttt/bots/50its.ttt.mcts")
 game.simulate_against_random(1000, replay_loss=False)
