@@ -14,10 +14,21 @@ device = (
 
 mdp = TTTTensorMDP(device=device)
 game = DMCTS(mdp, TTTResNN, torch.nn.CrossEntropyLoss(), torch.optim.Adam, device=device)
-# game.mcts(lr = 0.01, num_iterations=50, num_selfplay=20, num_searches=20, max_steps=100, ucb_parameter=10, temperature=1, train_batch=8, train_iterations=5, save_path="ttt/bots/50its.ttt.mcts")
 
-game.q.load("ttt/bots/50its.ttt.mcts")
-#game.simulate_against_random(1000, replay_loss=True)
+# s = mdp.get_initial_state(2)
+# print(game.search(s, 100, ucb_parameter=1.)) # TODO bug, always selecting the same...
+
+# print(game.search(s, 100, ucb_parameter=1.)) # TODO bug, always selecting the same...
+
+# print(game.q.n[mdp.state_to_hashable(mdp.get_initial_state())])
+# print(game.q.w[mdp.state_to_hashable(mdp.get_initial_state())])
+
+
+game.mcts(lr = 0.001, num_iterations=50, num_selfplay=20, num_searches=20, max_steps=100, ucb_parameter=10, temperature=1, train_batch=8, train_iterations=5, save_path="ttt/bots/50its.ttt.mcts")
+
+#game.q.load("ttt/bots/50its.ttt.mcts")
+game.simulate_against_random(1000, replay_loss=False)
+game.play([1])
 
 
 # TODO regularize using weight_decay=lr/10?
@@ -36,7 +47,6 @@ game.q.load("ttt/bots/50its.ttt.mcts")
 
 #game.simulate_against_random(1000)
 
-game.play([1])
 
 
 

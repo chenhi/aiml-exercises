@@ -1,8 +1,8 @@
-from qlearn import MDP
-from deepqlearn import *
+from rlbase import *
 import numpy as np
 import sys, warnings
 import torch
+from torch import nn
 
 
 # A shift function with truncation, like torch.roll except without the "rolling over"

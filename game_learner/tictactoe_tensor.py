@@ -1,6 +1,6 @@
-from qlearn import *
-from deepqlearn import *
+from rlbase import TensorMDP, PrototypeQFunction
 import torch
+from torch import nn
 
 
 class TTTTensorMDP(TensorMDP):
@@ -306,7 +306,7 @@ class TTTNN(nn.Module):
 
 
 class TTTResNN(nn.Module):
-    def __init__(self, num_hiddens = 3, hidden_depth=2, hidden_width = 32):
+    def __init__(self, num_hiddens = 4, hidden_depth=1, hidden_width = 32):
         super().__init__()
         self.head_stack = nn.Sequential(
             nn.Conv2d(2, hidden_width, (3,3), padding='same'),

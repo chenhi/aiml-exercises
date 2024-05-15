@@ -1,15 +1,14 @@
-import zipfile, os, random, warnings, datetime, copy, math
+import zipfile, os, random, warnings, datetime, copy
 import torch
 from torch import nn
 from collections import namedtuple, deque
-from qlearn import MDP, QFunction, PrototypeQFunction
-from aux import log, smoothing
 import matplotlib.pyplot as plt
 
-# The player order matches their names.
-# I sometimes indicate terminal states by negating all values in the state.
-#Sometimes this means I don't have to implement a method to check terminal conditions globally, which can be costly, and can just do it locally in transitions.
+from rlbase import TensorMDP, DeepRL
+from qlearn import QFunction
+from aux import log, smoothing
 
+# I sometimes indicate terminal states by negating all values in the state, so I don't have to implement a method to check terminal conditions, which can be costly.
 
 #################### DEEP Q-LEARNING ####################
 
@@ -44,98 +43,6 @@ class ExperienceReplay():
     
     def __len__(self):
         return len(self.memory)
-    
-
-
-class TensorMDP(MDP):
-    def __init__(self, state_shape, action_shape, default_memory: int, discount=1, num_players=1, penalty = -2, num_simulations=1000, default_hyperparameters={}, symb = {}, nn_args={}, input_str = "", batched=False, device="cpu"):
-        
-        super().__init__(None, None, discount, num_players, penalty, symb, input_str, default_hyperparameters, batched)
-        self.nn_args = nn_args
-        self.default_memory = default_memory
-        self.device=device
-
-
-        # Whether we filter out illegal moves in training or not
-        #self.filter_illegal = filter_illegal
-
-        self.state_shape = state_shape
-        self.action_shape = action_shape
-
-        # Useful for getting things in the right shape
-        self.state_projshape = (1, ) * len(self.state_shape)
-        self.action_projshape = (1, ) * len(self.action_shape)
-
-        self.state_linshape = 0
-        for i in range(len(self.state_shape)):
-            self.state_linshape += self.state_shape[i]
-        self.action_linshape = 0
-        for i in range(len(self.action_shape)):
-            self.action_linshape += self.action_shape[i]
-
-        self.num_simulations = num_simulations
-
-    ##### ACTIONS #####
-
-    def valid_action_filter(self, state: torch.Tensor) -> torch.Tensor:
-        raise NotImplementedError
-    
-    # Inserts negative infinity at invalid actions (logits version of multilication by masking filter)
-    # The reason this is needed is that the operation of zeroing out entries in filters corresponds, when taking maximums, to replacing those entries with negative infinity
-    # The return value of this function should be added to an action tensor
-    def neginf_kill_actions(self, state: torch.Tensor) -> torch.Tensor:
-        return (-torch.inf * (1 - self.valid_action_filter(state).float())).nan_to_num(0)
-    
-    # Helper function
-    def masked_softmax(self, state: torch.Tensor) -> torch.Tensor:
-        return (state + self.neginf_kill_actions(state)).flatten(1, -1).softmax(dim=1).reshape((-1,) + self.action_shape)
-    
-    # Chooses a valid action unifoirmly at random
-    def get_random_action(self, state) -> torch.Tensor:
-        return self.get_random_action_weighted(self.valid_action_filter(state).float())
-    
-    # Chooses a action from the indices with maximum value (uniformly at random if more than one)
-    def get_max_action(self, values) -> torch.Tensor:         # TODO what if all values are 0
-        return self.get_random_action_weighted(values == values.flatten(1,-1).max(1).values.reshape((-1,) + self.action_projshape).float())
-        
-    # Input action shape, return an action with probability weighted by the entries
-    def get_random_action_weighted(self, weights) -> torch.Tensor:
-        # Zero out negative entries and flatten
-        weights = ((weights > 0) * weights).flatten(1, -1)
-        return (torch.cumsum(weights / torch.sum(weights, 1)[:, None], 1) > torch.rand(weights.size(0), device=self.device)[:,None]).diff(dim=1, prepend=torch.zeros((weights.size(0),1), device=self.device)).reshape((-1,) + self.action_shape)
-    
-    # Output has state shape
-    def is_valid_action(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
-        return (self.valid_action_filter(state) * action).flatten(1,-1).sum(1, keepdim=True).reshape((-1,) + self.state_projshape) == 1.
-
-    def tests(self, qs: list[PrototypeQFunction]):
-        return []
-        
-    # Not batched
-    def state_to_hashable(self, state: torch.Tensor):
-        return tuple(state.flatten().tolist())
-    
-    def hashable_to_state(self, state):
-        return torch.tensor(state).reshape(self.state_shape)
-    
-    def action_to_hashable(self, action: torch.Tensor):
-        return tuple(action.flatten().tolist())
-    
-    def hashable_to_action(self, action):
-        return torch.tensor(action).reshape(self.action_shape)
-    
-    # Return an action uniformly from non-zero entries
-    # Deprecated for get_random_action_weighted; more efficient
-    # def get_random_action_from_filter(self, filter, max_tries=100) -> torch.Tensor:
-    #     filter = filter != 0.
-    #     while (filter.flatten(1,-1).count_nonzero(dim=1) <= 1).prod().item() != 1:                             # Almost always terminates after one step
-    #         temp = torch.rand((filter.size(0),) + self.action_shape, device=self.device) * filter
-    #         filter = (temp == temp.flatten(1,-1).max(1).values.reshape((-1,) + self.action_projshape)).float()
-    #         max_tries -= 1
-    #         if max_tries == 0:
-    #             break
-    #     return filter * 1.
-
 
 
 # A Q-function where the inputs and outputs are all tensors, for a single player
@@ -281,135 +188,6 @@ class NNQMultiFunction(QFunction):
 # We implement a random tensor of 0's and 1's generating a random tensor of floats in [0, 1), then converting it to a bool, then back to a float.
 def greedy_tensor(q: NNQFunction, state, eps = 0., valid_filter=True):
     return q.mdp.get_random_action(state) if random.random() < eps else q.policy(state, valid_filter=valid_filter)
-
-
-
-# Base class for implementing reinforcement learning algorithms
-# Contains some common methods, e.g. simulating games, etc.
-class DeepRL():
-    def __init__(self, mdp: TensorMDP, q: PrototypeQFunction, device="cpu"):
-        # An mdp that encodes the rules of the game.  The current player is part of the state, which is of the form (current player, actual state)
-        self.mdp = mdp
-        self.device = device
-        self.q = q
-    
-    def play(self, human_players: list):
-        s = self.mdp.get_initial_state()
-        total_rewards = torch.zeros(1, self.mdp.num_players)
-        while self.mdp.is_terminal(s).item() == False:
-            p = int(self.mdp.get_player(s).item())
-            print(f"\n{self.mdp.board_str(s)[0]}")
-
-            if p in human_players:
-                res = input(self.mdp.input_str)
-                a = self.mdp.str_to_action(res)
-                if a == None:
-                    print("Did not understand input.")
-                    continue
-                s, r = self.mdp.transition(s,a)
-            else:
-                print("Action values:")
-                print(self.q.get(s, None))
-                print("Action values, masked with softmax:")
-                print(torch.softmax((self.q.get(s, None) + self.mdp.neginf_kill_actions(s)).flatten(1,-1), dim=1).reshape((-1,) + self.mdp.action_shape))
-                a = self.q.policy(s)
-                print(f"Chosen action: \n{a}.\n")
-                if self.mdp.is_valid_action(s, a):
-                    s, r = self.mdp.transition(s, a)
-                else:
-                    print("Bot tried to make an illegal move.  Playing randomly.")
-                    a = self.mdp.get_random_action(s)
-                    print(f"Randomly chosen action: \n{item(a, mdp)}.\n")
-                    s, r = self.mdp.transition(s, a)
-            total_rewards += r
-            print(f"Rewards: {r.tolist()[0]}.")
-            print(f"Aggregate rewards: {total_rewards.tolist()[0]}.")
-        if r[0,p].item() == 1.:
-            winnerstr = f"Player {p + 1} ({self.mdp.symb[p]}), {'a person' if p in human_players else 'a bot'}, won."
-        elif r[0,p].item() == 0.:
-            winnerstr = 'The game is a tie.'
-        else:
-            winnerstr = "Somehow I'm not sure who won."
-        
-        print(f"\n{self.mdp.board_str(s)[0]}\n\n{winnerstr}\nTotal rewards: {total_rewards.tolist()[0]}.\n\n")
-
-
-
-    def stepthru_game(self, verbose=False):
-        s = self.mdp.get_initial_state()
-        print(f"Initial state:\n{self.mdp.board_str(s)[0]}")
-        turn = 0
-        while self.mdp.is_terminal(s) == False:
-            turn += 1
-            p = int(self.mdp.get_player(s)[0].item())
-            print(f"Turn {turn}, player {p+1} ({self.mdp.symb[p]})")
-            if verbose:
-                print(f"Values: {self.q.get(s)}")
-            a = self.q.policy(s)
-            print(f"Chosen action: {self.mdp.action_str(a)[0]}")
-            s, r = self.mdp.transition(s, a)
-            print(f"Next state:\n{self.mdp.board_str(s)[0]}")
-            print(f"Rewards for players: {r[0].tolist()}")
-            input("Enter to continue.\n")
-        input("Terminal state reached.  Enter to end. ")
-
-
-    def simulate(self):
-        s = self.mdp.get_initial_state()
-        while self.mdp.is_terminal(s) == False:
-            # p = int(self.mdp.get_player(s)[0].item())
-            a = self.q.policy(s)
-            if self.mdp.is_valid_action(s, a):
-                s, r = self.mdp.transition(s, a)
-            else:
-                a = self.mdp.get_random_action(s)
-                s, r = self.mdp.transition(s, a)
-        return r
-
-    def simulate_against_random(self, num_simulations: int, valid_filter=True, replay_loss = False, verbose = True):
-        output = []
-        for i in range(self.mdp.num_players):
-            if verbose:
-                print(f"Simulating player {i} against random bot for {num_simulations} simulations.")
-            wins, losses, ties, invalids, unknowns  = 0, 0, 0, 0, 0
-            for j in range(num_simulations):
-                s = self.mdp.get_initial_state()
-                if replay_loss:
-                    history = [s]
-                while self.mdp.is_terminal(s).item() == False:
-                    p = int(self.mdp.get_player(s).item())
-                    if p == i:
-                        a = self.q.policy(s, valid_filter=valid_filter)
-                        if self.mdp.is_valid_action(s, a).item():
-                            s, r = self.mdp.transition(s, a)
-                        else:
-                            invalids += 1
-                            a = self.mdp.get_random_action(s)
-                            s, r = self.mdp.transition(s, a)
-                    else:
-                        a = self.mdp.get_random_action(s)
-                        s, r = self.mdp.transition(s, a)
-                    if replay_loss:
-                        history.append(s)
-                if r[0,i].item() == 1.:
-                    wins += 1
-                elif r[0, i].item() == -1.:
-                    losses += 1
-                    if replay_loss:
-                        for s in history:
-                            print(self.mdp.board_str(s)[0])
-                            input()
-                elif r[0, i].item() == 0.:
-                    ties += 1
-                else:
-                    unknowns += 1
-            output.append((wins, losses, ties, invalids, unknowns))
-            if verbose:
-                print(f"Player {i} {wins} wins, {losses} losses, {ties} ties, {invalids} invalid moves, {unknowns} unknown results.")
-        return output
-            
- 
-
 
 
 # For now, for simplicity, fix a single strategy
