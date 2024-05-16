@@ -234,12 +234,14 @@ class DeepRL():
         output += f"Action values, masked with softmax:\n{torch.softmax((self.q.get(state, None) + self.mdp.neginf_kill_actions(s)).flatten(1,-1), dim=1).reshape((-1,) + self.mdp.action_shape)}\n"
         return output
     
-    def play(self, human_players: list):
+    def play(self, human_players: list, verbose=False):
         s = self.mdp.get_initial_state()
         total_rewards = torch.zeros(1, self.mdp.num_players)
         while self.mdp.is_terminal(s).item() == False:
             p = int(self.mdp.get_player(s).item())
             print(f"\n{self.mdp.board_str(s)[0]}")
+            if verbose:
+                print(self.get_statistics(s))
 
             if p in human_players:
                 res = input(self.mdp.input_str)
@@ -249,7 +251,6 @@ class DeepRL():
                     continue
                 s, r = self.mdp.transition(s,a)
             else:
-                print(self.get_statistics(s))
                 a = self.q.policy(s)
                 print(f"Chosen action: {self.mdp.action_str(a)}\n")
                 if self.mdp.is_valid_action(s, a):
@@ -257,7 +258,7 @@ class DeepRL():
                 else:
                     print("Bot tried to make an illegal move.  Playing randomly.")
                     a = self.mdp.get_random_action(s)
-                    print(f"Randomly chosen action: \n{item(a, mdp)}.\n")
+                    print(f"Randomly chosen action: \n{a.item()}.\n")
                     s, r = self.mdp.transition(s, a)
             total_rewards += r
             print(f"Rewards: {r.tolist()[0]}.")

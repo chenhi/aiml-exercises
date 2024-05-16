@@ -108,6 +108,8 @@ class DMCTS(DeepRL):
         q, n_ratio = self.q.ucb_get_parts(state, get_p=False)
         h = self.mdp.masked_softmax(self.q.h(state), state)
         output = f"Q values:\n{q}\n"
+        output += f"Visits:\n{self.q.n[self.mdp.state_to_hashable(state)]}\n"
+        output += f"Values:\n{self.q.w[self.mdp.state_to_hashable(state)]}\n"
         output += f"Visit factor:\n{1/n_ratio}\n"
         output += f"Heuristic logit values:\n{self.q.h(state)}\n"
         output += f"Heuristic values:\n{h}\n"
@@ -170,7 +172,7 @@ class DMCTS(DeepRL):
 
             # The AlphaGo algorithm calls for argmax, but we will do random, because the node statistics are not updated in parallel for us
             #action = self.mdp.get_max_action((1 + self.q.ucb_get(s, ucb_parameter * num_valid)) * valid_actions)
-            action = self.mdp.get_random_action_weighted(self.mdp.masked_softmax(self.q.ucb_get(s, ucb_parameter * num_valid), s))
+            action = self.mdp.get_random_action_weighted((1 + self.q.ucb_get(s, ucb_parameter * num_valid)) * valid_actions)
             for i in range(action.size(0)):
                 self.q.n[self.mdp.state_to_hashable(s[i])] += action[i]
 
@@ -306,6 +308,8 @@ class DMCTS(DeepRL):
         start_time = datetime.datetime.now()
         logtext += log(f"Started logging.")
         
+        logtext += log(f"Learn rate: {lr}\nNumber of iterations: {num_iterations}\nNumber of self-plays per iteration: {num_selfplay}\nNumber of Monte-Carlo searches per play: {num_searches}\nUpper confidence bound parameter: {ucb_parameter}\nTemperature: {temperature}\nTraining batch size: {train_batch}\nTraining iteration interval: {train_iterations}")
+
         losses = []
 
         training_inputs = []

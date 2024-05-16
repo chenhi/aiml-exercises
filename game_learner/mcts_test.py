@@ -12,8 +12,12 @@ device = (
 )
 
 
-mdp = TTTTensorMDP(penalty=-0.1, device=device)
-game = DMCTS(mdp, TTTResNN, torch.nn.CrossEntropyLoss(), torch.optim.Adam, device=device)
+#mdp = TTTTensorMDP(penalty=-0.1, device=device)
+#game = DMCTS(mdp, TTTResNN, torch.nn.CrossEntropyLoss(), torch.optim.Adam, device=device)
+
+
+mdp = C4TensorMDP(device=device)
+game = DMCTS(mdp, C4ResNN, torch.nn.CrossEntropyLoss(), torch.optim.Adam, device=device)
 
 # s = mdp.get_initial_state(2)
 # print(game.search(s, 100, ucb_parameter=1.)) # TODO bug, always selecting the same...
@@ -23,18 +27,18 @@ game = DMCTS(mdp, TTTResNN, torch.nn.CrossEntropyLoss(), torch.optim.Adam, devic
 # print(game.q.n[mdp.state_to_hashable(mdp.get_initial_state())])
 # print(game.q.w[mdp.state_to_hashable(mdp.get_initial_state())])
 
+#save = "ttt/bots/300its.ttt.mcts"
+save = "c4/bots/300its.c4.mcts"
 
-game.mcts(lr = 0.001, num_iterations=50, num_selfplay=30, num_searches=20, max_steps=100, ucb_parameter=10, temperature=1, train_batch=8, train_iterations=5, save_path="ttt/bots/30sp.50its.ttt.mcts")
+game.mcts(lr = 0.00025, num_iterations=300, num_selfplay=20, num_searches=20, max_steps=100, ucb_parameter=2, temperature=1, train_batch=8, train_iterations=5, save_path=save)
+#game.q.load(save)
 
-#game.q.load("ttt/bots/50its.ttt.mcts")
 game.simulate_against_random(1000, replay_loss=False)
-game.play([1])
+game.play([1], verbose=True)
 
 
 # TODO regularize using weight_decay=lr/10?
 
-#mdp = C4TensorMDP(device=device)
-#game = DMCTS(mdp, C4ResNN, torch.nn.CrossEntropyLoss(), torch.optim.Adam, device=device)
 
 #game.q.load("c4/bots/10its.c4.mcts")
 
