@@ -2,10 +2,11 @@ from connectfour import C4MDP
 from tictactoe import TTTMDP
 from connectfour_tensor import C4TensorMDP, C4NN, C4ResNN
 from tictactoe_tensor import TTTTensorMDP, TTTNN, TTTResNN, TTTCatNN
-from nothanks_tensor import NoThanksTensorMDP, NoThanksNN
+from nothanks import NoThanksMDP, NoThanksNN
 from gohome import GoHomeMDP, show_heatmap
 from qlearn import *
 from deepqlearn import *
+from rlbase import log
 import os, datetime, re, sys, torch
 
 # Alter for colab
@@ -57,7 +58,7 @@ def load_bots(qgame, saves) -> str:
             else:
                 raise Exception
         except:
-            qgame.null()
+            qgame.q.null()
             logtext += log("Loaded RANDOMBOT for all players.")
     else:
         qgame.null()
@@ -87,12 +88,13 @@ if len(sys.argv) > 2:
 
 #==================== GAME DEFINITION AND SELECTION ====================#
 
+
 tttmdp = TTTMDP()
 c4mdp = C4MDP()
 c4tmdp = C4TensorMDP(device=device)
 dtttmdp = TTTTensorMDP(device=device)
 ghmdp = GoHomeMDP((6,6), (0,0), (3,3), 0.9)
-ntmdp = NoThanksTensorMDP(num_players=5, device=device)
+ntmdp = NoThanksMDP(num_players=5, device=device)
 
 #names = ["Tic-Tac-Toe", "Connect Four", "Deep Tic-Tac-Toe", "Deep Connect Four", "No Thanks!", "Robot Go Home"]
 #shortnames = ["ttt", "c4", "dttt", "dc4", "nothanks", "home"]
@@ -376,7 +378,7 @@ if mode == "tournament":
 
 if mode == "play":
     if type == "dqn":
-        game = DQN(mdp, nn.Module, torch.nn.HuberLoss(), torch.optim.Adam, 0, device=device)
+        game = DQN(mdp, None, torch.nn.HuberLoss(), torch.optim.Adam, 0, device=device)
     elif type == "qlearn":
         game = QLearn(mdp)
     load_bots(game, save_files)
@@ -393,7 +395,7 @@ if mode == "benchmark":
         do_all = False
 
     if do_all == False:
-        game = DQN(mdp, nn.Module, torch.nn.HuberLoss(), torch.optim.Adam, 0, device=device)
+        game = DQN(mdp, None, torch.nn.HuberLoss(), torch.optim.Adam, 0, device=device)
         load_bots(game, save_files)
         replay = True if input("Enter 'y' to replay losses: ").lower() == 'y' else False
         game.simulate_against_random(sims, replay_loss=replay, verbose=True)
@@ -432,7 +434,7 @@ while True:
                 players.append(player_index)
         except:
             print(f"Didn't recognize {r.strip()}.  Using bot.")
-    game.play(players)
+    game.play(players, verbose=True)
     
     # s = game.mdp.get_initial_state()
     # total_rewards = torch.zeros(1, mdp.num_players)

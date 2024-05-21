@@ -85,7 +85,7 @@ class MCTSQFunction(PrototypeQFunction):
             self.n = load_dict['n']
             self.w = load_dict['w']
             self.p = load_dict['p']
-        self.h = torch.jit.load(fname + ".h")
+        self.h = torch.jit.load(fname + ".h", map_location=torch.device(self.device))
     
     def null(self, indices = None):
         self.n, self.w, self.p = {}, {}, {}

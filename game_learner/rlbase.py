@@ -129,7 +129,7 @@ class MDP():
 
 
 class TensorMDP(MDP):
-    def __init__(self, state_shape, action_shape, default_memory: int, discount=1, num_players=1, penalty = -2, num_simulations=1000, default_hyperparameters={}, symb = {}, nn_args={}, input_str = "", batched=False, device="cpu"):
+    def __init__(self, state_shape, action_shape, default_memory: int, discount=1., num_players=1, penalty = -2, num_simulations=1000, default_hyperparameters={}, symb = {}, nn_args={}, input_str = "", batched=False, device="cpu"):
         
         super().__init__(None, None, discount, num_players, penalty, symb, input_str, default_hyperparameters, batched)
         self.nn_args = nn_args
@@ -231,7 +231,7 @@ class DeepRL():
 
     def get_statistics(self, state: torch.Tensor) -> str:
         output = f"Action values:\n{self.q.get(state, None)}\n"
-        output += f"Action values, masked with softmax:\n{torch.softmax((self.q.get(state, None) + self.mdp.neginf_kill_actions(s)).flatten(1,-1), dim=1).reshape((-1,) + self.mdp.action_shape)}\n"
+        output += f"Action values, masked with softmax:\n{torch.softmax((self.q.get(state, None) + self.mdp.neginf_kill_actions(state)).flatten(1,-1), dim=1).reshape((-1,) + self.mdp.action_shape)}\n"
         return output
     
     def play(self, human_players: list, verbose=False):

@@ -4,13 +4,12 @@ from torch import nn
 from collections import namedtuple, deque
 import matplotlib.pyplot as plt
 
-from rlbase import TensorMDP, DeepRL
-from qlearn import QFunction
-from aux import log, smoothing
+from rlbase import TensorMDP, DeepRL, log, smoothing, PrototypeQFunction
+
+
 
 # I sometimes indicate terminal states by negating all values in the state, so I don't have to implement a method to check terminal conditions, which can be costly.
 
-#################### DEEP Q-LEARNING ####################
 
 # Source, action, target, reward
 TransitionData = namedtuple('TransitionData', ('s', 'a', 't', 'r'))
@@ -36,7 +35,6 @@ class ExperienceReplay():
     def sample(self, num: int, batch=True) -> list:
         if batch:
             data = random.sample(self.memory, num)
-            s = torch.stack([datum[0] for datum in data])
             return TransitionData(torch.stack([datum.s for datum in data]), torch.stack([datum.a for datum in data]), torch.stack([datum.t for datum in data]), torch.stack([datum.r for datum in data]))
         else:
             return random.sample(self.memory, num)       
@@ -46,12 +44,15 @@ class ExperienceReplay():
 
 
 # A Q-function where the inputs and outputs are all tensors, for a single player
-class NNQFunction(QFunction):
+class NNQFunction(PrototypeQFunction):
     def __init__(self, mdp: TensorMDP, q_model, model_args={}, device="cpu"):
         if mdp.state_shape == None or mdp.action_shape == None:
             raise Exception("The input MDP must handle tensors.")
-        self.q = q_model(**model_args, **mdp.nn_args).to(device)
-        self.q.eval()
+        if q_model == None:
+            self.q = None
+        else:
+            self.q = q_model(**model_args, **mdp.nn_args).to(device)
+            self.q.eval()
         
         self.mdp = mdp
         self.device=device
@@ -106,7 +107,7 @@ class NNQFunction(QFunction):
         self.q.train()
         opt = optimizer_class(self.q.parameters(), lr=learn_rate)
         pred = self.get(data.s, data.a)
-        y = data.r + target_q.val(data.t, valid_filter=valid_filter)
+        y = data.r + self.mdp.discount * target_q.val(data.t, valid_filter=valid_filter)
         self.q.train()
         loss = loss_fn(pred, y)
 
@@ -121,7 +122,7 @@ class NNQFunction(QFunction):
     
 
 # A wrapper for Q functions for multiple players
-class NNQMultiFunction(QFunction):
+class NNQMultiFunction(PrototypeQFunction):
     def __init__(self, mdp: TensorMDP, q_model, model_args={}, device="cpu"):
         self.qs = [NNQFunction(mdp, q_model, model_args=model_args, device=device) for i in range(mdp.num_players)]
         self.mdp = mdp
@@ -171,7 +172,7 @@ class NNQMultiFunction(QFunction):
         for i in range(self.mdp.num_players):
             if indices == None or i in indices:
                 zf.extract(f"player.{i}", "temp/")
-                self.qs[i].q = torch.jit.load(f"temp/player.{i}")
+                self.qs[i].q = torch.jit.load(f"temp/player.{i}", map_location=torch.device(self.device))
                 os.remove(f"temp/player.{i}")
         zf.close()
 
@@ -360,7 +361,7 @@ class DQN(DeepRL):
 
             # Save a copy of the model if time
             if save_path != None and (ep_num+1) % save_interval == 0:
-                self.save(f"{save_path}.{ep_num+1}")
+                self.q.save(f"{save_path}.{ep_num+1}")
                 logtext += log(f"Saved {ep_num+1}-iteration model to {save_path}.{ep_num+1}") 
 
             

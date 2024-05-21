@@ -1,8 +1,7 @@
 import random, pickle
 import matplotlib.pyplot as plt
 
-from aux import log
-from rlbase import PrototypeQFunction, MDP
+from rlbase import PrototypeQFunction, MDP, log
 
 
 #################### CLASSICAL Q-LEARNING ####################
