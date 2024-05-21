@@ -1,6 +1,6 @@
 from rlbase import *
 import numpy as np
-import sys, warnings
+import warnings
 import torch
 from torch import nn
 
