@@ -1,12 +1,4 @@
-torch
-matplotlib
-random
-os
-datetime
-re
-sys
-warnings
-zipfile
-copy
-collections
-pickle
+matplotlib==3.5.1
+numpy==1.26.3
+torch==2.2.1
+zipp==1.0.0
