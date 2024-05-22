@@ -1,194 +1,342 @@
-from qlearn import *
 import numpy as np
-import random, sys, torch, warnings
+import warnings
+import torch
+from torch import nn
 
-options = sys.argv[1:]
+from rlbase import *
+
+# A shift function with truncation, like torch.roll except without the "rolling over"
+def shift(x: torch.Tensor, shift: int, axis: int, device="cpu") -> torch.Tensor:
+    if shift == 0:
+        return x
+    if abs(shift) >= x.shape[axis]:
+        return torch.zeros(x.shape, device=device)
+    
+    zero_shape = list(x.shape)
+    if shift > 0:
+        zero_shape[axis] = shift
+        return torch.cat((torch.zeros(zero_shape, device=device), torch.index_select(x, axis, torch.arange(0, x.shape[axis] - shift, device=device))), axis)
+    else:
+        zero_shape[axis] = -shift
+        return torch.cat((torch.index_select(x, axis, torch.arange(-shift, x.shape[axis], device=device)), torch.zeros(zero_shape, device=device)), axis)
 
 
-#################### CLASSICAL IMPLEMENTATION ####################
+# State tensor shape (b = batches, player_channel = 2, h = 6, w = 7)
+# Action tensor (b, w)
+# Reward tensor (b, )
+class C4MDP(TensorMDP):
 
-
-# Set of states: (player, 7-tuple of strings of 0 and 1 of length in [0, 6], winner or None if not terminal)
-# Set of actions: integers [0, 6]
-class C4MDP(MDP):
-    def __init__(self):
+    def __init__(self, height=6, width=7, win_condition=4, device="cpu"):
         hyperpar = {
-            'lr': 0.1,
-            'expl': 0.5,
-            'iterations': 500,
-            'q_episodes': 64,
-            'episode_length': 1000
-        }
-        super().__init__(None, range(0, 7), discount=1, num_players=2, default_hyperparameters=hyperpar, \
-                         symb={0: "O", 1: "X", None: "-"}, input_str="Input column to play (1-7). ")
+            'lr': 0.00025, 
+            'greed_start': 0.0, 
+            'greed_end': 0.6,
+            'dq_episodes': 3000, 
+            'ramp_start': 100,
+            'ramp_end': 1900,
+            'training_delay': 100,
+            'episode_length': 45,
+            'sim_batch': 256, 
+            'train_batch': 512, 
+            'copy_interval_eps': 3
+            }
+        
+        self.height, self.width, self.win_condition = height, width, win_condition
+        self.area = self.height * self.width
+        super().__init__(state_shape=(2,self.height,self.width), action_shape=(self.width,), discount=1, num_players=2, batched=True, default_memory = 1000000, default_hyperparameters=hyperpar, \
+                         symb = {0: "O", 1: "X", None: "-"}, input_str = f"Input column to play (1-{self.width}). ", penalty=-2, device=device)
+        
+        # Generate kernels for detecting winner
+        # Shape: (hw, 4x, h, w)
+        # The first dimension corresponds to the flattened index of the center (i, j) <--> wi + j
+        stacks = []
 
-    def board_str(self, s):
-        rows = ["|" for i in range(6)]
-        p, cols, _ = s
-        out = ""
-        out += f"Current player: {self.symb[p]}\n"
-        for col in cols:
-            for c in range(6):
-                rows[5 - c] += self.symb[None] if c >= len(col) else self.symb[int(col[c])]
-        for row in rows:
-            out += f"{row}|\n"
-        out += "|1234567|"
-        return out
-    
-    def action_str(self, action) -> str:
-        return f"column {action+1}"
-    
+        for i in range(self.height):
+            for j in range(self.width):
+                filters = []
+                center = torch.zeros((self.height, self.width), device=device)
+                center[i, j] = 1
+
+                for k in range(self.win_condition):
+                    new_vert_filter = shift(center, -k, axis=0, device=device)
+                    new_horiz_filter = shift(center, -k, axis=1, device=device)
+                    new_diag_filter = shift(shift(center, -k, axis=0, device=device), -k, axis=1, device=device)
+                    new_adiag_filter = shift(shift(center, -k, axis=1, device=device), k, axis=0, device=device)
+                    for l in range(1, self.win_condition):
+                        new_vert_filter = new_vert_filter + shift(center, -k + l, axis=0, device=device)
+                        new_horiz_filter = new_horiz_filter + shift(center, -k + l, axis=1, device=device)
+                        new_diag_filter = new_diag_filter + shift(shift(center, -k + l, axis=0, device=device), -k + l, axis=1, device=device)
+                        new_adiag_filter = new_adiag_filter + shift(shift(center, -k + l, axis=1, device=device), k - l, axis=0, device=device)
+                    filters.append(new_vert_filter)
+                    filters.append(new_horiz_filter)
+                    filters.append(new_diag_filter)
+                    filters.append(new_adiag_filter)
+
+                # Shape (4x, h, w)
+                stacks.append(torch.stack(filters))
+        # Shape (hw, 4x, h, w)
+        self.filter_stack = torch.stack(stacks)
+
+    def __str__(self):
+        return f"C4MDP: discount={self.discount}, penalty={self.penalty}"
+
+    ##### UI RELATED METHODS #####
+    # Non-batch and not used in internal code, efficiency not as important
+        
+    # Return shape (1, w)
+    def int_to_action(self, index: int):
+        if index < 0 or index > self.width:
+            warnings.warn("Index out of range.")
+            return np.zeros((1, self.width), device=self.device)
+        return torch.eye(7, device=self.device)[index:index+1,:]
     
     def str_to_action(self, input: str) -> torch.Tensor:
         try:
             i = int(input) - 1
-            if i < 0 or i > 7:
+            if i < 0 or i > self.width:
                 raise Exception()
         except:
             return None
-        return i
-
-    def get_actions(self, state):
-        notfull = []
-        for i in range(7):
-            if len(state[1][i]) < 6:
-                notfull.append(i)
-        if len(notfull) > 0:
-            return notfull
-        else:
-            return self.actions
+        return self.int_to_action(i)
     
-    def state_to_tensor(self, state):
-        # Ignore player and winner
-        tensor = np.zeros((2,7,6), dtype=int)
-        for i in range(7):
-            for j in range(len(state[1][i])):
-                tensor[int(state[1][i][j])][i][j] = 1.
-        return tensor
-    
+    def action_str(self, action: torch.Tensor) -> list[str]:
+        outs = []
+        for i in range(action.shape[0]):
+            a = action[i, :].max(0).indices.item()
+            outs.append(f"column {a+1}")
+        return outs
 
-    # Input shape (batch_size, 7) or (7, )
-    # Returns torch.Tensor in first case, scalar in second case
-    def tensor_to_action(self, action_tensor: torch.Tensor):
-        if len(action_tensor.shape) == 1:
-            return action_tensor.max().indices.item()
-        elif len(action_tensor.shape) == 2:
-            return action_tensor.max(1).indices
-
-
-    def action_to_tensor(self, action):
-        tensor = np.zeros((7,))
-        tensor[action] = 1.
-        return tensor
-
-    # Reward is 1 for winning the game, -1 for losing, and 0 for a tie; awarded upon entering terminal state
-    def transition(self, state, a):
-        # Copy it
-        p, s, _ = state
+    # Returns a pretty looking board in a string.
+    def board_str(self, state: torch.Tensor) -> list[str]:
+        # Iterate through the batches and return a list.
+        outs = []
+        players = self.get_player(state)
+        term = self.is_terminal(state)
+        for i in range(state.shape[0]):
+            s = state[i]
+            # We indicate a terminal state by negating everything, so if the state is terminal we need to undo it
+            if term[i].item():
+                s = s * -1
             
-        # Check if move is valid, i.e. if the column is full and if a is in the set of actions
-        # If it's not a valid move, give a penalty (a large penality; it should learn to never make these moves)
-        if a not in self.actions or len(s[a]) >= 6:
-            if p == 0:
-                penalty = (-1000, 0,)
-            else:
-                penalty = (0, -1000)
-            return state, penalty
-        
-        # If the move is valid, make it
-        b = list(s)
-        b[a] += str(p)
-        b = tuple(b)
+            out = ""
+            out += f"Current player: {self.symb[players[i].item()]}\n"
+            pos0 = s[0] > s[1]
+            pos1 = s[0] < s[1]
 
-        # Check for a new winner, i.e. a winner made by the current move, which can only be the current player
-        # w = (1, -1) if p == 0 else (-1, 1)
-        # w = (1 - 2*p, -1 + 2*p)
-        if self.four(p, b, a):
-            return (1 - p, b, p), (1 - 2*p, -1 + 2*p)
-        else:
-            return (1 - p, b, None), (0, 0)
+            # Start from the top row
+            for row in range(self.height - 1, -1, -1):
+                rowtext = "|"
+                for col in range(self.width):
+                    if pos0[row, col].item():
+                        rowtext += self.symb[0]
+                    elif pos1[row, col].item():
+                        rowtext += self.symb[1]
+                    else:
+                        rowtext += self.symb[None]
+                    
+                out += rowtext + "|\n"
+            out += "|" + "=" * self.width + "|\n"
+            out += "|"
+            for i in range(self.width):
+                out += str((i + 1) % 10)
+            out += "|"
+            outs.append(out)
+        return outs
+
+    ##### INTERNAL LOGIC #####
+
+
+    ### PLAYERS ### 
+
+    # Return shape (b, 1, 1, 1)
+    def get_player(self, state: torch.Tensor) -> torch.Tensor:
+        return (state.sum((1,2,3)) % 2).int()[:,None,None,None]
+
+    # Return shape (b, 2, 1, 1)
+    def get_player_vector(self, state: torch.Tensor) -> torch.Tensor:
+        return torch.eye(2, device=self.device)[None].expand(state.size(0),-1,-1)[torch.arange(state.size(0)),self.get_player(state).int()[:, 0, 0, 0]][:,:,None, None]
     
-    def get_initial_state(self, start_player = 0):
-        if start_player != 0 and start_player != 1:
-            start_player = random.choice((0,1))
-        return (start_player, ("","","","","","",""), None)
+    # Return shape (b, 2, 1, 1)
+    def swap_player(self, player_vector: torch.Tensor) -> torch.Tensor:
+        return torch.tensordot(player_vector, torch.eye(2, device=self.device)[[1,0]], dims=([1], [0])).swapaxes(1, -1)
+
+
+
+    ### ACTIONS ###
+
+    # Return shape (b, w), boolean type
+    def valid_action_filter(self, state: torch.Tensor) -> torch.Tensor:
+        return state.sum((1,2)) < self.height
+
+
+    ### STATES ###
+
+    # Return shape (b, 2, h, w)
+    def get_initial_state(self, batch_size=1) -> torch.Tensor:
+        return torch.zeros((batch_size, 2, self.height, self.width), device=self.device)
     
+    # Checks for a win condition at a given position
+    # Inputs: state shape (b, 2, h, w), player shape (b, ), center shape (b, h, w)
+    # Return shape (b, 1, 1, 1) boolean saying whether the indicated player is a winner
+    def is_winner(self, state: torch.Tensor, player: torch.Tensor, center: torch.Tensor) -> torch.Tensor:
+        # Extract the current player's layer, shape (b, h, w)
+        player_board = state[torch.arange(state.shape[0]), player.int()[:,0,0,0]]
+        # Extract the relevant part of the filter stack given the center, shape (b, 4x, h, w)
+        stack = torch.tensordot(center.flatten(1,2), self.filter_stack, ([1], [0]))
+        # Dot, shape (b, 4x)
+        dotted = torch.sum((player_board[:, None] * stack).flatten(2,3), dim=2)
+        return ((dotted == 4).sum(1) > 0)[:,None, None, None]
+
+
+
     # The game is short enough that maybe we don't care about intermediate states
-    def get_random_state(self):
+    def get_random_state(self) -> torch.Tensor:
         return self.get_initial_state()
 
-    def is_terminal(self, state):
-        return False if state[2] == None else True
+    # Indicate a terminal state by negating everything.  So, if the maximum value of the negation is positive, then it is a terminal state.
+    def is_terminal(self, state: torch.Tensor) -> torch.Tensor:
+        return ((state * -1).flatten(1,3).max(1).values > 0)[:, None, None, None]
     
-    # '0' or '1' for a player, '' for empty
-    def get_by_coords(self, s, row, col):
-        return '' if (row >= len(s[col]) <= row or row < 0) else s[col][row]
+    # Sum the channels, and board factors.  The result should be 1 * 1 * h * w = hw.  If it is greater, something went wrong and we won't account for it.
+    def is_full(self, state: torch.Tensor) -> torch.Tensor:
+        return (abs(state.sum((1,2,3))) == self.area)[:, None, None, None]
 
-    # Determine if the move in the indicate column created new four
-    def four(self, p, s, a):
-        # Check the column; it has to be at the top, i.e. end
-        if len(s[a]) >= 4 and s[a][-4:] == str(p) * 4:
-            return True
 
-        # Check the row
-        r = len(s[a]) - 1
-        length = 1
-        # To the right
-        for i in range(a+1, 7):
-            if self.get_by_coords(s, r, i) != str(p):
-                break
-            length += 1
-        # To the left
-        for i in range(a-1, -1, -1):
-            if self.get_by_coords(s, r, i) != str(p):
-                break
-            length += 1
-        if length >= 4:
-            return True
-        
-        # Check the up-diagonal
-        length = 1
-        # To the right
-        for i in range(a+1, 7):
-            if self.get_by_coords(s, r+i-a, i) != str(p):
-                break
-            length += 1
-        # To the left
-        for i in range(a-1, -1, -1):
-            if self.get_by_coords(s, r+i-a, i) != str(p):
-                break
-            length += 1
-        if length >= 4:
-            return True
-        
-        # Check the down-diagonal
-        length = 1
-        # To the right
-        for i in range(a+1, 7):
-            if self.get_by_coords(s, r-i+a, i) != str(p):
-                break
-            length += 1
-        # To the left
-        for i in range(a-1, -1, -1):
-            if self.get_by_coords(s, r-i+a, i) != str(p):
-                break
-            length += 1
-        if length >= 4:
-            return True
-        
-        return False
-        
+    ### TRANSITION ###
 
-    def is_full(self, state):
-        s = state[1]
-        for row in s:
-            if len(row) < 6:
-                return False
-        return True
+    # Reward is 1 for winning the game, -1 for losing, and 0 for a tie; awarded upon entering terminal state
+    # Return tuple of tensors with shape (batch, ) + state_shape for the next state and (batch, 2) for the reward
+    def transition(self, state: torch.Tensor, action: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        # If the state is terminal, don't do anything.  Zero out the corresponding actions.
+        action = (self.is_terminal(state) == False)[:, :, 0, 0] * action
+        p = self.get_player(state)
+        p_tensor = self.get_player_vector(state)
+
+        # Make the move!  If the move is invalid, no move will be made.
+        # First, get the position we want to add by summing the channels and columns: state.sum((1,2))
+        # This has shape (batch, 7); we extend it by ones to shape (batch, 6, 7): torch.tensordot(state.sum((1,2)), torch.ones(6), 0)
+        #coltotals = state.sum((1,2))[:,None,:].expand(-1,6,-1)
+        # Then, we compare it to tensor of shape (7, 6) to get a tensor of shape (batch, 6, 7).  The result is a board with True along the correct row
+        #rowcounter = torch.arange(6)[:,None].expand(-1,7)
+        # Then, we multiply it with action to isolate the right column, shape (batch, 6, 7)
+        #newpos = action[:,None,:].expand(-1,6,-1)  * (coltotals == rowcounter)
+        newpos = action[:,None,:].expand(-1, self.height,-1)  * (state.sum((1,2))[:,None,:].expand(-1, self.height, -1) == torch.arange(self.height, device=self.device)[:,None].expand(-1, self.width))
+
+        # Restore channel and add, shape (b, 2, w, h)
+        newstate = state + p_tensor * newpos[:,None,:,:]
+
+        # Check whether the current player is a winner after playing at position newpos
+        winner = self.is_winner(newstate, p, newpos)
+        # Also check if the board is full, meaning a draw
+        full = self.is_full(newstate)
+        # Check if the original state was terminal
+        was_terminal = self.is_terminal(state)
+
+        # Make the state terminal if there is a winner or if the board is full, and if it wasn't terminal to begin with
+        newstate = (1 - 2 * (~was_terminal & (winner | full))) * newstate
+        
+        # Give out a reward if there is a winner.
+        reward = (winner.float() * p_tensor - winner * self.swap_player(p_tensor))[:,:,0,0]
+        # Invalid moves don't result in a change in the board.  However, we want to impose a penalty (except when it's a terminal state)
+        reward += (torch.logical_and(self.is_valid_action(state, action) == False, self.is_terminal(state).reshape((-1,) + self.state_projshape) == False).float() * self.penalty * p_tensor)[:,:,0,0]
+        
+        return newstate, reward
     
-    def get_player(self, state):
-        return state[0]
+
+
+
     
-    def tests(self, q: QFunction):
-        return None
+
+class C4ResNN(nn.Module):
+    def __init__(self, num_hidden_conv = 5, hidden_conv_depth=1, hidden_conv_layers = 32, num_hidden_linear = 3, hidden_linear_depth=2, hidden_linear_width=16):
+        super().__init__()
+        self.head_stack = nn.Sequential(
+            nn.Conv2d(2, hidden_conv_layers, (3,3), padding='same'),
+            nn.BatchNorm2d(hidden_conv_layers),
+            nn.ReLU(),
+        )
+        hlays = []
+        for i in range(num_hidden_conv - 1):
+            lay = nn.Sequential(nn.Conv2d(hidden_conv_layers, hidden_conv_layers, (5,5), padding='same'))
+            for j in range(hidden_conv_depth):
+                lay.append(nn.BatchNorm2d(hidden_conv_layers))
+                lay.append(nn.ReLU())
+                lay.append(nn.Conv2d(hidden_conv_layers, hidden_conv_layers, (5,5), padding='same'))
+            lay.append(nn.BatchNorm2d(hidden_conv_layers))
+            hlays.append(lay)
+        
+        self.hidden_conv_layers = nn.ModuleList(hlays)
+
+        self.conv_to_linear = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(hidden_conv_layers * 7 * 6, hidden_linear_width * 7 * 6)
+        )
+
+        hlays = []
+        for i in range(num_hidden_linear):
+            lay = nn.Sequential(nn.Linear(hidden_linear_width * 42, hidden_linear_width * 42))
+            for j in range(hidden_linear_depth - 1):
+                lay.append(nn.BatchNorm1d(hidden_linear_width*42))
+                lay.append(nn.ReLU())
+                lay.append(nn.Linear(hidden_linear_width * 42, hidden_linear_width * 42))
+            lay.append(nn.BatchNorm1d(hidden_linear_width * 42))
+            hlays.append(lay)
+        
+        self.hidden_linear_layers = nn.ModuleList(hlays)
+
+
+        self.tail = nn.Sequential(
+                nn.Linear(hidden_linear_width * 42, 7)    
+        )
+        self.relu = nn.ReLU()                                               # This is necessary for saving?
+
+    def forward(self, x):
+        x = self.head_stack(x)
+        for h in self.hidden_conv_layers:
+            x = self.relu(h(x) + x)
+        x = self.conv_to_linear(x)
+        for h in self.hidden_linear_layers:
+            x = self.relu(h(x) + x)
+        return self.tail(x)
     
+
+
+
+
+class C4NN(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.stack = nn.Sequential(
+            nn.Conv2d(2, 32, (5,5), padding='same'),
+            nn.LeakyReLU(),
+            nn.BatchNorm2d(32),
+            nn.Conv2d(32, 32, (3,3), padding='same'),
+            nn.LeakyReLU(),
+            nn.BatchNorm2d(32),
+            nn.Conv2d(32, 16, (3,3), padding='same'),
+            nn.LeakyReLU(),
+            nn.BatchNorm2d(16),
+            nn.Conv2d(16, 16, (3,3), padding='same'),
+            nn.LeakyReLU(),
+            nn.BatchNorm2d(16),
+            nn.Flatten(),
+            nn.Linear(16*7*6, 8*7*6),
+            nn.LeakyReLU(),
+            nn.BatchNorm1d(8*7*6),
+            nn.Linear(8*7*6, 4*7*6),
+            nn.LeakyReLU(),
+            nn.BatchNorm1d(4*7*6),
+            nn.Linear(4*7*6, 2*7*6),
+            nn.LeakyReLU(),
+            nn.BatchNorm1d(2*7*6),
+            nn.Linear(2*7*6, 7*6),
+            nn.LeakyReLU(),
+            nn.BatchNorm1d(7*6),
+            nn.Linear(7*6, 7*3),
+            nn.LeakyReLU(),
+            nn.BatchNorm1d(7*3),
+            nn.Linear(7*3, 7)
+        )
+
+    def forward(self, x):
+        return self.stack(x)

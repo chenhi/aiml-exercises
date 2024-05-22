@@ -1,4 +1,4 @@
-import zipfile, os, random, warnings, datetime, copy
+import zipfile, os, random, warnings, datetime, copy, pickle
 import torch
 from torch import nn
 from collections import namedtuple, deque
@@ -265,7 +265,7 @@ class DQN(DeepRL):
     # Handling multiplayer: each player keeps their own "record", separate from memory
     # When any entry in the record has source = target, then the player "banks" it in their memory
     # The next time an action is taken, if the source = target, then it gets overwritten
-    def deep_q(self, lr: float, dq_episodes: int, episode_length: int, ramp_start: int, ramp_end: int, greed_start: float, greed_end: float, training_delay: int, sim_batch: int, train_batch: int, copy_interval_eps=1, valid_filter=True, save_interval=100, save_path=None, verbose=False, graph_smoothing=10, initial_log=""):
+    def deep_q(self, lr: float, dq_episodes: int, episode_length: int, ramp_start: int, ramp_end: int, greed_start: float, greed_end: float, training_delay: int, sim_batch: int, train_batch: int, copy_interval_eps=1, valid_filter=True, save_interval=100, save_path=None, verbose=False, graph_smoothing=10, initial_log="", save_memory=False, load_memory = None):
 
         dq_episodes, episode_length, ramp_start, ramp_end, sim_batch, train_batch, copy_interval_eps, training_delay = int(dq_episodes), int(episode_length), int(ramp_start), int(ramp_end), int(sim_batch), int(train_batch), max(1, int(copy_interval_eps)), int(training_delay)
         expl_start, expl_end = 1. - greed_start, 1. - greed_end
@@ -277,6 +277,12 @@ class DQN(DeepRL):
 
         # Logging
         logtext = initial_log
+
+        if load_memory != None:
+            with open(load_memory, 'rb') as f:
+                self.memories = pickle.load(f)
+                logtext += log(f"Loaded replay memory from {load_memory}")
+
         if do_logging:
             logtext += log(f"Device: {self.device}", verbose)
             logtext += log(f"MDP:\n{self.mdp}", verbose)
@@ -286,6 +292,7 @@ class DQN(DeepRL):
             logtext += log(f"Zeroing out invalid moves" if valid_filter else f"Penalizing invalid moves")
             logtext += log(f"Learn rate: {lr}, episodes: {dq_episodes}, start and end exploration: [{expl_start}, {expl_end}], ramp: [{ramp_start}, {ramp_end}], training delay: {training_delay}, episode length: {episode_length}, batch size: {sim_batch}, training batch size: {train_batch}, copy frequency: {copy_interval_eps}, memory capacity: {self.memory_capacity}.", verbose)
             
+            
             episode_losses = [[] for i in range(self.mdp.num_players)]
             tests = []                                          # Format: tests[i][j] is the jth iteration of the ith test
             initial_test = self.mdp.tests(self.q.qs)
@@ -293,6 +300,7 @@ class DQN(DeepRL):
                 tests.append([initial_test[i]])
             start_time = datetime.datetime.now()
             logtext += log(f"Starting training at {start_time}\n", verbose)
+
                         
         # Initialize target network
         target_qs = [copy.deepcopy(self.q.qs[i]) for i in range(self.mdp.num_players)]
@@ -391,6 +399,11 @@ class DQN(DeepRL):
             self.q.save(save_path)
             logtext += log(f"Saved final model to {save_path}")
             
+            if save_memory:
+                with open(save_path + ".mem", 'wb') as f:
+                    pickle.dump(self.memories, f)
+                    logtext += log(f"Saved replay memory to {save_path}.mem")
+
             # Plot losses
             plt.figure(figsize=(12, 12))
             plt.subplot(1, 1, 1)
@@ -416,6 +429,7 @@ class DQN(DeepRL):
                 plotpath = save_path + f".test{j}.png"
                 plt.savefig(plotpath)
                 logtext += log(f"Saved test {j} plot to {plotpath}", verbose)
+
 
         if do_logging:
             logtext += log("Benchmarking against random.")
