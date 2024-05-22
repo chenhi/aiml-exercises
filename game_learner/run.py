@@ -53,7 +53,8 @@ def load_bots(qgame, saves) -> str:
         try:
             index = int(res[0])
             if index >= 0 and index < len(saves):
-                qgame.q.load(base_path + f'{shortname}/bots/' + saves[index])
+                print(base_path + f'{shortname}/bots/dqn/' + saves[index])
+                qgame.q.load(base_path + f'{shortname}/bots/dqn/' + saves[index])
                 logtext += log(f"Loaded {saves[index]} for all players.")
             else:
                 raise Exception
@@ -68,7 +69,7 @@ def load_bots(qgame, saves) -> str:
                 if index < 0 or index >= len(saves):
                     logtext += log(f"{i} is not a bot on the list.  Loading RANDOMBOT as player {i}.")
                 else:
-                    game.q.load(base_path + f'{shortname}/bots/' + saves[index], [i])
+                    game.q.load(base_path + f'{shortname}/bots/dqn/' + saves[index], [i])
             except:
                 logtext += log(f"Didn't understand {s}.  Loading RANDOMBOT as player {i}.")
         if len(res) > game.mdp.num_players:
@@ -295,7 +296,7 @@ if mode == "tournament":
 
     for match in matches:
         for i in range(n):
-            game.load(base_path + f'{shortname}/bots/' + saves[match[i]], [i])
+            game.load(base_path + f'{shortname}/bots/dqn/' + saves[match[i]], [i])
         r = game.simulate()
         logtext += log(f"Result of match {match}: {r[0].int().tolist()}")
         for i in range(n):
@@ -361,7 +362,7 @@ if mode == "benchmark":
         logtext = ""
         logtext += log(f"Simulating {name} against RANDOMBOT for {sims} simulations.")
         for i in range(1, len(save_files)):
-            game.load(base_path + f'{shortname}/bots/' + save_files[i])
+            game.load(base_path + f'{shortname}/bots/dqn/' + save_files[i])
             result = game.simulate_against_random(sims, replay_loss=False, verbose=False)
             logtext += log(f"")
             for j in range(len(result)):
