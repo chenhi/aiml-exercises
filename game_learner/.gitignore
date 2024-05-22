@@ -7,14 +7,14 @@ old/*
 ttt/bots/*
 !ttt/bots/dqn
 ttt/bots/dqn/*
-!ttt/bots/dqn/20240330180235_standard_defaults6_penalty1.dttt.pt
+!ttt/bots/dqn/20240330180235_standard_defaults6_penalty1.ttt.pt
 !ttt/bots/mcts
 ttt/bots/mcts/*
 
 c4/bots/*
 !c4/bots/dqn
 c4/bots/dqn/*
-!c4/bots/dqn/20240329000901_continue_mll.dc4.pt
+!c4/bots/dqn/20240329000901_continue_mll.c4.pt
 !c4/bots/mcts
 c4/bots/mcts/*
 
