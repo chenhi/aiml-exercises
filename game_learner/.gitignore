@@ -1,11 +1,9 @@
 __pycache__
-bots/*
 logs/*
 writeups/*
 old/*
 
 
-!ttt/bots/
 ttt/bots/*
 !ttt/bots/dqn
 ttt/bots/dqn/*
@@ -13,8 +11,6 @@ ttt/bots/dqn/*
 !ttt/bots/mcts
 ttt/bots/mcts/*
 
-
-!c4/bots/
 c4/bots/*
 !c4/bots/dqn
 c4/bots/dqn/*
@@ -22,7 +18,6 @@ c4/bots/dqn/*
 !c4/bots/mcts
 c4/bots/mcts/*
 
-!nothanks/bots/
 nothanks/bots/*
 !nothanks/bots/dqn
 nothanks/bots/dqn/*
