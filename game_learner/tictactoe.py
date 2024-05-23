@@ -329,6 +329,8 @@ class TTTResNN(nn.Module):
         self.relu = nn.ReLU()                                               # This is necessary for saving?
 
     def forward(self, x):
+        if x.shape[0] == 0:
+            return torch.zeros((0, 3, 3))
         x = self.head_stack(x)
         for h in self.hidden_layers:
             x = self.relu(h(x) + x)
