@@ -176,7 +176,8 @@ class TensorMDP(MDP):
         return self.get_random_action_weighted(self.valid_action_filter(state).float())
     
     # Chooses a action from the indices with maximum value (uniformly at random if more than one)
-    def get_max_action(self, values) -> torch.Tensor:         # TODO what if all values are 0
+    # If tensor is zero, returns a random action
+    def get_max_action(self, values) -> torch.Tensor:
         return self.get_random_action_weighted(values == values.flatten(1,-1).max(1).values.reshape((-1,) + self.action_projshape).float())
         
     # Input action shape, return an action with probability weighted by the entries

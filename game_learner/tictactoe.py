@@ -330,7 +330,7 @@ class TTTResNN(nn.Module):
 
     def forward(self, x):
         if x.shape[0] == 0:
-            return torch.zeros((0, 3, 3))
+            return torch.zeros((0, 3, 3), device="mps")         # Will only work on MPS
         x = self.head_stack(x)
         for h in self.hidden_layers:
             x = self.relu(h(x) + x)
