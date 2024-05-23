@@ -155,7 +155,7 @@ class NNQMultiFunction(PrototypeQFunction):
         output = torch.zeros((state.size(0), ) + self.mdp.action_shape, device=self.device)
         for p in range(self.mdp.num_players):
             indices = torch.arange(state.size(0), device=self.device)[players.flatten() == p]
-            output[indices] = self.qs[p].policy(state, valid_filter)
+            output[indices] = self.qs[p].policy(state[indices], valid_filter)
         return output
     
     def save(self, fname):
@@ -182,13 +182,6 @@ class NNQMultiFunction(PrototypeQFunction):
             if indices == None or i in indices:
                 self.qs[i].lobotomize()
 
-
-
-
-# Input shape (batch_size, ) + state_tensor
-# We implement a random tensor of 0's and 1's generating a random tensor of floats in [0, 1), then converting it to a bool, then back to a float.
-def greedy_tensor(q: NNQFunction, state, eps = 0., valid_filter=True):
-    return q.mdp.get_random_action(state) if random.random() < eps else q.policy(state, valid_filter=valid_filter)
 
 
 # For now, for simplicity, fix a single strategy
@@ -327,16 +320,12 @@ class DQN(DeepRL):
             for k in range(episode_length):
 
                 # Execute the transition on the "actual" state
-                # To do this, we need to iterate over players, because each has a different q function for determining the strategy
-                p = self.mdp.get_player(s)
-
-                # Get the actions using each player's policy #TODO can make this more efficient
+                
+                # Get the actions using each player's policy using epsilon-greed
                 a = torch.zeros((sim_batch, ) + self.mdp.action_shape, device=self.device)
-                for pi in range(self.mdp.num_players):
-                    # Get the indices corresponding to this player's turn
-                    indices = torch.arange(sim_batch, device=self.device)[p.flatten() == pi]
-                    a[indices] = greedy_tensor(self.q.qs[pi], s[indices], expl_cur, valid_filter=valid_filter)
-
+                random_numbers = torch.rand(s.size(0))
+                a[random_numbers < expl_cur] = self.mdp.get_random_action(s[random_numbers < expl_cur])
+                a[random_numbers >= expl_cur] = self.q.policy(s[random_numbers >= expl_cur], valid_filter=valid_filter)
 
                 # Do the transition 
                 t, r = self.mdp.transition(s, a)
