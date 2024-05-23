@@ -1,4 +1,4 @@
-import zipfile, os, random, warnings, datetime, copy, pickle
+import zipfile, random, warnings, datetime, copy, pickle, tempfile
 import torch
 from torch import nn
 from collections import namedtuple, deque
@@ -159,22 +159,22 @@ class NNQMultiFunction(PrototypeQFunction):
         return output
     
     def save(self, fname):
-        zf = zipfile.ZipFile(fname, mode="w")
-        for i in range(self.mdp.num_players):
-            model_scripted = torch.jit.script(self.qs[i].q)
-            model_scripted.save(f"temp/player.{i}")
-            zf.write(f"temp/player.{i}", f"player.{i}", compress_type=zipfile.ZIP_STORED)
-            os.remove(f"temp/player.{i}")
-        zf.close()        
+        with zipfile.ZipFile(fname, mode="w") as zf:
+            for i in range(self.mdp.num_players):
+                model_scripted = torch.jit.script(self.qs[i].q)
+                with tempfile.NamedTemporaryFile() as tmp:
+                    model_scripted.save(tmp.name)
+                    zf.write(tmp.name, f"player.{i}", compress_type=zipfile.ZIP_STORED)
+      
 
     def load(self, fname, indices=None):
-        zf = zipfile.ZipFile(fname, mode="r")
-        for i in range(self.mdp.num_players):
-            if indices == None or i in indices:
-                zf.extract(f"player.{i}", "temp/")
-                self.qs[i].q = torch.jit.load(f"temp/player.{i}", map_location=torch.device(self.device))
-                os.remove(f"temp/player.{i}")
-        zf.close()
+        with zipfile.ZipFile(fname, mode="r") as zf:
+            for i in range(self.mdp.num_players):
+                if indices == None or i in indices:
+                    with tempfile.TemporaryDirectory() as tmpdir:
+                        load_file = zf.extract(f"player.{i}",  tmpdir)
+                        self.qs[i].q = torch.jit.load(load_file, map_location=torch.device(self.device))
+
 
 
     def null(self, indices = None):

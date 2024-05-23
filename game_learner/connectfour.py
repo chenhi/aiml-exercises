@@ -291,7 +291,7 @@ class C4ResNN(nn.Module):
         self.relu = nn.ReLU()                                               # This is necessary for saving?
 
     def forward(self, x):
-        if x.shape[0] == 0:
+        if x.shape[0] == 0:                                             # For avoiding a bug when running on MPS
             return torch.zeros((0, 7), device=x.device)
         x = self.head_stack(x)
         for h in self.hidden_conv_layers:
