@@ -43,7 +43,7 @@ class C4MDP(TensorMDP):
         
         self.height, self.width, self.win_condition = height, width, win_condition
         self.area = self.height * self.width
-        super().__init__(state_shape=(2,self.height,self.width), action_shape=(self.width,), discount=1, num_players=2, batched=True, default_memory = 1000000, default_hyperparameters=hyperpar, \
+        super().__init__(state_shape=(2,self.height,self.width), action_shape=(self.width,), discount=.95, num_players=2, batched=True, default_memory = 1000000, default_hyperparameters=hyperpar, \
                          symb = {0: "O", 1: "X", None: "-"}, input_str = f"Input column to play (1-{self.width}). ", penalty=-2, device=device)
         
         # Generate kernels for detecting winner
@@ -258,7 +258,7 @@ class C4ResNN(nn.Module):
         hlays = []
         for i in range(num_hidden_conv - 1):
             lay = nn.Sequential(nn.Conv2d(hidden_conv_layers, hidden_conv_layers, (5,5), padding='same'))
-            for j in range(hidden_conv_depth):
+            for j in range(hidden_conv_depth - 1):
                 lay.append(nn.BatchNorm2d(hidden_conv_layers))
                 lay.append(nn.ReLU())
                 lay.append(nn.Conv2d(hidden_conv_layers, hidden_conv_layers, (5,5), padding='same'))

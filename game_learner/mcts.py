@@ -225,82 +225,6 @@ class DMCTS(DeepRL):
             p_vector[i] = p_vector[i] / p_vector[i].flatten().sum()
         return p_vector
     
-    
-    
-    def old_search(self, state, num: int, ucb_parameter, temperature=1.0, max_depth=1000):
-        
-        # Do a certain number of searches from the initial state
-        for i in range(num):
-            history = []
-            s = state
-            depth = 0
-
-            # Go down tree, using upper confidence bound and dictionary q values to play
-            while self.mdp.state_to_hashable(s) in self.q.q and self.mdp.is_terminal(s).item() == False:
-                if depth >= max_depth:
-                    print("Max depth researched in selection.  Something might have gone wrong.")
-                    valid_actions = self.mdp.valid_action_filter(s)
-                    num_valid = valid_actions.sum()
-                    print(f"Valid: {valid_actions}")
-                    print(f"Get: {self.q.ucb_get(s, ucb_parameter * num_valid)}")
-                    input()
-                    break
-
-                # Q has values [-1, 1] generally, so do a shift
-                valid_actions = self.mdp.valid_action_filter(s)
-                num_valid = valid_actions.sum()
-                # Scale the parameter by the number of valid actions
-                action = self.mdp.get_max_action((1 + self.q.ucb_get(s, ucb_parameter * num_valid)) * valid_actions)
-                history.append((s, action))
-                s, r = self.mdp.transition(s, action)
-                depth += 1
-                
-            # Once we reach a leaf, use the heuristic function p to simulate play
-            # TODO this cna be parallelized, i.e. the evaluaiton
-            if self.mdp.is_terminal(s).item() == False:
-                self.q.q[self.mdp.state_to_hashable(s)] = torch.zeros(self.mdp.action_shape, device=self.device)
-                self.q.n[self.mdp.state_to_hashable(s)] = torch.zeros(self.mdp.action_shape, device=self.device)
-                self.q.n_tot[self.mdp.state_to_hashable(s)] = 0
-                self.q.w[self.mdp.state_to_hashable(s)] = torch.zeros(self.mdp.action_shape, device=self.device)
-
-                # Placeholder prior probability given by neural network, do in batches TODO implement
-                # evaluation_queue.append(s)
-                # if len(evaluation_queue) >= evaluation_batch_size:
-                #     heuristic_prob = heuristic(torch.cat(evaluation_queue, dim=0))
-                #     for i in range(heuristic_prob.size(0)):
-                #         self.p[self.mdp.state_to_hashable(evaluation_queue[i])] = heuristic_prob[i:i+1]
-
-                # Sigmoid so that the values are in (0, 1)
-                # These prior probabilities are only assigned once; eventually, with enough visits the quality function will dominate the heuristic
-                self.q.p[self.mdp.state_to_hashable(s)] = self.mdp.masked_softmax(self.q.h(s), s)
-
-            while self.mdp.is_terminal(s).item() == False:
-                if depth >= max_depth:
-                    print("Max depth researched in expansion.  Something may have gone wrong.")
-                    print(f"Board: {self.mdp.board_str(s)[0]}")
-                    print(f"Heuristic: {self.q.h(s)}")
-                    print(f"Probabilities: {torch.exp(self.q.h(s) + self.mdp.neginf_kill_actions(s))}")
-                    break
-                # Exponential means un-normalized softmax
-                action = self.mdp.get_random_action_weighted(self.mdp.masked_softmax(self.q.h(s), s))
-                # We don't keep the simulation nodes in history for memory reasons
-                s, r = self.mdp.transition(s, action)
-                depth += 1
-            
-            while len(history) > 0:
-                s, action = history.pop()
-                if self.mdp.state_to_hashable(s) in self.q.p:
-                    self.q.n[self.mdp.state_to_hashable(s)] += action[0]
-                    self.q.n_tot[self.mdp.state_to_hashable(s)] += action[0].sum().item()
-                    self.q.w[self.mdp.state_to_hashable(s)] += action[0] * r[0, self.mdp.get_player(s).flatten(1, -1)[0]]
-                    self.q.q[self.mdp.state_to_hashable(s)] = self.q.w[self.mdp.state_to_hashable(s)] / self.q.n[self.mdp.state_to_hashable(s)]
-
-        # Return probability vector for initial state (even if it isn't updated)
-        p_vector = self.q.n[self.mdp.state_to_hashable(state)] ** (1 / temperature)
-        return (p_vector / p_vector.flatten().sum())[None]
-                
-
-
 
     def mcts(self, lr: float, num_iterations: int, num_selfplay: int, num_searches: int, max_steps: int, ucb_parameter: float, temperature: float, train_batch: int, train_iterations = 1, save_path=None, verbose=True, initial_log=""):        
         logtext = initial_log
@@ -402,9 +326,3 @@ class DMCTS(DeepRL):
             with open(logpath, "w") as f:
                 logtext += log(f"Saved logs to {logpath}", verbose)
                 f.write(logtext)
-
-
-
-                
-
-            

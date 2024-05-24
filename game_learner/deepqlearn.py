@@ -1,4 +1,4 @@
-import zipfile, random, warnings, datetime, copy, pickle, tempfile
+import zipfile, random, datetime, copy, pickle, tempfile
 import torch
 from torch import nn
 from collections import namedtuple, deque
@@ -211,9 +211,9 @@ class DQN(DeepRL):
     # Adds the rewards
     # Returns a tuple: (composition, to_memory)
     def compose_transition_tensor(self, first: TransitionData, second: TransitionData, player_index: int):
-        if torch.prod((first.t == second.s) == 0).item():
-            # Make this error non-fatal but make a note
-            warnings.warn("The source and target states do not match.")
+        # Uncomment this to debug
+        #if torch.prod((first.t == second.s) == 0).item():
+        #    print("The source and target states do not match.")
 
         # Two cases: say (s,a,r,t) compose (s',a',r',t')
         # If player(t) = player_index or t is terminal, then (s',a',r',t'), i.e. replace because loop completed last turn, has been commited to memory

@@ -9,9 +9,6 @@ from deepqlearn import *
 from rlbase import log
 
 
-# Alter for colab
-base_path = ""
-# base_path = "/content/gdrive/My Drive/colab/"
 
 open_str = '\nCommand-line options: python play.py <game> <play/train/simulate/benchmark/tournament>\n\
     If play (default), play against a model, against other humans, or watch bots play each other.\n\
@@ -28,19 +25,17 @@ device = (
     else "cpu"
 )
 
+# No arguments received; explain to possible new user
 if len(sys.argv) == 1:
     print(open_str)
 
-# Auxillary function used to handle the fact that for MDPs we tend to get back scalars or arrays, and for TensorMDPs we tend to get back batched tensors with batch size 1
-def item(obj, mdp: MDP, is_list=False):
-    if mdp.batched:
-        if is_list:
-            return obj[0]
-        elif torch.numel(obj) == 1:
-            return obj[0].item()
-        else:
-            return obj[0].tolist()
-    return obj
+# Default mode is play; rewrite if an argument is given
+mode = "play"
+if len(sys.argv) > 2:
+    mode = sys.argv[2]
+
+
+#==================== FUNCTIONS ====================#
 
 def load_bots(qgame, saves) -> str:
     logtext = ""
@@ -53,8 +48,8 @@ def load_bots(qgame, saves) -> str:
         try:
             index = int(res[0])
             if index >= 0 and index < len(saves):
-                print(base_path + f'{shortname}/bots/dqn/' + saves[index])
-                qgame.q.load(base_path + f'{shortname}/bots/dqn/' + saves[index])
+                print(f'{shortname}/bots/dqn/' + saves[index])
+                qgame.q.load(f'{shortname}/bots/dqn/' + saves[index])
                 logtext += log(f"Loaded {saves[index]} for all players.")
             else:
                 raise Exception
@@ -62,16 +57,16 @@ def load_bots(qgame, saves) -> str:
             qgame.q.null()
             logtext += log("Loaded RANDOMBOT for all players.")
     else:
-        qgame.null()
+        qgame.q.null()
         for i in range(min(len(res), game.mdp.num_players)):
             try:
                 index = int(res[i])
                 if index < 0 or index >= len(saves):
                     logtext += log(f"{i} is not a bot on the list.  Loading RANDOMBOT as player {i}.")
                 else:
-                    game.q.load(base_path + f'{shortname}/bots/dqn/' + saves[index], [i])
+                    game.q.load(f'{shortname}/bots/dqn/' + saves[index], [i])
             except:
-                logtext += log(f"Didn't understand {s}.  Loading RANDOMBOT as player {i}.")
+                logtext += log(f"Didn't understand {res[i]}.  Loading RANDOMBOT as player {i}.")
         if len(res) > game.mdp.num_players:
             logtext += log(f"Extra bots in the list in excess of number of players ignored.")
         elif len(res) < game.mdp.num_players:
@@ -79,13 +74,6 @@ def load_bots(qgame, saves) -> str:
 
     return logtext
 
-
-#==================== GAMEMODE LOGIC ====================#
-
-mode = "play"
-
-if len(sys.argv) > 2:
-    mode = sys.argv[2]
 
 #==================== GAME DEFINITION AND SELECTION ====================#
 
@@ -153,7 +141,7 @@ print(f"\nPlaying {name}.\n")
 #==================== LOAD SAVES ====================#
 
 
-save_files = [each for each in os.listdir(base_path + f'{shortname}/bots/dqn/') if each.endswith(file_ext)]
+save_files = [each for each in os.listdir(f'{shortname}/bots/dqn/') if each.endswith(file_ext)]
 save_files.sort()
 
 
@@ -194,7 +182,7 @@ if mode == "train":
 
     res = input("Name of file (alphanumeric only, max length 64, w/o extension): ")
     fname_end = f"{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}_" + re.sub(r'\W+', '', res)[0:64] + f"{file_ext}"
-    fname = base_path + f'{shortname}/bots/dqn/' + fname_end
+    fname = f'{shortname}/bots/dqn/' + fname_end
 
     print(f"Will save model to {fname}\n")
 
@@ -211,7 +199,7 @@ if mode == "train":
 
     res = input("Load existing model (y/n)? ")
     if res.lower() == 'y':
-        game = DQN(mdp, nn.Module, torch.nn.HuberLoss(), torch.optim.Adam, memory, device=device)
+        game = DQN(mdp, torch.nn.Module, torch.nn.HuberLoss(), torch.optim.Adam, memory, device=device)
         logtext += load_bots(game, save_files)
     else:
         print("No model pre-loaded.")
@@ -296,7 +284,7 @@ if mode == "tournament":
 
     for match in matches:
         for i in range(n):
-            game.load(base_path + f'{shortname}/bots/dqn/' + saves[match[i]], [i])
+            game.load(f'{shortname}/bots/dqn/' + saves[match[i]], [i])
         r = game.simulate()
         logtext += log(f"Result of match {match}: {r[0].int().tolist()}")
         for i in range(n):
@@ -330,7 +318,7 @@ if mode == "tournament":
     for i in range(k):
         logtext += log(f"{saves[by_score[i]]}: {records[by_score[i]]}")
 
-    with open(base_path + f"logs/tournament.{shortname}.{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.log", "w") as f:
+    with open(f"logs/tournament.{shortname}.{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.log", "w") as f:
         f.write(logtext)
     
     exit()
@@ -362,13 +350,13 @@ if mode == "benchmark":
         logtext = ""
         logtext += log(f"Simulating {name} against RANDOMBOT for {sims} simulations.")
         for i in range(1, len(save_files)):
-            game.load(base_path + f'{shortname}/bots/dqn/' + save_files[i])
+            game.load(f'{shortname}/bots/dqn/' + save_files[i])
             result = game.simulate_against_random(sims, replay_loss=False, verbose=False)
             logtext += log(f"")
             for j in range(len(result)):
                 logtext += log(f"Bot {save_files[i]} as player {j}: {result[j][0]} wins, {result[j][1]} losses, {result[j][2]} ties, {result[j][3]} invalid moves, {result[j][4]} unknown results.")
 
-        with open(base_path + f"logs/benchmark.{shortname}.{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.log", "w") as f:
+        with open(f"logs/benchmark.{shortname}.{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.log", "w") as f:
             f.write(logtext)
 
     exit()

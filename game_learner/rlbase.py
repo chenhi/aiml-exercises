@@ -129,7 +129,7 @@ class MDP():
 
 
 class TensorMDP(MDP):
-    def __init__(self, state_shape, action_shape, default_memory: int, discount=1., num_players=1, penalty = -2, num_simulations=1000, default_hyperparameters={}, symb = {}, nn_args={}, input_str = "", batched=False, device="cpu"):
+    def __init__(self, state_shape, action_shape, default_memory: int, discount=1., num_players=1, penalty = -1, num_simulations=1000, default_hyperparameters={}, symb = {}, nn_args={}, input_str = "", batched=False, device="cpu"):
         
         super().__init__(None, None, discount, num_players, penalty, symb, input_str, default_hyperparameters, batched)
         self.nn_args = nn_args
