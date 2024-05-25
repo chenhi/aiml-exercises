@@ -165,7 +165,8 @@ class DMCTS(DeepRL):
             in_index, out_index = self.in_dict_indices(s, self.q.n)
             new_leaves = s[out_index]
             self.q.h.eval()
-            ps = self.mdp.masked_softmax(self.q.h(new_leaves), new_leaves)
+            with torch.no_grad():
+                ps = self.mdp.masked_softmax(self.q.h(new_leaves), new_leaves)
             for i in range(new_leaves.size(0)):
                 # Note: device on CPU to save GPU memory, need to convert later
                 self.q.n[self.mdp.state_to_hashable(new_leaves[i])] = torch.zeros(self.mdp.action_shape, device=self.q.dict_device)
