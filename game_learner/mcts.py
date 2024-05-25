@@ -236,14 +236,20 @@ class DMCTS(DeepRL):
         logtext = initial_log
         start_time = datetime.datetime.now()
         logtext += log(f"Started logging.")
-        logtext += log(f"Learn rate: {lr}\nWeight decay: {wd}\nNumber of iterations: {num_iterations}\nNumber of self-plays per iteration: {num_selfplay}\nNumber of Monte-Carlo searches per play: {num_searches}\nUpper confidence bound parameter: {ucb_parameter}\nTemperature: {temperature}\nTraining batch size: {train_batch}\nMemory size: {memory_size}")
+        logtext += log(f"Device: {self.device}", verbose)
+        logtext += log(f"MDP:\n{self.mdp}", verbose)
+        logtext += log(f"Model:\n{self.q.h}", verbose)
+        logtext += log(f"Loss function:\n{self.loss_fn}", verbose)
+        logtext += log(f"Optimizer:\n{self.optimizer}", verbose)
+        logtext += log(f"Learn rate: {lr}\nWeight decay: {wd}\nNumber of iterations: {num_iterations}\nNumber of self-plays per iteration: {num_selfplay}\nNumber of Monte-Carlo searches per play: {num_searches}\nUpper confidence bound parameter: {ucb_parameter}\nTemperature: {temperature}\nTraining batch size: {train_batch}\nMemory size: {memory_size}", verbose)
 
         # Initialize memory and records
         memory_inputs = torch.zeros((0,) + self.mdp.state_shape, device=self.device)
-        memory_values = torch.zeros((0,) + self.mdp.action_shape)
+        memory_values = torch.zeros((0,) + self.mdp.action_shape, device=self.device)
         opt = self.optimizer(self.q.h.parameters(), lr=lr,  weight_decay=wd)
         losses = []
 
+        logtext += log("\n", verbose)
 
         # In each iteration, we simulate a certain number of self-plays; we train at each step
         for i in range(num_iterations):
@@ -264,7 +270,7 @@ class DMCTS(DeepRL):
                 memory_inputs = torch.cat([memory_inputs[-memory_size + s.size(0):], s], dim=0)
                 memory_values = torch.cat([memory_values[-memory_size + p_vector.size(0):], p_vector], dim=0)
 
-                indices = torch.randint(memory_inputs.size(0), (train_batch,))
+                indices = torch.randint(memory_inputs.size(0), (train_batch,), device=self.device)
                 x = memory_inputs[indices]
                 y = memory_values[indices]
                 self.q.h.train()
