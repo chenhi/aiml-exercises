@@ -104,7 +104,7 @@ class MCTSQFunction(PrototypeQFunction):
 class DMCTS(DeepRL):
 
     def __init__(self, mdp: TensorMDP, model: nn.Module, loss_fn, optimizer, model_args = {}, device="cpu"):
-        super().__init__(mdp, MCTSQFunction(mdp, model, model_args, device), device)
+        super().__init__(mdp, MCTSQFunction(mdp, model, model_args, device=device, dict_device=device), device)
         self.loss_fn = loss_fn
         self.optimizer = optimizer
 
@@ -165,7 +165,7 @@ class DMCTS(DeepRL):
             in_index, out_index = self.in_dict_indices(s, self.q.n)
             new_leaves = s[out_index]
             self.q.h.eval()
-            with torch.no_grad():
+            with torch.no_grad():           # Fixes memory leak (because ps gets stored later)
                 ps = self.mdp.masked_softmax(self.q.h(new_leaves), new_leaves)
             for i in range(new_leaves.size(0)):
                 # Note: device on CPU to save GPU memory, need to convert later
@@ -183,7 +183,8 @@ class DMCTS(DeepRL):
             for i in range(action.size(0)):
                 self.q.n[self.mdp.state_to_hashable(s[i])] += action[i].to(device=self.q.dict_device)
 
-            leaf_action = self.mdp.get_random_action_weighted(self.mdp.masked_softmax(self.q.h(leaf_s), leaf_s))
+            with torch.no_grad():
+                leaf_action = self.mdp.get_random_action_weighted(self.mdp.masked_softmax(self.q.h(leaf_s), leaf_s))
             
             # We don't keep the simulation nodes in history for memory reasons, but do keep the first leaf encountered
             history_state = torch.cat([history_state, s])
@@ -237,7 +238,7 @@ class DMCTS(DeepRL):
         return p_vector
     
 
-    def mcts(self, lr: float, wd: float, num_iterations: int, num_selfplay: int, num_searches: int, max_steps: int, ucb_parameter: float, temperature: float, train_batch: int, train_times: int, memory_size = 500000, save_path=None, verbose=True, initial_log=""):        
+    def mcts(self, lr: float, wd: float, num_iterations: int, num_selfplay: int, num_searches: int, max_steps: int, ucb_parameter: float, temperature: float, train_batch: int, train_times = 1, memory_size = 500000, save_path=None, verbose=True, initial_log=""):        
         
         # Initialize logging
         logtext = initial_log
