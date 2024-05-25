@@ -7,8 +7,9 @@ from rlbase import log, smoothing, PrototypeQFunction, DeepRL, TensorMDP
 
 
 class MCTSQFunction(PrototypeQFunction):
-    def __init__(self, mdp: TensorMDP, heuristic_model: nn.Module, model_args={}, device="cpu"):
+    def __init__(self, mdp: TensorMDP, heuristic_model: nn.Module, model_args={}, device="cpu", dict_device="cpu"):
         self.device = device
+        self.dict_device = dict_device
         self.mdp = mdp
         if heuristic_model != None:
             self.h = heuristic_model(**model_args, **self.mdp.nn_args).to(self.device)
@@ -40,10 +41,10 @@ class MCTSQFunction(PrototypeQFunction):
         for i in range(state.size(0)):
             statehash = self.mdp.state_to_hashable(state[i])
             if statehash in self.n:
-                n[i] = self.n[statehash]
-                q[i] = self.w[statehash] / n[i]
+                n[i] = self.n[statehash].to(self.device)
+                q[i] = self.w[statehash].to(self.device) / n[i]
                 if get_p:
-                    p[i] = self.p[statehash]
+                    p[i] = self.p[statehash].to(self.device)
         n_tot = n.flatten(1, -1).sum(dim=1).reshape((state.size(0),) + self.mdp.action_projshape)
         if get_p:
             return q.nan_to_num(0), torch.sqrt(1 + n_tot) / (1 + n), p
@@ -166,9 +167,10 @@ class DMCTS(DeepRL):
             self.q.h.eval()
             ps = self.mdp.masked_softmax(self.q.h(new_leaves), new_leaves)
             for i in range(new_leaves.size(0)):
-                self.q.n[self.mdp.state_to_hashable(new_leaves[i])] = torch.zeros(self.mdp.action_shape, device=self.device)
-                self.q.w[self.mdp.state_to_hashable(new_leaves[i])] = torch.zeros(self.mdp.action_shape, device=self.device)
-                self.q.p[self.mdp.state_to_hashable(new_leaves[i])] = ps[i][None]
+                # Note: device on CPU to save GPU memory, need to convert later
+                self.q.n[self.mdp.state_to_hashable(new_leaves[i])] = torch.zeros(self.mdp.action_shape, device=self.q.dict_device)
+                self.q.w[self.mdp.state_to_hashable(new_leaves[i])] = torch.zeros(self.mdp.action_shape, device=self.q.dict_device)
+                self.q.p[self.mdp.state_to_hashable(new_leaves[i])] = ps[i][None].to(device=self.q.dict_device)
 
             # Get actions for explored and unexplored states, and add to history, update counter
             valid_actions = self.mdp.valid_action_filter(s)
@@ -178,7 +180,7 @@ class DMCTS(DeepRL):
             #action = self.mdp.get_max_action((1 + self.q.ucb_get(s, ucb_parameter * num_valid)) * valid_actions)
             action = self.mdp.get_random_action_weighted((1 + self.q.ucb_get(s, ucb_parameter * num_valid)) * valid_actions)
             for i in range(action.size(0)):
-                self.q.n[self.mdp.state_to_hashable(s[i])] += action[i]
+                self.q.n[self.mdp.state_to_hashable(s[i])] += action[i].to(device=self.q.dict_device)
 
             leaf_action = self.mdp.get_random_action_weighted(self.mdp.masked_softmax(self.q.h(leaf_s), leaf_s))
             
@@ -210,7 +212,7 @@ class DMCTS(DeepRL):
                 update_result = results[i]
                 update_player = self.mdp.get_player(update_state).flatten(1, -1)
                 for j in range(update_state.size(0)):
-                    self.q.w[self.mdp.state_to_hashable(update_state[j])] += update_action[j] * update_result[update_player[j]]
+                    self.q.w[self.mdp.state_to_hashable(update_state[j])] += (update_action[j] * update_result[update_player[j]]).to(device=self.q.dict_device)
 
             # Remove terminal states and indices
             index_tracker = index_tracker[~self.mdp.is_terminal(s).flatten()]
@@ -222,15 +224,19 @@ class DMCTS(DeepRL):
             # Increase depth
             depth += 1
 
+            # Clean up memory (from the dictionary gets)
+            if self.device == "cuda":
+                torch.cuda.empty_cache()
+
         # Return probability vector for initial state
         p_vector = torch.zeros((state.size(0), ) + self.mdp.action_shape, device=self.device).float()
         for i in range(state.size(0)):
-            p_vector[i] = self.q.n[self.mdp.state_to_hashable(state[i])] ** (1 / temperature)
+            p_vector[i] = self.q.n[self.mdp.state_to_hashable(state[i])].to(self.device) ** (1 / temperature)
             p_vector[i] = p_vector[i] / p_vector[i].flatten().sum()
         return p_vector
     
 
-    def mcts(self, lr: float, wd: float, num_iterations: int, num_selfplay: int, num_searches: int, max_steps: int, ucb_parameter: float, temperature: float, train_batch: int, memory_size = 500000, save_path=None, verbose=True, initial_log=""):        
+    def mcts(self, lr: float, wd: float, num_iterations: int, num_selfplay: int, num_searches: int, max_steps: int, ucb_parameter: float, temperature: float, train_batch: int, train_times: int, memory_size = 500000, save_path=None, verbose=True, initial_log=""):        
         
         # Initialize logging
         logtext = initial_log
@@ -266,23 +272,9 @@ class DMCTS(DeepRL):
                 # Do searches
                 p_vector = self.search(s, ucb_parameter=ucb_parameter, num=num_searches, temperature=temperature)
 
-                # Train
+                # Add to record
                 memory_inputs = torch.cat([memory_inputs[-memory_size + s.size(0):], s], dim=0)
                 memory_values = torch.cat([memory_values[-memory_size + p_vector.size(0):], p_vector], dim=0)
-
-                indices = torch.randint(memory_inputs.size(0), (train_batch,), device=self.device)
-                x = memory_inputs[indices]
-                y = memory_values[indices]
-                self.q.h.train()
-                pred = self.q.h(x)
-
-                loss = self.loss_fn(pred.flatten(1, -1), y.flatten(1, -1))
-                loss.backward()
-                opt.step()
-                opt.zero_grad()
-
-                total_loss += loss.item()
-                num_train += 1
 
                 # Select actions and do all the transitions
                 a = self.mdp.get_random_action_weighted(p_vector)
@@ -293,8 +285,35 @@ class DMCTS(DeepRL):
                 # If there are no more states, end the iteration
                 if s.size(0) == 0:
                     break
+
+                # Clean up memory
+                # if self.device == "cuda":
+                #     del p_vector
+                #     torch.cuda.empty_cache()
+
+                # Train
+                for j in range(train_times):
+                    indices = torch.randint(memory_inputs.size(0), (train_batch,), device=self.device)
+                    x = memory_inputs[indices]
+                    y = memory_values[indices]
+                    self.q.h.train()
+                    pred = self.q.h(x)
+
+                    loss = self.loss_fn(pred.flatten(1, -1), y.flatten(1, -1))
+                    loss.backward()
+                    opt.step()
+                    opt.zero_grad()
+
+                    total_loss += loss.item()
+                    num_train += 1
+
+                
+                # Clean up memory
+                # if self.device == "cuda":
+                #     torch.cuda.empty_cache()
             
             losses.append(total_loss / num_train)
+            logtext += log(f"Input/value memory sizes: {memory_inputs.size(0)}/{memory_values.size(0)}", verbose)
             logtext += log(f"Loss: {total_loss/num_train} on {num_train} batches of size {min(len(indices), train_batch)}.", verbose)
 
         if save_path != None:
