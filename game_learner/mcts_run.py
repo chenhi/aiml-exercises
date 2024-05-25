@@ -3,6 +3,7 @@ import os, datetime, re, sys, torch
 from connectfour import C4MDP, C4NN, C4ResNN
 from tictactoe import TTTMDP, TTTNN, TTTResNN, TTTCatNN
 from nothanks import NoThanksMDP, NoThanksNN
+from mcts import DMCTS
 
 from qlearn import *
 from deepqlearn import *
@@ -44,19 +45,18 @@ def load_bots(qgame, saves) -> str:
     for i in range(len(saves)):
         savestr += f"[{i}] {saves[i]}\n"
     res = input(f"\nThere are some saved bots:\n{savestr}\n\nEnter a number, a comma-separated list of numbers of length {qgame.mdp.num_players}, or empty for a bot that plays randomly: ").split(',')
-
     if len(res) == 1:
         try:
             index = int(res[0])
             if index >= 0 and index < len(saves):
-                print(f'{shortname}/bots/dqn/' + saves[index])
-                qgame.q.load(f'{shortname}/bots/dqn/' + saves[index])
+                print(f'{shortname}/bots/mcts/' + saves[index])
+                qgame.q.load(f'{shortname}/bots/mcts/' + saves[index])
                 logtext += log(f"Loaded {saves[index]} for all players.")
             else:
                 raise Exception
         except:
-            qgame.q.null()
-            logtext += log("Loaded RANDOMBOT for all players.")
+           qgame.q.null()
+           logtext += log("Loaded RANDOMBOT for all players.")
     else:
         qgame.q.null()
         for i in range(min(len(res), game.mdp.num_players)):
@@ -65,7 +65,7 @@ def load_bots(qgame, saves) -> str:
                 if index < 0 or index >= len(saves):
                     logtext += log(f"{i} is not a bot on the list.  Loading RANDOMBOT as player {i}.")
                 else:
-                    game.q.load(f'{shortname}/bots/dqn/' + saves[index], [i])
+                    game.q.load(f'{shortname}/bots/mcts/' + saves[index], [i])
             except:
                 logtext += log(f"Didn't understand {res[i]}.  Loading RANDOMBOT as player {i}.")
         if len(res) > game.mdp.num_players:
@@ -95,9 +95,9 @@ mdps = {
 }
 
 file_exts = {
-    'ttt': '.ttt.pt', 
-    'c4': '.c4.pt', 
-    'nothanks': 'nt.pt', 
+    'ttt': '.ttt.mcts', 
+    'c4': '.c4.mcts', 
+    'nothanks': 'nt.mcts', 
 }
 
 nnarchss = {
@@ -141,7 +141,7 @@ print(f"\nPlaying {name}.\n")
 #==================== LOAD SAVES ====================#
 
 
-save_files = [each for each in os.listdir(f'{shortname}/bots/dqn/') if each.endswith(file_ext)]
+save_files = [each for each in os.listdir(f'{shortname}/bots/mcts/') if each.endswith(file_ext)]
 #save_files = [f'{shortname}/bots/' + os.path.join(dp, f) for dp, dn, fn in os.walk(os.path.expanduser(f'{shortname}/bots/')) for f in fn if f.endswith(file_ext)]
 save_files.sort()
 
@@ -183,7 +183,7 @@ if mode == "train":
 
     res = input("Name of file (alphanumeric only, max length 64, w/o extension): ")
     fname_end = f"{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}_" + re.sub(r'\W+', '', res)[0:64] + f"{file_ext}"
-    fname = f'{shortname}/bots/dqn/' + fname_end
+    fname = f'{shortname}/bots/mcts/' + fname_end
 
     print(f"Will save model to {fname}\n")
 
@@ -200,7 +200,7 @@ if mode == "train":
 
     res = input("Load existing model (y/n)? ")
     if res.lower() == 'y':
-        game = DQN(mdp, torch.nn.Module, torch.nn.HuberLoss(), torch.optim.Adam, memory, device=device)
+        game = DMCTS(mdp, torch.nn.Module, torch.nn.HuberLoss(), torch.optim.Adam, memory, device=device)
         logtext += load_bots(game, save_files)
     else:
         print("No model pre-loaded.")
@@ -228,7 +228,7 @@ if mode == "train":
             except:
                 print(f"Not a valid value.  Setting {k} to {v}.")
 
-        game = DQN(mdp, model, torch.nn.HuberLoss(), torch.optim.Adam, memory_capacity=memory, model_args=model_args, device=device)
+        game = DMCTS(mdp, model, torch.nn.HuberLoss(), torch.optim.Adam, memory_capacity=memory, model_args=model_args, device=device)
     
     res = input("Penalize (pen) or prohibit (pro) invalid moves? (defualt prohbit) ")
     if res.lower() == "pen":
@@ -259,7 +259,6 @@ if mode == "train":
     
 if mode == "tournament":
     saves = save_files
-    game = DQN(mdp, None, torch.nn.HuberLoss(), torch.optim.Adam, memory_capacity=0, device=device)
     
     logtext = "Bot Tournament\n\nList of bots:\n"
     for i in range(len(saves)):
@@ -286,7 +285,7 @@ if mode == "tournament":
 
     for match in matches:
         for i in range(n):
-            game.q.load(f'{shortname}/bots/dqn/' + saves[match[i]], [i])
+            game.load(f'{shortname}/bots/mcts/' + saves[match[i]], [i])
         r = game.simulate()
         logtext += log(f"Result of match {match}: {r[0].int().tolist()}")
         for i in range(n):
@@ -329,7 +328,7 @@ if mode == "tournament":
 #==================== BOT SELECTION ====================#
 
 if mode == "play":
-    game = DQN(mdp, None, torch.nn.HuberLoss(), torch.optim.Adam, 0, device=device)
+    game = DMCTS(mdp, None, torch.nn.HuberLoss(), torch.optim.Adam, 0, device=device)
     load_bots(game, save_files)
 
 #==================== BENCHMARK AGAINST RANDOM ====================#
@@ -344,7 +343,7 @@ if mode == "benchmark":
         do_all = False
 
     if do_all == False:
-        game = DQN(mdp, None, torch.nn.HuberLoss(), torch.optim.Adam, 0, device=device)
+        game = DMCTS(mdp, None, torch.nn.HuberLoss(), torch.optim.Adam, 0, device=device)
         load_bots(game, save_files)
         replay = True if input("Enter 'y' to replay losses: ").lower() == 'y' else False
         game.simulate_against_random(sims, replay_loss=replay, verbose=True)
@@ -352,7 +351,7 @@ if mode == "benchmark":
         logtext = ""
         logtext += log(f"Simulating {name} against RANDOMBOT for {sims} simulations.")
         for i in range(1, len(save_files)):
-            game.load(f'{shortname}/bots/dqn/' + save_files[i])
+            game.load(f'{shortname}/bots/mcts/' + save_files[i])
             result = game.simulate_against_random(sims, replay_loss=False, verbose=False)
             logtext += log(f"")
             for j in range(len(result)):

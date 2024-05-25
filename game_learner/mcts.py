@@ -10,8 +10,11 @@ class MCTSQFunction(PrototypeQFunction):
     def __init__(self, mdp: TensorMDP, heuristic_model: nn.Module, model_args={}, device="cpu"):
         self.device = device
         self.mdp = mdp
-        self.h = heuristic_model(**model_args, **self.mdp.nn_args).to(self.device)
-        self.h.eval()
+        if heuristic_model != None:
+            self.h = heuristic_model(**model_args, **self.mdp.nn_args).to(self.device)
+            self.h.eval()
+        else:
+            self.h = None
 
         # Keys: hashable states.  Values: tensor with shape of actions
         self.n = {}
@@ -69,7 +72,7 @@ class MCTSQFunction(PrototypeQFunction):
 
     def policy(self, state: torch.Tensor, heuristic_parameter = 1., stochastic=False, valid_filter=True):
         if stochastic:
-            return self.mdp.get_random_action_weighted(self.get(state, heuristic_parameter=heuristic_parameter) * self.mdp.valid_action_filter(state))      # TODO q...?
+            return self.mdp.get_random_action_weighted(self.get(state, heuristic_parameter=heuristic_parameter) * self.mdp.valid_action_filter(state))
         else:
             return self.mdp.get_max_action(self.get(state, heuristic_parameter=heuristic_parameter) + self.mdp.neginf_kill_actions(state))
         
@@ -77,7 +80,7 @@ class MCTSQFunction(PrototypeQFunction):
         with open(fname + ".q", 'wb') as f:
             pickle.dump({'n': self.n, 'w': self.w, 'p': self.p}, f)
         model_scripted = torch.jit.script(self.h)
-        model_scripted.save(fname + ".h")
+        model_scripted.save(fname)
 
     def load(self, fname, indices=None):
         with open(fname + ".q", 'rb') as f:
@@ -85,7 +88,7 @@ class MCTSQFunction(PrototypeQFunction):
             self.n = load_dict['n']
             self.w = load_dict['w']
             self.p = load_dict['p']
-        self.h = torch.jit.load(fname + ".h", map_location=torch.device(self.device))
+        self.h = torch.jit.load(fname, map_location=torch.device(self.device))
     
     def null(self, indices = None):
         self.n, self.w, self.p = {}, {}, {}
@@ -160,6 +163,7 @@ class DMCTS(DeepRL):
             # Check for leaves and initialize dictionary
             in_index, out_index = self.in_dict_indices(s, self.q.n)
             new_leaves = s[out_index]
+            self.q.h.eval()
             ps = self.mdp.masked_softmax(self.q.h(new_leaves), new_leaves)
             for i in range(new_leaves.size(0)):
                 self.q.n[self.mdp.state_to_hashable(new_leaves[i])] = torch.zeros(self.mdp.action_shape, device=self.device)
@@ -226,74 +230,44 @@ class DMCTS(DeepRL):
         return p_vector
     
 
-    def mcts(self, lr: float, num_iterations: int, num_selfplay: int, num_searches: int, max_steps: int, ucb_parameter: float, temperature: float, train_batch: int, train_iterations = 1, save_path=None, verbose=True, initial_log=""):        
-        logtext = initial_log
+    def mcts(self, lr: float, wd: float, num_iterations: int, num_selfplay: int, num_searches: int, max_steps: int, ucb_parameter: float, temperature: float, train_batch: int, memory_size = 500000, save_path=None, verbose=True, initial_log=""):        
         
+        # Initialize logging
+        logtext = initial_log
         start_time = datetime.datetime.now()
         logtext += log(f"Started logging.")
-        
-        logtext += log(f"Learn rate: {lr}\nNumber of iterations: {num_iterations}\nNumber of self-plays per iteration: {num_selfplay}\nNumber of Monte-Carlo searches per play: {num_searches}\nUpper confidence bound parameter: {ucb_parameter}\nTemperature: {temperature}\nTraining batch size: {train_batch}\nTraining iteration interval: {train_iterations}")
+        logtext += log(f"Learn rate: {lr}\nWeight decay: {wd}\nNumber of iterations: {num_iterations}\nNumber of self-plays per iteration: {num_selfplay}\nNumber of Monte-Carlo searches per play: {num_searches}\nUpper confidence bound parameter: {ucb_parameter}\nTemperature: {temperature}\nTraining batch size: {train_batch}\nMemory size: {memory_size}")
 
+        # Initialize memory and records
+        memory_inputs = torch.zeros((0,) + self.mdp.state_shape, device=self.device)
+        memory_values = torch.zeros((0,) + self.mdp.action_shape)
+        opt = self.optimizer(self.q.h.parameters(), lr=lr,  weight_decay=wd)
         losses = []
 
-        training_inputs = []
-        training_values = []
 
-        # In each iteration, we simulate a certain number of self-plays, then we train on the resulting data
+        # In each iteration, we simulate a certain number of self-plays; we train at each step
         for i in range(num_iterations):
-            logtext += log(f"Iteration {i+1}", verbose)
-            opt = self.optimizer(self.q.h.parameters(), lr=lr)
 
-
+            # Initialize iteration state and statistics
+            logtext += log(f"Iteration {i+1} at time {datetime.datetime.now() - start_time}", verbose)
             s = self.mdp.get_initial_state(num_selfplay)
+            total_loss = 0.
+            num_train = 0.
 
-            # The probability vectors for each self-play
-            record_state = torch.tensor([], device=self.device)
-            record_p = torch.tensor([], device=self.device)
-
-            logtext += log(f"Self-plays at time {datetime.datetime.now() - start_time}", verbose)
             # Each step in the self-plays
             for step in range(max_steps):
-                
+
                 # Do searches
                 p_vector = self.search(s, ucb_parameter=ucb_parameter, num=num_searches, temperature=temperature)
 
-                # Add probability vector to record
-                record_state = torch.cat([record_state, s], dim=0)
-                record_p = torch.cat([record_p, p_vector], dim=0)
-                
-                # Select actions and do all the transitions
-                a = self.mdp.get_random_action_weighted(p_vector)
-                s, _ = self.mdp.transition(s, a)
+                # Train
+                memory_inputs = torch.cat([memory_inputs[-memory_size + s.size(0):], s], dim=0)
+                memory_values = torch.cat([memory_values[-memory_size + p_vector.size(0):], p_vector], dim=0)
 
-                # If state is terminal, then discard it
-                s = s[(~self.mdp.is_terminal(s)).flatten()]
-                # If there are no more states, break
-                if s.size(0) == 0:
-                    break
-                        
-            # TODO think about having the bot concede? might save some simulations
-
-            logtext += log(f"Training at {datetime.datetime.now() - start_time}", verbose)
-
-            training_inputs.append(record_state)
-            training_values.append(record_p)
-
-            # Do training on recent data
-            inputs = torch.cat(training_inputs[-train_iterations:])
-            values = torch.cat(training_values[-train_iterations:])
-            indices = list(range(inputs.size(0)))
-            total_loss = 0.
-            num_train = 0.
-            self.q.h.train()
-            for i in range(inputs.size(0)):
-                get_indices = random.sample(indices, min(len(indices), train_batch))
-                x = inputs[get_indices]
-               
-                # Already in range (0, 1)
-                y = values[get_indices]
-                
-                # Before softmax
+                indices = torch.randint(memory_inputs.size(0), (train_batch,))
+                x = memory_inputs[indices]
+                y = memory_values[indices]
+                self.q.h.train()
                 pred = self.q.h(x)
 
                 loss = self.loss_fn(pred.flatten(1, -1), y.flatten(1, -1))
@@ -304,7 +278,16 @@ class DMCTS(DeepRL):
                 total_loss += loss.item()
                 num_train += 1
 
-            self.q.h.eval()
+                # Select actions and do all the transitions
+                a = self.mdp.get_random_action_weighted(p_vector)
+                s, _ = self.mdp.transition(s, a)
+
+                # If state is terminal, then discard it
+                s = s[(~self.mdp.is_terminal(s)).flatten()]
+                # If there are no more states, end the iteration
+                if s.size(0) == 0:
+                    break
+            
             losses.append(total_loss / num_train)
             logtext += log(f"Loss: {total_loss/num_train} on {num_train} batches of size {min(len(indices), train_batch)}.", verbose)
 

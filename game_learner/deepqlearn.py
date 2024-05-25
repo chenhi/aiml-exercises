@@ -119,14 +119,14 @@ class NNQFunction(PrototypeQFunction):
         self.q.eval()
 
         return loss.item()
-    
+
 
 # A wrapper for Q functions for multiple players
 class NNQMultiFunction(PrototypeQFunction):
     def __init__(self, mdp: TensorMDP, q_model, model_args={}, device="cpu"):
         self.qs = [NNQFunction(mdp, q_model, model_args=model_args, device=device) for i in range(mdp.num_players)]
         self.mdp = mdp
-        self.device=device
+        self.device = device
 
     # If input action = None, then return the entire vector of action values of shape (batch, ) + action_shape
     # Otherwise, output shape (batch, )
@@ -175,8 +175,6 @@ class NNQMultiFunction(PrototypeQFunction):
                         load_file = zf.extract(f"player.{i}",  tmpdir)
                         self.qs[i].q = torch.jit.load(load_file, map_location=torch.device(self.device))
 
-
-
     def null(self, indices = None):
         for i in range(self.mdp.num_players):
             if indices == None or i in indices:
@@ -187,7 +185,7 @@ class NNQMultiFunction(PrototypeQFunction):
 # For now, for simplicity, fix a single strategy
 # Note that qs is policy_qs
 class DQN(DeepRL):
-    def __init__(self, mdp: TensorMDP, model: nn.Module, loss_fn, optimizer, memory_capacity: int, model_args = {}, device="cpu"):
+    def __init__(self, mdp: TensorMDP, model: nn.Module, loss_fn, optimizer, memory_capacity: int, model_args = {}, separate_models=True, device="cpu"):
         # An mdp that encodes the rules of the game.  The current player is part of the state, which is of the form (current player, actual state)
         # self.mdp = mdp
         # self.device = device
@@ -196,7 +194,10 @@ class DQN(DeepRL):
         # #self.qs = [NNQFunction(mdp, model, model_args=model_args, device=device) for i in range(mdp.num_players)]
         # self.q = NNQMultiFunction(mdp, model, model_args, device)
 
-        super().__init__(mdp, NNQMultiFunction(mdp, model, model_args, device), device)
+        if separate_models:
+            super().__init__(mdp, NNQMultiFunction(mdp, model, model_args, device), device)
+        else:
+            super().__init__(mdp, NNQFunction(mdp, model, model_args, device), device)
 
         self.memories = [ExperienceReplay(memory_capacity) for i in range(mdp.num_players)]
         self.memory_capacity = memory_capacity
