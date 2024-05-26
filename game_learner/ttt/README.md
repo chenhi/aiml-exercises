@@ -5,9 +5,7 @@ play more sophisticated games, we restrict our attention in this note to Tic-Tac
 
 # Monte-Carlo tree search (MCTS)
 
-In a 2017 paper[^SSS17], Silver, Julian Schrittwieser, Karen Simonyan, *et. al.* give an algorithm implemeting a Monte-Carlo tree search coupled with a neural network for a heuristic function.  This algorithm may be applied to any zero-sum perfect-information game.  The tree search is purely classical, and the game tree for Tic-Tac-Toe is small enough that it can be fully explored.  In particular, the heuristic function can be ignored, so this algorithm is easily able to train an optimal bot in under 5 minutes (and likely even less).
-
-However, some useful experience can still be gained on the toy example.  Namely, one can measure how closely the heuristic function, at the end of training, conforms to the value function (which is implemented as a dictionary), and how this changes as we vary hyperparameters.
+In a 2017 paper[^SSS17], Silver, Julian Schrittwieser, Karen Simonyan, *et. al.* give an algorithm implemeting a Monte-Carlo tree search coupled with a neural network for a heuristic function.  This algorithm may be applied to any zero-sum perfect-information game.  The tree search is purely classical, and the game tree for Tic-Tac-Toe is small enough that it can be fully explored in fairly short time.  However, in general the Q-data accumulated from the searches will be too large to keep, so for the purpose of this exercise our goal is to train the heuristic function so that it can play optimally after doing a small number of live searches.
 
 # Deep Q-networks (DQN)
 
