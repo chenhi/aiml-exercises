@@ -382,5 +382,5 @@ while True:
                 players.append(player_index)
         except:
             print(f"Didn't recognize {r.strip()}.  Using bot.")
-    game.play(players, verbose=True)
+    game.play(players, policy_args={'heuristic_parameter': 5, 'num_searches': 512, 'temperature': .3}, verbose=True)
     

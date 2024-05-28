@@ -171,7 +171,7 @@ class TensorMDP(MDP):
     def masked_softmax(self, input: torch.Tensor, state: torch.Tensor) -> torch.Tensor:
         return (input + self.neginf_kill_actions(state)).flatten(1, -1).softmax(dim=1).reshape((-1,) + self.action_shape)
     
-    # Chooses a valid action unifoirmly at random
+    # Chooses a valid action uniformly at random
     def get_random_action(self, state) -> torch.Tensor:
         return self.get_random_action_weighted(self.valid_action_filter(state).float())
     
@@ -235,16 +235,16 @@ class DeepRL():
         output += f"Action values, masked with softmax:\n{torch.softmax((self.q.get(state, None) + self.mdp.neginf_kill_actions(state)).flatten(1,-1), dim=1).reshape((-1,) + self.mdp.action_shape)}\n"
         return output
     
-    def play(self, human_players: list, verbose=False):
+    def play(self, human_players: list, policy_args = {}, verbose=False):
         s = self.mdp.get_initial_state()
         total_rewards = torch.zeros(1, self.mdp.num_players)
         while self.mdp.is_terminal(s).item() == False:
             p = int(self.mdp.get_player(s).item())
             print(f"\n{self.mdp.board_str(s)[0]}")
-            if verbose:
-                print(self.get_statistics(s))
-
+            
             if p in human_players:
+                if verbose:
+                    print(self.get_statistics(s))
                 res = input(self.mdp.input_str)
                 a = self.mdp.str_to_action(res)
                 if a == None:
@@ -252,7 +252,10 @@ class DeepRL():
                     continue
                 s, r = self.mdp.transition(s,a)
             else:
-                a = self.q.policy(s)
+                a = self.q.policy(s, **policy_args)
+                # Print statistics after action selection (can affect statistics)
+                if verbose:
+                    print(self.get_statistics(s))
                 print(f"Chosen action: {self.mdp.action_str(a)}\n")
                 if self.mdp.is_valid_action(s, a):
                     s, r = self.mdp.transition(s, a)
@@ -262,6 +265,8 @@ class DeepRL():
                     print(f"Randomly chosen action: \n{a.item()}.\n")
                     s, r = self.mdp.transition(s, a)
             total_rewards += r
+
+
             print(f"Rewards: {r.tolist()[0]}.")
             print(f"Aggregate rewards: {total_rewards.tolist()[0]}.")
         if r[0,p].item() == 1.:

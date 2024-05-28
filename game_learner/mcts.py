@@ -63,24 +63,31 @@ class MCTSQFunction(PrototypeQFunction):
         return q + heuristic_parameter * p * n_ratio        # TODO q is a value so can be negative... ???? also do we want "Get" to return N or ...?
     
 
-    # Only uses the heuristic function
-    def get(self, state: torch.Tensor, action = None, heuristic_parameter= 1., num_searches = 25):
+    # Will either:
+    # 1) Do some searches, then ???? # TODO default 1024 maybe should be 0??
+    # 2) Do no searches, and use only the heuristic function
+    def get(self, state: torch.Tensor, action = None, heuristic_parameter= 1., temperature=1., num_searches = 1024):
         #q, n_ratio = self.ucb_get_parts(state, get_p=False)
         #output = q + self.mdp.masked_softmax(self.h(state), state) * heuristic_parameter * n_ratio
         #output = self.mdp.masked_softmax(self.h(state), state)
-
-        p_vector = self.search(state, ucb_parameter=heuristic_parameter, num=num_searches, temperature=1.)
+        if num_searches > 0:
+            self.search(state, ucb_parameter=heuristic_parameter, num=num_searches, temperature=temperature)
+            q, _, p = self.ucb_get_parts(state)
+            # Omit the visit count, we don't want any exploration
+            vals = q + heuristic_parameter * p
+        else:
+            vals = self.h(state)
         if action == None:
-            return p_vector
+            return vals
         else:
-            return (action * p_vector).sum(tuple(range(1, action.dim())))
+            return (action * vals).sum(tuple(range(1, action.dim())))
 
 
-    def policy(self, state: torch.Tensor, heuristic_parameter = 1., stochastic=False, valid_filter=True, num_searches=25):
+    def policy(self, state: torch.Tensor, heuristic_parameter = 1., temperature=1., stochastic=False, valid_filter=True, num_searches=1024):
         if stochastic:
-            return self.mdp.get_random_action_weighted(self.get(state, heuristic_parameter=heuristic_parameter, num_searches=num_searches) * self.mdp.valid_action_filter(state))
+            return self.mdp.get_random_action_weighted(self.mdp.masked_softmax(self.get(state, heuristic_parameter=heuristic_parameter, temperature=temperature, num_searches=num_searches), state))
         else:
-            return self.mdp.get_max_action(self.get(state, heuristic_parameter=heuristic_parameter, num_searches=num_searches) + self.mdp.neginf_kill_actions(state))
+            return self.mdp.get_max_action(self.get(state, heuristic_parameter=heuristic_parameter, temperature=temperature, num_searches=num_searches) + self.mdp.neginf_kill_actions(state))
         
     # Only save and load the network (Q gets way too big)
     def save(self, fname):
@@ -178,7 +185,8 @@ class MCTSQFunction(PrototypeQFunction):
             num_valid = valid_actions.flatten(1, -1).sum(dim=1).reshape((-1,) + self.mdp.action_projshape)
 
             # The AlphaGo algorithm calls for argmax, but we will do random, because the node statistics are not updated in parallel for us
-            #action = self.mdp.get_max_action((1 + self.ucb_get(s, ucb_parameter * num_valid)) * valid_actions)
+            #action = self.mdp.get_max_action(self.ucb_get(s, ucb_parameter * num_valid), mask=valid_actions)
+            # Note that ucb_get is in the range [-1, infty)
             action = self.mdp.get_random_action_weighted((1 + self.ucb_get(s, ucb_parameter * num_valid)) * valid_actions)
             for i in range(action.size(0)):
                 self.n[self.mdp.state_to_hashable(s[i])] += action[i].to(device=self.dict_device)
@@ -252,20 +260,19 @@ class DMCTS(DeepRL):
         self.optimizer = optimizer
 
     def get_statistics(self, state: torch.Tensor) -> str:
-        #q, n_ratio = self.q.ucb_get_parts(state, get_p=False)
+        q, n_ratio = self.q.ucb_get_parts(state, get_p=False)
         h = self.q.h(state)
-        #output = f"Q values:\n{q}\n"
-        #output += f"Visits:\n{self.q.n[self.mdp.state_to_hashable(state)]}\n"
-        #output += f"Values:\n{self.q.w[self.mdp.state_to_hashable(state)]}\n"
-        #output += f"Visit factor:\n{1/n_ratio}\n"
-        output = f"Heuristic logit values:\n{h}\n"
+        statehash = self.mdp.state_to_hashable(state)
+        output = f"Q values:\n{q}\n"
+        output += f"Visit factor:\n{n_ratio}\n"
+        #output += f"Visits:\n{self.q.n[statehash] if statehash in self.q.n}\n"
+        output += f"Heuristic logit values:\n{h}\n"
         output += f"Heuristic values:\n{self.mdp.masked_softmax(h, state)}\n"
-        #output += f"Visit-tempered heuristic values:\n{h * n_ratio}\n"
-        #output += f"Action values, masked, with softmax:\n{torch.softmax((self.q.get(state, None) + self.mdp.neginf_kill_actions(state)).flatten(1,-1), dim=1).reshape((-1,) + self.mdp.action_shape)}\n"
+        #output += f"Action values:\n{self.q.get(state, None)}\n"
         return output
 
     # Returns average rewards TODO need to permute players...
-    def compare_models(self, models, num_plays, num_searches, ucb_parameter, temperature=1.):
+    def compare_models(self, models, num_plays, num_searches, ucb_parameter):
         if self.mdp.num_players > 2:
             raise NotImplementedError
         
@@ -278,8 +285,8 @@ class DMCTS(DeepRL):
             
             # Actions
             a = torch.zeros((s.size(0),) + self.mdp.action_shape)
-            a[player_index == 0] = models[0].policy(s[player_index == 0], heuristic_parameter=ucb_parameter, num_searches=num_searches, stochastic=True)
-            a[player_index == 1] = models[1].policy(s[player_index == 1], heuristic_parameter=ucb_parameter, num_searches=num_searches, stochastic=True)
+            a[player_index == 0] = models[0].policy(s[player_index == 0], heuristic_parameter=ucb_parameter, temperature=.1, num_searches=num_searches, stochastic=True)
+            a[player_index == 1] = models[1].policy(s[player_index == 1], heuristic_parameter=ucb_parameter, temperature=.1, num_searches=num_searches, stochastic=True)
             s, r = self.mdp.transition(s, a)
             rewards += r
             
@@ -291,7 +298,7 @@ class DMCTS(DeepRL):
 
 
 
-    def mcts(self, lr: float | list[tuple], wd: float, num_iterations: int, num_episodes: int, num_selfplay: int, num_searches: int, max_steps: int, ucb_parameter: float, temperature: float, train_batch: int, tournament_length: int, tournament_searches: int, train_times = 1, memory_size = 500000, dethrone_threshold = .1, save_path=None, verbose=True, save_intermediate_models = False, initial_log=""):        
+    def mcts(self, lr: float | list[tuple], wd: float, num_iterations: int, num_episodes: int, num_selfplay: int, num_searches: int, max_steps: int, ucb_parameter: float, temperature: float, train_batch: int, tournament_length: int, tournament_searches: int, train_times = 1, memory_size = 500000, dethrone_threshold = .1, save_path=None, verbose=True, initial_log=""):        
         
         # Initialize logging
         logtext = initial_log
@@ -306,30 +313,41 @@ class DMCTS(DeepRL):
 
 
         opt = self.optimizer(self.q.h.parameters(), lr=lr,  weight_decay=wd)
-        best_models = []
 
-        # In each iteration, we simulate a certain number of self-plays; we train at each step
+        # Initialize memory and records; memory persists across iterations, losses reset on new model
+        memory_inputs = torch.zeros((0,) + self.mdp.state_shape, device=self.device)
+        memory_values = torch.zeros((0,) + self.mdp.action_shape, device=self.device)
+        losses = []
+        sim_changes = []
+        generation_model = copy.deepcopy(self.q)
+
+        # Versions with no dictionaries
+        temp_gen_model = copy.deepcopy(self.q)
+        temp_cur_model = copy.deepcopy(self.q)
+
+        model_num_iterations = 0
+        
+        # At the end of each iteration, we evaluate the current model against the generation (self-play) model
         for i in range(num_iterations):
-
-            # Initialize memory and records
-            memory_inputs = torch.zeros((0,) + self.mdp.state_shape, device=self.device)
-            memory_values = torch.zeros((0,) + self.mdp.action_shape, device=self.device)
-            losses = []
+            
             logtext += log(f"Iteration {i+1} at time {datetime.datetime.now() - start_time}", verbose)
+            model_num_iterations = 1
 
+            # In each episode, we simulate a certain number of self-plays; we train at each step
             for ep in range(num_episodes):
 
-                # Initialize iteration state and loss statistics, reset tree statistics
+                # Initialize iteration state and loss statistics
                 logtext += log(f"Iteration {i+1}, episode {ep+1} at time {datetime.datetime.now() - start_time}", verbose)
                 s = self.mdp.get_initial_state(num_selfplay)
                 total_loss = 0.
                 num_train = 0.
+                
 
-                # Each step in the self-plays
+                # Generate data via self-plays and the generation model
                 for _ in range(max_steps):
 
                     # Do searches
-                    p_vector = self.q.search(s, ucb_parameter=ucb_parameter, num=num_searches, temperature=temperature)
+                    p_vector = generation_model.search(s, ucb_parameter=ucb_parameter, num=num_searches, temperature=temperature)
 
                     # Add to record
                     memory_inputs = torch.cat([memory_inputs[-memory_size + s.size(0):], s], dim=0)
@@ -345,12 +363,7 @@ class DMCTS(DeepRL):
                     if s.size(0) == 0:
                         break
 
-                    # Clean up memory
-                    # if self.device == "cuda":
-                    #     del p_vector
-                    #     torch.cuda.empty_cache()
-
-                    # Train
+                    # Train the current model
                     for _ in range(train_times):
                         indices = torch.randint(memory_inputs.size(0), (train_batch,), device=self.device)
                         x = memory_inputs[indices]
@@ -366,50 +379,29 @@ class DMCTS(DeepRL):
                         total_loss += loss.item()
                         num_train += 1
 
-                    
-                    # Clean up memory
-                    # if self.device == "cuda":
-                    #     torch.cuda.empty_cache()
-                
+
+                # At end of episode, calculate losses
                 losses.append(total_loss / num_train)
                 logtext += log(f"Input/value memory sizes: {memory_inputs.size(0)}/{memory_values.size(0)}", verbose)
                 logtext += log(f"Loss: {total_loss/num_train} on {num_train} batches of size {min(len(indices), train_batch)}.", verbose)
 
 
-            # Compare models at end of episode
+            # Evaluate models at the end of an iteration
             logtext += log(f"\nEvaluating models at end of iteration with {tournament_length} matches and {tournament_searches} searches.", verbose)
-            best_models.append(self.q)
-            if len(best_models) < self.mdp.num_players:
-                logtext += log(f"Not enough existing models.  Model saved.")
-                model_action = "(saved by default)"
+            # We want to delete Q data, so we need to take a copy
+            temp_gen_model.h = generation_model.h
+            temp_cur_model.h = self.q.h
+            temp_gen_model.null_q()
+            temp_cur_model.null_q()
+            win_ratios = self.compare_models([temp_gen_model, temp_cur_model], num_plays=tournament_length, num_searches=tournament_searches, ucb_parameter=ucb_parameter)
+            
+            if win_ratios[1] - win_ratios[0] > dethrone_threshold:
+                logtext += log(f"Replacing old self-play model; rewards {win_ratios}.")
+                generation_model.h = copy.deepcopy(self.q.h)
+                sim_changes.append(len(losses))
             else:
-                win_ratios = self.compare_models(best_models, num_plays=tournament_length, num_searches=tournament_searches, ucb_parameter=ucb_parameter)
-                worst = min(win_ratios)
-                worst_index = min(range(len(win_ratios)), key=win_ratios.__getitem__)
-                if win_ratios[-1] - worst > dethrone_threshold:
-                    defeated = best_models.pop(worst_index)
-                    logtext += log(f"Replacing old model; rewards {win_ratios}.")
-                    if save_intermediate_models:
-                        defeated.save(f"{save_path}.{i}")
-                        logtext += log(f"Saved historic model to {save_path}.{i}", verbose)      
-                    model_action = "(saved)"
-                else:
-                    logtext += log(f"Discarding new model; rewards {win_ratios}.")
-                    model_action = "(discarded)"
-                
-            # Copy heuristic function, reset tree statistics
-            self.q = copy.deepcopy(best_models[-1])
-            self.q.null_q()
+                logtext += log(f"Keeping old self-play model; rewards {win_ratios}.")
 
-            # Plot losses
-            plt.figure(figsize=(12, 12))
-            plt.subplot(1, 1, 1)
-            plt.plot(range(num_episodes), losses, label=f'Loss')
-            plt.legend(loc='lower left')
-            plt.title(f'Training Loss for Iteration {i+1} {model_action}')
-            plotpath = save_path + f".losses.{i+1}.png"
-            plt.savefig(plotpath)
-            logtext += log(f"Saved loss plot for iteration {i+1} to {plotpath}", verbose)
 
             logtext += log("\n", verbose)
 
@@ -419,6 +411,19 @@ class DMCTS(DeepRL):
         if save_path != None:
             self.q.save(save_path)
             logtext += log(f"Saved model to {save_path}", verbose)
+
+            # Plot losses
+            plt.figure(figsize=(12, 12))
+            plt.subplot(1, 1, 1)
+            plt.plot(range(len(losses)), losses, label=f'Loss')
+            plt.legend(loc='lower left')
+            plt.title(f'Training Loss')
+            for l in sim_changes:
+                plt.axvline(l, linestyle=':', color='r')
+
+            plotpath = save_path + f".losses.png"
+            plt.savefig(plotpath)
+            logtext += log(f"Saved loss plot to {plotpath}", verbose)
 
             logpath = save_path + ".log"
             with open(logpath, "w") as f:

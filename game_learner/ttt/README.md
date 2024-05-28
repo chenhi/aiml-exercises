@@ -7,6 +7,15 @@ play more sophisticated games, we restrict our attention in this note to Tic-Tac
 
 In a 2017 paper[^SSS17], Silver, Julian Schrittwieser, Karen Simonyan, *et. al.* give an algorithm implemeting a Monte-Carlo tree search coupled with a neural network for a heuristic function.  This algorithm may be applied to any zero-sum perfect-information game.  The tree search is purely classical, and the game tree for Tic-Tac-Toe is small enough that it can be fully explored in fairly short time.  However, in general the Q-data accumulated from the searches will be too large to keep, so for the purpose of this exercise our goal is to train the heuristic function so that it can play optimally after doing a small number of live searches.
 
+We make a few modifications to the AlphaZero algorithm.
++ Due to computational limitations, we are only able to train one model at a time.  However, we still keep the historically best performing to use for data generation.
++ For now, we do not anneal temperature nor learning rate.
++ In AlphaZero, the initial tree search before reaching leaves is done by choosing the maximum upper confidence bound value.  Because the algorithm is parallelized, the tree statistics are updated asynchronously; for us, we only parallelize the tensor calculations and the tree statistics are updated together.  So, choosing the maximum value for us would mean every self-play would make the same choice.  To side-step this issue, we choose actions stochastically.  Note that Q+UCB value does not readily admit an interpretation as a probability, so we add 1 to its value.  Also note that UCB has unbounded positive theoretical value, though it will tend toward zero asymptotically.
+
+## Upper confidence bound
+
+The 
+
 # Deep Q-networks (DQN)
 
 In a 2015 paper[^MKS15], Minh, Kavukcuoglu, Silver *et. al.* give an algorithm for using neural networks within a Q-learning algorithm (DQN) to train bots to play various player vs. environment (PvE) games on the Atari video game platform.  The same algorithms may be readily adapted to PvP games by giving each player their own Q-function, with each player considering the other players as part of the environment.  Unlike the PvE setting, the "environment" is now no longer given by a static and fixed (stochastic) Markov decision process, but one which evolves along with the player.  We do not investigate whether the theoretical assumptions justifying Q-learning remain valid in this set-up, but experimentally we find that the algorithm is still able to train good bots.
