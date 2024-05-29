@@ -66,15 +66,18 @@ class MCTSQFunction(PrototypeQFunction):
     # Will either:
     # 1) Do some searches, then ???? # TODO default 1024 maybe should be 0??
     # 2) Do no searches, and use only the heuristic function
-    def get(self, state: torch.Tensor, action = None, heuristic_parameter= 1., temperature=1., num_searches = 1024):
-        #q, n_ratio = self.ucb_get_parts(state, get_p=False)
-        #output = q + self.mdp.masked_softmax(self.h(state), state) * heuristic_parameter * n_ratio
-        #output = self.mdp.masked_softmax(self.h(state), state)
+    def get(self, state: torch.Tensor, action = None, heuristic_parameter= 1., temperature=1., num_searches = 1024, exploration=False):
+        
         if num_searches > 0:
+            
             self.search(state, ucb_parameter=heuristic_parameter, num=num_searches, temperature=temperature)
-            q, _, p = self.ucb_get_parts(state)
+            
             # Omit the visit count, we don't want any exploration
-            vals = q + heuristic_parameter * p
+            if exploration:
+                vals = self.ucb_get(state)
+            else:
+                q, _, p = self.ucb_get_parts(state)
+                vals = q + heuristic_parameter * p
         else:
             vals = self.h(state)
         if action == None:
@@ -83,11 +86,11 @@ class MCTSQFunction(PrototypeQFunction):
             return (action * vals).sum(tuple(range(1, action.dim())))
 
 
-    def policy(self, state: torch.Tensor, heuristic_parameter = 1., temperature=1., stochastic=False, valid_filter=True, num_searches=1024):
+    def policy(self, state: torch.Tensor, heuristic_parameter = 1., temperature=1., stochastic=False, valid_filter=True, num_searches=1024, exploration=False):
         if stochastic:
-            return self.mdp.get_random_action_weighted(self.mdp.masked_softmax(self.get(state, heuristic_parameter=heuristic_parameter, temperature=temperature, num_searches=num_searches), state))
+            return self.mdp.get_random_action_weighted(self.mdp.masked_softmax(self.get(state, heuristic_parameter=heuristic_parameter, temperature=temperature, num_searches=num_searches, exploration=exploration), state))
         else:
-            return self.mdp.get_max_action(self.get(state, heuristic_parameter=heuristic_parameter, temperature=temperature, num_searches=num_searches) + self.mdp.neginf_kill_actions(state))
+            return self.mdp.get_max_action(self.get(state, heuristic_parameter=heuristic_parameter, temperature=temperature, num_searches=num_searches, exploration=exploration) + self.mdp.neginf_kill_actions(state))
         
     # Only save and load the network (Q gets way too big)
     def save(self, fname):
@@ -115,6 +118,12 @@ class MCTSQFunction(PrototypeQFunction):
 
     def null_q(self):
         self.n, self.w, self.p = {}, {}, {}
+
+    # Swaps Q dictionaries out for new ones
+    def swap_q(self, new_n = {}, new_w = {}, new_p = {}):
+        temp_n, temp_w, temp_p = self.n, self.w, self.p
+        self.n, self.w, self.p = new_n, new_w, new_p
+        return temp_n, temp_w, temp_p
         
 
     # Helper function
@@ -272,7 +281,7 @@ class DMCTS(DeepRL):
         return output
 
     # Returns average rewards TODO need to permute players...
-    def compare_models(self, models, num_plays, num_searches, ucb_parameter):
+    def compare_models(self, models, num_plays, num_searches, ucb_parameter, temperature):
         if self.mdp.num_players > 2:
             raise NotImplementedError
         
@@ -285,8 +294,8 @@ class DMCTS(DeepRL):
             
             # Actions
             a = torch.zeros((s.size(0),) + self.mdp.action_shape, device=self.device)
-            a[player_index == 0] = models[0].policy(s[player_index == 0], heuristic_parameter=ucb_parameter, temperature=.1, num_searches=num_searches, stochastic=True)
-            a[player_index == 1] = models[1].policy(s[player_index == 1], heuristic_parameter=ucb_parameter, temperature=.1, num_searches=num_searches, stochastic=True)
+            a[player_index == 0] = models[0].policy(s[player_index == 0], heuristic_parameter=ucb_parameter, temperature=temperature, num_searches=num_searches, stochastic=True)
+            a[player_index == 1] = models[1].policy(s[player_index == 1], heuristic_parameter=ucb_parameter, temperature=temperature, num_searches=num_searches, stochastic=True)
             s, r = self.mdp.transition(s, a)
             rewards += r
             
@@ -320,19 +329,12 @@ class DMCTS(DeepRL):
         losses = []
         sim_changes = []
         generation_model = copy.deepcopy(self.q)
-
-        # Versions with no dictionaries
-        temp_gen_model = copy.deepcopy(self.q)
-        temp_cur_model = copy.deepcopy(self.q)
-
-        model_num_iterations = 0
         
         # At the end of each iteration, we evaluate the current model against the generation (self-play) model
         for i in range(num_iterations):
             
             logtext += log(f"[{datetime.datetime.now() - start_time}] Iteration {i+1} starting", verbose)
-            model_num_iterations = 1
-
+            
             # In each episode, we simulate a certain number of self-plays; we train at each step
             for ep in range(num_episodes):
                 
@@ -353,8 +355,8 @@ class DMCTS(DeepRL):
                     p_vector = generation_model.search(s, ucb_parameter=ucb_parameter, num=num_searches, temperature=temperature)
 
                     # Add to record
-                    memory_inputs = torch.cat([memory_inputs[-memory_size + s.size(0):], s], dim=0)
-                    memory_values = torch.cat([memory_values[-memory_size + p_vector.size(0):], p_vector], dim=0)
+                    memory_inputs = torch.cat([memory_inputs[min(-memory_size + s.size(0), -1):], s], dim=0)
+                    memory_values = torch.cat([memory_values[min(-memory_size + p_vector.size(0), -1):], p_vector], dim=0)
 
                     # Select actions and do all the transitions
                     a = self.mdp.get_random_action_weighted(p_vector)
@@ -391,13 +393,14 @@ class DMCTS(DeepRL):
 
             # Evaluate models at the end of an iteration
             logtext += log(f"\nEvaluating models at end of iteration with {tournament_length} matches and {tournament_searches} searches.", verbose)
-            # We want to delete Q data, so we need to take a copy
-            temp_gen_model.h = generation_model.h
-            temp_cur_model.h = self.q.h
-            temp_gen_model.null_q()
-            temp_cur_model.null_q()
-            win_ratios = self.compare_models([temp_gen_model, temp_cur_model], num_plays=tournament_length, num_searches=tournament_searches, ucb_parameter=ucb_parameter)
-            
+            # We want to delete Q data, so we need temporarily take them out
+            temp_n, temp_w, temp_p = generation_model.swap_q()
+            self.q.null_q()
+            # Compare the models using the ending temperature (not current)
+            win_ratios = self.compare_models([generation_model, self.q], num_plays=tournament_length, num_searches=tournament_searches, ucb_parameter=ucb_parameter, temperature=temperature_end)
+            # Put back
+            generation_model.swap_q(temp_n, temp_w, temp_p)
+
             if win_ratios[1] - win_ratios[0] > dethrone_threshold:
                 logtext += log(f"Replacing self-play model; rewards {win_ratios}.")
                 generation_model.h = copy.deepcopy(self.q.h)
