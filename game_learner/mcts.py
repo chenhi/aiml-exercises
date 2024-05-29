@@ -298,7 +298,7 @@ class DMCTS(DeepRL):
 
 
 
-    def mcts(self, lr: float | list[tuple], wd: float, num_iterations: int, num_episodes: int, num_selfplay: int, num_searches: int, max_steps: int, ucb_parameter: float, temperature: float, train_batch: int, tournament_length: int, tournament_searches: int, train_times = 1, memory_size = 500000, dethrone_threshold = .1, save_path=None, verbose=True, initial_log=""):        
+    def mcts(self, lr: float | list[tuple], wd: float, num_iterations: int, num_episodes: int, num_selfplay: int, num_searches: int, max_steps: int, ucb_parameter: float, temperature_start: float, temperature_end, train_batch: int, tournament_length: int, tournament_searches: int, train_times = 1, memory_size = 500000, dethrone_threshold = .1, save_path=None, verbose=True, initial_log=""):        
         
         # Initialize logging
         logtext = initial_log
@@ -309,7 +309,7 @@ class DMCTS(DeepRL):
         logtext += log(f"Model:\n{self.q.h}", verbose)
         logtext += log(f"Loss function:\n{self.loss_fn}", verbose)
         logtext += log(f"Optimizer:\n{self.optimizer}", verbose)
-        logtext += log(f"Learn rate: {lr}\nWeight decay: {wd}\nNumber of iterations: {num_iterations}\nNumber of self-plays per iteration: {num_selfplay}\nNumber of Monte-Carlo searches per play: {num_searches}\nUpper confidence bound parameter: {ucb_parameter}\nTemperature: {temperature}\nTraining batch size: {train_batch}\nMemory size: {memory_size}\n", verbose)
+        logtext += log(f"Learn rate: {lr}\nWeight decay: {wd}\nNumber of iterations: {num_iterations}\nNumber of self-plays per iteration: {num_selfplay}\nNumber of Monte-Carlo searches per play: {num_searches}\nUpper confidence bound parameter: {ucb_parameter}\nStarting/ending temperature: {temperature_start}/{temperature_end}\nEvaluation plays/searches: {tournament_length}/{tournament_searches}\nReplacement threshold: {dethrone_threshold}\nTraining batch size/times: {train_batch}/{train_times}\nMemory size: {memory_size}\n", verbose)
 
 
         opt = self.optimizer(self.q.h.parameters(), lr=lr,  weight_decay=wd)
@@ -330,18 +330,21 @@ class DMCTS(DeepRL):
         # At the end of each iteration, we evaluate the current model against the generation (self-play) model
         for i in range(num_iterations):
             
-            logtext += log(f"Iteration {i+1} at time {datetime.datetime.now() - start_time}", verbose)
+            logtext += log(f"[{datetime.datetime.now() - start_time}] Iteration {i+1} starting", verbose)
             model_num_iterations = 1
 
             # In each episode, we simulate a certain number of self-plays; we train at each step
             for ep in range(num_episodes):
+                
+                # Set temperature
+                agg_ep = (i / num_iterations) + (ep / (num_episodes * num_iterations))
+                temperature = temperature_end * (agg_ep) + temperature_start * (1 - agg_ep)
 
                 # Initialize iteration state and loss statistics
-                logtext += log(f"Iteration {i+1}, episode {ep+1} at time {datetime.datetime.now() - start_time}", verbose)
+                logtext += log(f"[{datetime.datetime.now() - start_time}] Iteration {i+1}, episode {ep+1}, temperature {temperature}", verbose)
                 s = self.mdp.get_initial_state(num_selfplay)
                 total_loss = 0.
                 num_train = 0.
-                
 
                 # Generate data via self-plays and the generation model
                 for _ in range(max_steps):
@@ -396,11 +399,11 @@ class DMCTS(DeepRL):
             win_ratios = self.compare_models([temp_gen_model, temp_cur_model], num_plays=tournament_length, num_searches=tournament_searches, ucb_parameter=ucb_parameter)
             
             if win_ratios[1] - win_ratios[0] > dethrone_threshold:
-                logtext += log(f"Replacing old self-play model; rewards {win_ratios}.")
+                logtext += log(f"Replacing self-play model; rewards {win_ratios}.")
                 generation_model.h = copy.deepcopy(self.q.h)
                 sim_changes.append(len(losses))
             else:
-                logtext += log(f"Keeping old self-play model; rewards {win_ratios}.")
+                logtext += log(f"Keeping self-play model; rewards {win_ratios}.")
 
 
             logtext += log("\n", verbose)
