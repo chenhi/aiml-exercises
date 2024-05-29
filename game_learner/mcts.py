@@ -284,7 +284,7 @@ class DMCTS(DeepRL):
             player_index = (self.mdp.get_player(s).flatten() + torch.arange(s.size(0), device=self.device)) % 2
             
             # Actions
-            a = torch.zeros((s.size(0),) + self.mdp.action_shape)
+            a = torch.zeros((s.size(0),) + self.mdp.action_shape, device=self.device)
             a[player_index == 0] = models[0].policy(s[player_index == 0], heuristic_parameter=ucb_parameter, temperature=.1, num_searches=num_searches, stochastic=True)
             a[player_index == 1] = models[1].policy(s[player_index == 1], heuristic_parameter=ucb_parameter, temperature=.1, num_searches=num_searches, stochastic=True)
             s, r = self.mdp.transition(s, a)
