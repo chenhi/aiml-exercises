@@ -13,9 +13,10 @@ draw_tensor_model:
 
 game_learner:
 * Write some general classes for training an AI to play games using Q learning. (done)
-* Train a bot to play tic-tac-toe using Q learning and experiment with hyperparameters.
-* Train a bot to play Connect 4 using deep Q learning (partially trained on the cloud).
-* TODO: Do the same but with Monte Carlo search trees.
+* Experiment with DQN hyperparameters in toy example tic-tac-toe.
+* Train a good bot to play Connect 4 using DQN on the cloud (in progress).
+* Experiment with AlphaZero MCTS algorithms in toy exampl tic-tac-toe (in progress).
+* Train a good bot to play Connect 4 using MCTS on the cloud (todo).
 
 tensor_puzzles:
 * Learn how to broadcast with numpy arrays.
