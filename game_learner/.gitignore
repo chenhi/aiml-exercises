@@ -3,6 +3,7 @@ logs/*
 writeups/*
 old/*
 *_test.py
+.venv/
 
 ttt/bots/*
 !ttt/bots/dqn

@@ -11,7 +11,7 @@ import datetime
 
 import models_pytorch as ptm
 import models_tensorflow as tfm
-from aux import log, tf_summary_string
+from util import log, tf_summary_string
 
 #################### TRAINING LIST AND OPTIONS ####################
 
